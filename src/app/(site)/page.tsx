@@ -6,12 +6,10 @@ import HeroCarousel, { type HeroStatus } from '@/components/content/HeroCarousel
 import WeatherCard from '@/components/home/WeatherCard';
 import FinanceCard from '@/components/home/FinanceCard';
 import SportsCard from '@/components/home/SportsCard';
-import LocalNewsCard, { type LocalNewsItem } from '@/components/home/LocalNewsCard';
 import StoryCard from '@/components/content/StoryCard';
 import { PREFS_CHANGED_EVENT } from '@/components/layout/PersonalizePopup';
 import { api, handleImgError, resolveImageUrl } from '@/lib/api';
 import { storeSelectedArticle, trackView } from '@/lib/article';
-import { getGeoLocation } from '@/lib/geo';
 import { useAuth } from '@/lib/auth';
 import {
   articleTypeOf,
@@ -66,10 +64,6 @@ export default function HomePage() {
   const [nlMsg, setNlMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [nlSubmitting, setNlSubmitting] = useState(false);
 
-  // Local news — auto-resolved from the same location the weather card uses.
-  const [localItems, setLocalItems] = useState<LocalNewsItem[]>([]);
-  const [localLabel, setLocalLabel] = useState('');
-  const [localLoading, setLocalLoading] = useState(true);
   const didLoad = useRef(false);
   const lastPlacementLoad = useRef(0); // ms epoch of the last successful feed load
 
@@ -100,31 +94,6 @@ export default function HomePage() {
       /* ignore */
     }
   }, []);
-
-  // ---- Local news -----------------------------------------------------------
-
-  const fetchLocalNews = useCallback(
-    async (params: Record<string, string>, label: string) => {
-      try {
-        // NOTE: no `limit` param — the backend caps at 12. The backend also
-        // widens to nearby cities when the exact location has no stories.
-        const qs = new URLSearchParams(params).toString();
-        const data = await api.get<{
-          success?: boolean;
-          location?: { city?: string; region?: string; country?: string; nearby?: boolean };
-          stories?: LocalNewsItem[];
-        }>(`/api/local-news?${qs}`, { auth: false });
-        setLocalItems(data.stories || []);
-        // Prefer the backend-resolved location name (may be a nearby city).
-        setLocalLabel(data.location?.city || label);
-      } catch {
-        setLocalItems([]);
-      } finally {
-        setLocalLoading(false);
-      }
-    },
-    [],
-  );
 
   // ---- Initial data load ----------------------------------------------------
 
@@ -169,16 +138,8 @@ export default function HomePage() {
       /* ignore */
     }
 
-    // Local news: reuse the same location the weather card resolves (no prompt),
-    // then load stories for that area. getGeoLocation never rejects — it falls
-    // back to IP/default — so this always resolves to a usable lat/lon.
-    void (async () => {
-      const geo = await getGeoLocation();
-      await fetchLocalNews({ lat: String(geo.lat), lon: String(geo.lon) }, geo.city);
-    })();
-
     void loadPlacement();
-  }, [loadPlacement, fetchLocalNews]);
+  }, [loadPlacement]);
 
   // ---- Auto-refresh every 6 hours (PST 12AM/6AM/12PM/6PM) -------------------
   // The backend regenerates the locked portal layout at those PST boundaries, so
@@ -346,32 +307,6 @@ export default function HomePage() {
           })}
         </div>
       </div>
-
-      {/* Local news — auto-resolved, article-card format. Hidden entirely when
-          neither local nor nearby stories are available. */}
-      {localLoading ? (
-        <section>
-          <div className="section-header">
-            <h2 className="section-title">Local News</h2>
-          </div>
-          <div className="content-grid" style={{ justifyContent: 'flex-start' }}>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="content-card skeleton" style={{ height: 304 }} />
-            ))}
-          </div>
-        </section>
-      ) : localItems.length > 0 ? (
-        <section>
-          <div className="section-header">
-            <h2 className="section-title">Local News{localLabel ? ` — ${localLabel}` : ''}</h2>
-          </div>
-          <div className="content-grid" style={{ justifyContent: 'flex-start' }}>
-            {localItems.map((item, i) => (
-              <LocalNewsCard key={item.link || i} item={item} />
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       {/* Current events feed */}
       <section>
