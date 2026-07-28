@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="JubileeVerse Sports - Live scores, results, and upcoming matches">
+    <title>Sports - JubileeVerse</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1b1b1b;
+            --bg-secondary: #242424;
+            --bg-tertiary: #2d2d2d;
+            --bg-card: #2d2d2d;
+            --text-primary: #ffffff;
+            --text-secondary: #c4c4c4;
+            --text-muted: #8a8a8a;
+            --accent-gold: #E6AC00;
+            --accent-gold-hover: #F5C518;
+            --accent-blue: #0078d4;
+            --accent-green: #107c10;
+            --accent-red: #d13438;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --header-height: 48px;
+            --card-radius: 8px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            height: var(--header-height);
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 10px;
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+        }
+        .logo-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: #ffffff;
+        }
+        .logo-text span { color: var(--accent-gold); font-weight: 400; }
+        .logo-text .logo-verse { color: var(--accent-gold); }
+        .logo-text .logo-dotcom { color: #ffffff; }
+        .back-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--accent-gold); }
+        .back-link svg { width: 16px; height: 16px; }
+
+        /* Sports page layout */
+        .sports-page {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 16px;
+        }
+
+        /* Loading */
+        .sports-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+            gap: 16px;
+        }
+        .sports-loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: var(--accent-gold);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* League tabs */
+        .league-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            padding-bottom: 4px;
+        }
+        .league-tabs::-webkit-scrollbar { display: none; }
+        .league-tab {
+            flex-shrink: 0;
+            padding: 8px 20px;
+            border-radius: 24px;
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .league-tab:hover {
+            border-color: var(--accent-gold);
+            color: var(--text-primary);
+        }
+        .league-tab.active {
+            background: var(--accent-gold);
+            color: #000;
+            border-color: var(--accent-gold);
+            font-weight: 600;
+        }
+        .league-tab-icon { font-size: 16px; }
+
+        /* Section title */
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-title-icon { font-size: 24px; }
+        .section-title-badge {
+            font-size: 11px;
+            background: var(--accent-gold);
+            color: #000;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        /* Match cards */
+        .matches-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 32px;
+        }
+        .match-card {
+            background: var(--bg-card);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+        .match-card:hover {
+            border-color: rgba(255,255,255,0.2);
+        }
+        .match-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px 0;
+        }
+        .match-card-league {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .match-card-status {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        .match-card-status.completed {
+            color: var(--text-secondary);
+            background: rgba(255,255,255,0.05);
+        }
+        .match-card-status.live {
+            color: #fff;
+            background: var(--accent-red);
+            animation: pulse 2s infinite;
+        }
+        .match-card-status.upcoming {
+            color: var(--accent-gold);
+            background: rgba(230,172,0,0.1);
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .match-card-body {
+            padding: 12px 16px 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .match-team {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .match-team.right {
+            flex-direction: row-reverse;
+            text-align: right;
+        }
+        .match-team-flag {
+            font-size: 28px;
+            line-height: 1;
+            width: 36px;
+            text-align: center;
+        }
+        .match-team-info {
+            display: flex;
+            flex-direction: column;
+        }
+        .match-team-name {
+            font-size: 15px;
+            font-weight: 600;
+        }
+        .match-team-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .match-score-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 80px;
+        }
+        .match-scores {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .match-score {
+            font-size: 24px;
+            font-weight: 700;
+            min-width: 36px;
+            text-align: center;
+        }
+        .match-score-overs {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+        .match-vs {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .match-result {
+            font-size: 12px;
+            color: var(--accent-gold);
+            text-align: center;
+            padding: 0 16px 10px;
+        }
+        /* Upcoming match center */
+        .match-upcoming-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 100px;
+            gap: 2px;
+        }
+        .match-upcoming-date {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent-gold);
+        }
+        .match-upcoming-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .match-upcoming-venue {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-align: center;
+            max-width: 140px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Standings table */
+        .standings-card {
+            background: var(--bg-card);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            margin-bottom: 32px;
+        }
+        .standings-title {
+            padding: 14px 16px;
+            font-size: 16px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .standings-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .standings-table th {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 500;
+        }
+        .standings-table th:not(:first-child) { text-align: center; }
+        .standings-table td {
+            padding: 10px 12px;
+            font-size: 13px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .standings-table td:not(:first-child) { text-align: center; color: var(--text-secondary); }
+        .standings-table tr:last-child td { border-bottom: none; }
+        .standings-table tr:hover { background: rgba(255,255,255,0.03); }
+        .standings-team {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .standings-pos {
+            font-size: 12px;
+            color: var(--text-muted);
+            min-width: 20px;
+        }
+        .standings-flag { font-size: 18px; }
+        .standings-name { font-weight: 500; }
+
+        /* Quick links */
+        .quick-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+        .quick-link {
+            background: var(--bg-card);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            text-decoration: none;
+            color: var(--text-primary);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .quick-link:hover {
+            border-color: var(--accent-gold);
+            background: var(--bg-tertiary);
+        }
+        .quick-link-icon { font-size: 28px; }
+        .quick-link-text { font-size: 14px; font-weight: 500; }
+        .quick-link-sub { font-size: 11px; color: var(--text-muted); }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .match-card-body { gap: 8px; }
+            .match-team-flag { font-size: 22px; width: 28px; }
+            .match-team-name { font-size: 13px; }
+            .match-score { font-size: 20px; min-width: 30px; }
+            .match-upcoming-center { min-width: 80px; }
+            .standings-table th, .standings-table td { padding: 8px 8px; font-size: 12px; }
+        }
+        @media (max-width: 480px) {
+            .sports-page { padding: 16px 10px; }
+            .match-team-sub { display: none; }
+            .quick-links { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-inner">
+            <a href="/" class="logo">
+                <img src="/images/JubileeLogo.png" alt="Jubilee" class="logo-icon">
+                <div class="logo-text">Jubilee<span class="logo-verse">Verse</span><span class="logo-dotcom">.com</span></div>
+            </a>
+            <a href="/" class="back-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5"></path><path d="M12 19l-7-7 7-7"></path></svg>
+                Back to Home
+            </a>
+        </div>
+    </header>
+
+    <div class="sports-page" id="sportsPage">
+        <div class="sports-loading" id="sportsLoading">
+            <div class="sports-loading-spinner"></div>
+            <div style="color:var(--text-secondary);font-size:14px;">Loading sports data...</div>
+        </div>
+    </div>
+
+    <script>
+        const sportsDataSets = {
+            US: {
+                league: 'NFL',
+                icon: '🏈',
+                tabs: [
+                    { id: 'nfl', label: 'NFL', icon: '🏈' },
+                    { id: 'nba', label: 'NBA', icon: '🏀' },
+                    { id: 'mlb', label: 'MLB', icon: '⚾' }
+                ],
+                leagues: {
+                    nfl: {
+                        name: 'National Football League',
+                        icon: '🏈',
+                        matches: [
+                            { type: 'result', team1: { name: 'Kansas City Chiefs', short: 'KC', flag: '🟡', score: '27' }, team2: { name: 'Buffalo Bills', short: 'BUF', flag: '🔵', score: '24' }, status: 'Final', result: 'KC won by 3 pts', league: 'NFL Week 18' },
+                            { type: 'result', team1: { name: 'Philadelphia Eagles', short: 'PHI', flag: '🟢', score: '31' }, team2: { name: 'Dallas Cowboys', short: 'DAL', flag: '⭐', score: '17' }, status: 'Final', result: 'PHI won by 14 pts', league: 'NFL Week 18' },
+                            { type: 'result', team1: { name: 'Baltimore Ravens', short: 'BAL', flag: '🟣', score: '35' }, team2: { name: 'Cincinnati Bengals', short: 'CIN', flag: '🟠', score: '28' }, status: 'Final', result: 'BAL won by 7 pts', league: 'NFL Week 18' },
+                            { type: 'result', team1: { name: 'Miami Dolphins', short: 'MIA', flag: '🐬', score: '20' }, team2: { name: 'New York Jets', short: 'NYJ', flag: '🟢', score: '17' }, status: 'Final', result: 'MIA won by 3 pts', league: 'NFL Week 17' },
+                            { type: 'upcoming', team1: { name: 'San Francisco 49ers', short: 'SF', flag: '🔴' }, team2: { name: 'Detroit Lions', short: 'DET', flag: '🦁' }, date: 'Feb 2', time: '6:30 PM', venue: "Levi's Stadium, Santa Clara", league: 'NFC Championship' },
+                            { type: 'upcoming', team1: { name: 'Green Bay Packers', short: 'GB', flag: '💚' }, team2: { name: 'Chicago Bears', short: 'CHI', flag: '🐻' }, date: 'Feb 3', time: '1:00 PM', venue: 'Lambeau Field, Green Bay', league: 'NFL Playoffs' }
+                        ],
+                        standings: [
+                            { pos: 1, name: 'Kansas City Chiefs', flag: '🟡', w: 14, l: 3, pct: '.824' },
+                            { pos: 2, name: 'Buffalo Bills', flag: '🔵', w: 13, l: 4, pct: '.765' },
+                            { pos: 3, name: 'Baltimore Ravens', flag: '🟣', w: 13, l: 4, pct: '.765' },
+                            { pos: 4, name: 'Philadelphia Eagles', flag: '🟢', w: 12, l: 5, pct: '.706' },
+                            { pos: 5, name: 'San Francisco 49ers', flag: '🔴', w: 12, l: 5, pct: '.706' },
+                            { pos: 6, name: 'Detroit Lions', flag: '🦁', w: 11, l: 6, pct: '.647' },
+                            { pos: 7, name: 'Miami Dolphins', flag: '🐬', w: 10, l: 7, pct: '.588' },
+                            { pos: 8, name: 'Dallas Cowboys', flag: '⭐', w: 9, l: 8, pct: '.529' }
+                        ],
+                        standingsColumns: ['Team', 'W', 'L', 'PCT']
+                    },
+                    nba: {
+                        name: 'National Basketball Association',
+                        icon: '🏀',
+                        matches: [
+                            { type: 'result', team1: { name: 'Boston Celtics', short: 'BOS', flag: '☘️', score: '118' }, team2: { name: 'LA Lakers', short: 'LAL', flag: '💛', score: '105' }, status: 'Final', result: 'BOS won', league: 'NBA Regular Season' },
+                            { type: 'result', team1: { name: 'Denver Nuggets', short: 'DEN', flag: '💙', score: '122' }, team2: { name: 'Golden State Warriors', short: 'GSW', flag: '🔵', score: '119' }, status: 'Final', result: 'DEN won by 3 pts', league: 'NBA Regular Season' },
+                            { type: 'upcoming', team1: { name: 'Milwaukee Bucks', short: 'MIL', flag: '🦌' }, team2: { name: 'Phoenix Suns', short: 'PHX', flag: '🟠' }, date: 'Feb 4', time: '8:00 PM', venue: 'Fiserv Forum, Milwaukee', league: 'NBA Regular Season' }
+                        ],
+                        standings: [
+                            { pos: 1, name: 'Boston Celtics', flag: '☘️', w: 38, l: 12, pct: '.760' },
+                            { pos: 2, name: 'OKC Thunder', flag: '🔵', w: 36, l: 13, pct: '.735' },
+                            { pos: 3, name: 'Denver Nuggets', flag: '💙', w: 33, l: 16, pct: '.673' },
+                            { pos: 4, name: 'Milwaukee Bucks', flag: '🦌', w: 30, l: 18, pct: '.625' }
+                        ],
+                        standingsColumns: ['Team', 'W', 'L', 'PCT']
+                    },
+                    mlb: {
+                        name: 'Major League Baseball',
+                        icon: '⚾',
+                        matches: [
+                            { type: 'upcoming', team1: { name: 'LA Dodgers', short: 'LAD', flag: '🔵' }, team2: { name: 'NY Yankees', short: 'NYY', flag: '⚾' }, date: 'Mar 27', time: '7:00 PM', venue: 'Dodger Stadium, Los Angeles', league: 'Opening Day' },
+                            { type: 'upcoming', team1: { name: 'Houston Astros', short: 'HOU', flag: '🟠' }, team2: { name: 'Texas Rangers', short: 'TEX', flag: '🔵' }, date: 'Mar 27', time: '8:00 PM', venue: 'Minute Maid Park, Houston', league: 'Opening Day' }
+                        ],
+                        standings: [],
+                        standingsColumns: ['Team', 'W', 'L', 'PCT']
+                    }
+                }
+            },
+            IN: {
+                league: 'ICC',
+                icon: '🏏',
+                tabs: [
+                    { id: 'icc', label: 'ICC', icon: '🏏' },
+                    { id: 'ipl', label: 'IPL', icon: '🏏' },
+                    { id: 'football', label: 'ISL', icon: '⚽' }
+                ],
+                leagues: {
+                    icc: {
+                        name: 'International Cricket Council',
+                        icon: '🏏',
+                        matches: [
+                            { type: 'result', team1: { name: 'Sri Lanka', short: 'SL', flag: '🇱🇰', score: '189/5', sub: '(20.0)' }, team2: { name: 'England', short: 'ENG', flag: '🏴', score: '173/4', sub: '(16.4)' }, status: 'Completed', result: 'ENG won by 6 wickets (D/L)', league: 'T20I Series' },
+                            { type: 'result', team1: { name: 'Pakistan', short: 'PAK', flag: '🇵🇰', score: '207/6', sub: '(20.0)' }, team2: { name: 'Australia', short: 'AUS', flag: '🇦🇺', score: '96', sub: '(16.5)' }, status: 'Completed', result: 'PAK won by 111 runs', league: 'T20I Series' },
+                            { type: 'result', team1: { name: 'India', short: 'IND', flag: '🇮🇳', score: '297/6', sub: '(50.0)' }, team2: { name: 'New Zealand', short: 'NZ', flag: '🇳🇿', score: '245', sub: '(47.3)' }, status: 'Completed', result: 'IND won by 52 runs', league: 'ODI Series' },
+                            { type: 'result', team1: { name: 'South Africa', short: 'SA', flag: '🇿🇦', score: '312/4', sub: '(50.0)' }, team2: { name: 'Bangladesh', short: 'BAN', flag: '🇧🇩', score: '198', sub: '(43.2)' }, status: 'Completed', result: 'SA won by 114 runs', league: 'ODI Series' },
+                            { type: 'upcoming', team1: { name: 'Afghanistan', short: 'AFG', flag: '🇦🇫' }, team2: { name: 'Scotland', short: 'SCO', flag: '🏴' }, date: 'Feb 2', time: '3:00 PM', venue: 'BCCI Centre, Bengaluru', league: 'T20I' },
+                            { type: 'upcoming', team1: { name: 'India', short: 'IND', flag: '🇮🇳' }, team2: { name: 'England', short: 'ENG', flag: '🏴' }, date: 'Feb 5', time: '2:00 PM', venue: 'MA Chidambaram Stadium, Chennai', league: 'ODI Series' }
+                        ],
+                        standings: [
+                            { pos: 1, name: 'India', flag: '🇮🇳', w: 12, l: 1, pts: '132' },
+                            { pos: 2, name: 'Australia', flag: '🇦🇺', w: 10, l: 3, pts: '118' },
+                            { pos: 3, name: 'England', flag: '🏴', w: 9, l: 4, pts: '106' },
+                            { pos: 4, name: 'South Africa', flag: '🇿🇦', w: 8, l: 4, pts: '100' },
+                            { pos: 5, name: 'New Zealand', flag: '🇳🇿', w: 7, l: 5, pts: '90' },
+                            { pos: 6, name: 'Pakistan', flag: '🇵🇰', w: 6, l: 6, pts: '78' }
+                        ],
+                        standingsColumns: ['Team', 'W', 'L', 'PTS']
+                    },
+                    ipl: {
+                        name: 'Indian Premier League',
+                        icon: '🏏',
+                        matches: [
+                            { type: 'result', team1: { name: 'Mumbai Indians', short: 'MI', flag: '🔵', score: '186/4', sub: '(20.0)' }, team2: { name: 'Chennai Super Kings', short: 'CSK', flag: '🟡', score: '178/7', sub: '(20.0)' }, status: 'Completed', result: 'MI won by 8 runs', league: 'IPL 2025' },
+                            { type: 'result', team1: { name: 'Royal Challengers', short: 'RCB', flag: '🔴', score: '205/3', sub: '(20.0)' }, team2: { name: 'Kolkata Knight Riders', short: 'KKR', flag: '🟣', score: '199/8', sub: '(20.0)' }, status: 'Completed', result: 'RCB won by 6 runs', league: 'IPL 2025' },
+                            { type: 'upcoming', team1: { name: 'Delhi Capitals', short: 'DC', flag: '🔵' }, team2: { name: 'Gujarat Titans', short: 'GT', flag: '🔷' }, date: 'Feb 3', time: '7:30 PM', venue: 'Arun Jaitley Stadium, Delhi', league: 'IPL 2025' }
+                        ],
+                        standings: [
+                            { pos: 1, name: 'Mumbai Indians', flag: '🔵', w: 5, l: 2, pts: '10' },
+                            { pos: 2, name: 'Royal Challengers', flag: '🔴', w: 4, l: 2, pts: '8' },
+                            { pos: 3, name: 'Chennai Super Kings', flag: '🟡', w: 4, l: 3, pts: '8' },
+                            { pos: 4, name: 'Kolkata Knight Riders', flag: '🟣', w: 3, l: 3, pts: '6' }
+                        ],
+                        standingsColumns: ['Team', 'W', 'L', 'PTS']
+                    },
+                    football: {
+                        name: 'Indian Super League',
+                        icon: '⚽',
+                        matches: [
+                            { type: 'result', team1: { name: 'Mohun Bagan SG', short: 'MBSG', flag: '🟢', score: '2' }, team2: { name: 'Mumbai City FC', short: 'MCFC', flag: '🔵', score: '1' }, status: 'Final', result: 'MBSG won', league: 'ISL 2024-25' },
+                            { type: 'upcoming', team1: { name: 'Kerala Blasters', short: 'KBFC', flag: '🟡' }, team2: { name: 'Bengaluru FC', short: 'BFC', flag: '🔵' }, date: 'Feb 4', time: '7:30 PM', venue: 'Jawaharlal Nehru Stadium, Kochi', league: 'ISL 2024-25' }
+                        ],
+                        standings: [
+                            { pos: 1, name: 'Mohun Bagan SG', flag: '🟢', w: 10, l: 2, pts: '34' },
+                            { pos: 2, name: 'Mumbai City FC', flag: '🔵', w: 9, l: 3, pts: '30' },
+                            { pos: 3, name: 'FC Goa', flag: '🟠', w: 8, l: 4, pts: '28' }
+                        ],
+                        standingsColumns: ['Team', 'W', 'L', 'PTS']
+                    }
+                }
+            },
+            GB: {
+                league: 'Premier League',
+                icon: '⚽',
+                tabs: [
+                    { id: 'epl', label: 'Premier League', icon: '⚽' },
+                    { id: 'ucl', label: 'Champions League', icon: '🏆' }
+                ],
+                leagues: {
+                    epl: {
+                        name: 'English Premier League',
+                        icon: '⚽',
+                        matches: [
+                            { type: 'result', team1: { name: 'Arsenal', short: 'ARS', flag: '🔴', score: '3' }, team2: { name: 'Chelsea', short: 'CHE', flag: '🔵', score: '1' }, status: 'Final', result: 'Arsenal won', league: 'Matchweek 24' },
+                            { type: 'result', team1: { name: 'Liverpool', short: 'LIV', flag: '🔴', score: '2' }, team2: { name: 'Man City', short: 'MCI', flag: '🔵', score: '2' }, status: 'Final', result: 'Draw', league: 'Matchweek 24' },
+                            { type: 'upcoming', team1: { name: 'Man United', short: 'MUN', flag: '🔴' }, team2: { name: 'Tottenham', short: 'TOT', flag: '⚪' }, date: 'Feb 2', time: '4:30 PM', venue: 'Old Trafford, Manchester', league: 'Matchweek 25' }
+                        ],
+                        standings: [
+                            { pos: 1, name: 'Liverpool', flag: '🔴', w: 17, l: 2, pts: '53' },
+                            { pos: 2, name: 'Arsenal', flag: '🔴', w: 14, l: 3, pts: '47' },
+                            { pos: 3, name: 'Man City', flag: '🔵', w: 13, l: 5, pts: '43' },
+                            { pos: 4, name: 'Aston Villa', flag: '🟣', w: 12, l: 5, pts: '40' }
+                        ],
+                        standingsColumns: ['Team', 'W', 'L', 'PTS']
+                    },
+                    ucl: {
+                        name: 'UEFA Champions League',
+                        icon: '🏆',
+                        matches: [
+                            { type: 'upcoming', team1: { name: 'Real Madrid', short: 'RMA', flag: '⚪' }, team2: { name: 'Bayern Munich', short: 'BAY', flag: '🔴' }, date: 'Feb 11', time: '9:00 PM', venue: 'Santiago Bernabeu, Madrid', league: 'Round of 16' },
+                            { type: 'upcoming', team1: { name: 'PSG', short: 'PSG', flag: '🔵' }, team2: { name: 'Barcelona', short: 'BAR', flag: '🔵' }, date: 'Feb 12', time: '9:00 PM', venue: 'Parc des Princes, Paris', league: 'Round of 16' }
+                        ],
+                        standings: [],
+                        standingsColumns: ['Team', 'W', 'L', 'PTS']
+                    }
+                }
+            }
+        };
+        sportsDataSets.DEFAULT = sportsDataSets.US;
+
+        let currentCountry = 'US';
+        let currentLeagueId = '';
+
+        async function getCountry() {
+            try {
+                const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(5000) });
+                if (res.ok) { const g = await res.json(); return g.country_code || 'US'; }
+            } catch (e) {}
+            try {
+                const res = await fetch('https://ip-api.com/json/?fields=countryCode', { signal: AbortSignal.timeout(5000) });
+                if (res.ok) { const g = await res.json(); return g.countryCode || 'US'; }
+            } catch (e) {}
+            return 'US';
+        }
+
+        function renderMatchCard(match) {
+            const isResult = match.type === 'result';
+            const isUpcoming = match.type === 'upcoming';
+            const statusClass = match.status === 'Final' || match.status === 'Completed' ? 'completed' : (isUpcoming ? 'upcoming' : 'live');
+            const statusText = isUpcoming ? 'Upcoming' : match.status;
+
+            let bodyHTML = '';
+            if (isUpcoming) {
+                bodyHTML = `
+                    <div class="match-card-body">
+                        <div class="match-team">
+                            <span class="match-team-flag">${match.team1.flag}</span>
+                            <div class="match-team-info">
+                                <span class="match-team-name">${match.team1.name}</span>
+                            </div>
+                        </div>
+                        <div class="match-upcoming-center">
+                            <div class="match-upcoming-date">${match.date}</div>
+                            <div class="match-upcoming-time">${match.time}</div>
+                            <div class="match-upcoming-venue">${match.venue}</div>
+                        </div>
+                        <div class="match-team right">
+                            <span class="match-team-flag">${match.team2.flag}</span>
+                            <div class="match-team-info">
+                                <span class="match-team-name">${match.team2.name}</span>
+                            </div>
+                        </div>
+                    </div>`;
+            } else {
+                bodyHTML = `
+                    <div class="match-card-body">
+                        <div class="match-team">
+                            <span class="match-team-flag">${match.team1.flag}</span>
+                            <div class="match-team-info">
+                                <span class="match-team-name">${match.team1.name}</span>
+                                ${match.team1.sub ? '<span class="match-team-sub">' + match.team1.sub + '</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="match-score-area">
+                            <div class="match-scores">
+                                <span class="match-score">${match.team1.score}</span>
+                                <span class="match-vs">vs</span>
+                                <span class="match-score">${match.team2.score}</span>
+                            </div>
+                        </div>
+                        <div class="match-team right">
+                            <span class="match-team-flag">${match.team2.flag}</span>
+                            <div class="match-team-info">
+                                <span class="match-team-name">${match.team2.name}</span>
+                                ${match.team2.sub ? '<span class="match-team-sub">' + match.team2.sub + '</span>' : ''}
+                            </div>
+                        </div>
+                    </div>
+                    ${match.result ? '<div class="match-result">' + match.result + '</div>' : ''}`;
+            }
+
+            return `
+                <div class="match-card">
+                    <div class="match-card-header">
+                        <span class="match-card-league">${match.league || ''}</span>
+                        <span class="match-card-status ${statusClass}">${statusText}</span>
+                    </div>
+                    ${bodyHTML}
+                </div>`;
+        }
+
+        function renderPage() {
+            const page = document.getElementById('sportsPage');
+            const data = sportsDataSets[currentCountry] || sportsDataSets.DEFAULT;
+            const tabs = data.tabs;
+            if (!currentLeagueId) currentLeagueId = tabs[0].id;
+            const league = data.leagues[currentLeagueId];
+
+            // Tabs
+            const tabsHTML = tabs.map(t =>
+                `<button class="league-tab${t.id === currentLeagueId ? ' active' : ''}" onclick="switchLeague('${t.id}')">
+                    <span class="league-tab-icon">${t.icon}</span> ${t.label}
+                </button>`
+            ).join('');
+
+            // Separate matches
+            const results = league.matches.filter(m => m.type === 'result');
+            const upcoming = league.matches.filter(m => m.type === 'upcoming');
+
+            // Results
+            let resultsHTML = '';
+            if (results.length) {
+                resultsHTML = `
+                    <div class="section-title">
+                        <span class="section-title-icon">${league.icon}</span>
+                        Recent Results
+                        <span class="section-title-badge">${results.length}</span>
+                    </div>
+                    <div class="matches-grid">${results.map(m => renderMatchCard(m)).join('')}</div>`;
+            }
+
+            // Upcoming
+            let upcomingHTML = '';
+            if (upcoming.length) {
+                upcomingHTML = `
+                    <div class="section-title">
+                        <span class="section-title-icon">📅</span>
+                        Upcoming Matches
+                        <span class="section-title-badge">${upcoming.length}</span>
+                    </div>
+                    <div class="matches-grid">${upcoming.map(m => renderMatchCard(m)).join('')}</div>`;
+            }
+
+            // Standings
+            let standingsHTML = '';
+            if (league.standings && league.standings.length) {
+                const cols = league.standingsColumns;
+                const thHTML = cols.map(c => `<th>${c}</th>`).join('');
+                const rowsHTML = league.standings.map(row => {
+                    const values = [row.w, row.l, row.pts || row.pct];
+                    return `<tr>
+                        <td><div class="standings-team">
+                            <span class="standings-pos">${row.pos}</span>
+                            <span class="standings-flag">${row.flag}</span>
+                            <span class="standings-name">${row.name}</span>
+                        </div></td>
+                        ${values.map(v => `<td>${v}</td>`).join('')}
+                    </tr>`;
+                }).join('');
+                standingsHTML = `
+                    <div class="standings-card">
+                        <div class="standings-title">Standings</div>
+                        <table class="standings-table">
+                            <thead><tr>${thHTML}</tr></thead>
+                            <tbody>${rowsHTML}</tbody>
+                        </table>
+                    </div>`;
+            }
+
+            // Quick links
+            const quickLinksHTML = `
+                <div class="section-title"><span class="section-title-icon">🔗</span> Quick Links</div>
+                <div class="quick-links">
+                    ${tabs.map(t => `
+                        <a href="#" class="quick-link" onclick="event.preventDefault(); switchLeague('${t.id}'); window.scrollTo({top:0,behavior:'smooth'});">
+                            <span class="quick-link-icon">${t.icon}</span>
+                            <div>
+                                <div class="quick-link-text">${t.label}</div>
+                                <div class="quick-link-sub">${(data.leagues[t.id].matches || []).length} matches</div>
+                            </div>
+                        </a>`).join('')}
+                    <a href="/" class="quick-link">
+                        <span class="quick-link-icon">🏠</span>
+                        <div>
+                            <div class="quick-link-text">Back to Home</div>
+                            <div class="quick-link-sub">JubileeVerse.com</div>
+                        </div>
+                    </a>
+                </div>`;
+
+            page.innerHTML = `
+                <div class="league-tabs">${tabsHTML}</div>
+                ${resultsHTML}
+                ${upcomingHTML}
+                ${standingsHTML}
+                ${quickLinksHTML}
+            `;
+        }
+
+        function switchLeague(id) {
+            currentLeagueId = id;
+            renderPage();
+        }
+
+        async function init() {
+            currentCountry = await getCountry();
+            if (!sportsDataSets[currentCountry]) currentCountry = 'US';
+
+            // Try to fetch live data for football/soccer
+            try {
+                const sportsRes = await fetch('/api/sports');
+                if (sportsRes.ok) {
+                    const liveData = await sportsRes.json();
+                    if (liveData.success && liveData.data) {
+                        const regionData = liveData.data[currentCountry] || liveData.data.DEFAULT;
+                        if (regionData && regionData.matches && regionData.matches.length > 0) {
+                            // Add a "Live" tab with the real-time data
+                            const liveLeague = {
+                                name: regionData.league + ' (Live)',
+                                icon: regionData.icon || '⚽',
+                                matches: regionData.matches,
+                                standings: [],
+                                standingsColumns: ['Team', 'W', 'L', 'PTS']
+                            };
+                            // Insert live data as first tab option
+                            if (!sportsDataSets[currentCountry].leagues.live) {
+                                sportsDataSets[currentCountry].tabs.unshift({ id: 'live', label: 'Live ⚽', icon: '🔴' });
+                                sportsDataSets[currentCountry].leagues.live = liveLeague;
+                            }
+                            console.log('[Sports Page] Loaded live data, last updated:', regionData.lastUpdated);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.log('[Sports Page] Live data unavailable, using static data');
+            }
+
+            const data = sportsDataSets[currentCountry];
+            currentLeagueId = data.tabs[0].id;
+            renderPage();
+        }
+
+        init();
+    </script>
+    <script src="/js/site-translate.js"></script>
+</body>
+</html>

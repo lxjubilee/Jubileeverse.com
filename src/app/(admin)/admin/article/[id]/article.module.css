@@ -1,0 +1,237 @@
+/* ============================================================================
+   Single-article editor — back-office
+   Ported from the original static admin inline <style>:
+     - public/admin/article.html   (container / header / content / actions / btn)
+     - public/admin/articles.html  (form-group / form-row / select / toast)
+   Class references renamed to CSS-Module-local names. Design tokens
+   (--bg-*, --text-*, --accent-*, --border-color, --space-*, --font-*) come
+   from globals.css and are NOT redefined here.
+   ============================================================================ */
+
+/* ── Layout container (article.html .article-container) ── */
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-2xl);
+  line-height: 1.6;
+}
+
+/* ── Header block (article.html .article-header) ── */
+.articleHeader {
+  background: var(--bg-secondary);
+  padding: var(--space-xl);
+  border-radius: 8px;
+  margin-bottom: var(--space-xl);
+  border: 1px solid var(--border-color);
+}
+
+.articleCategory {
+  font-size: var(--font-sm);
+  color: var(--accent-gold);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: var(--space-sm);
+}
+
+.articleTitle {
+  font-size: var(--font-3xl);
+  font-weight: 700;
+  margin-bottom: var(--space-md);
+  color: var(--text-primary);
+}
+
+.articleMeta {
+  display: flex;
+  gap: var(--space-lg);
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+}
+
+/* ── Content / panel cards (article.html .article-content) ── */
+.articleContent {
+  background: var(--bg-card);
+  padding: var(--space-2xl);
+  border-radius: 8px;
+  margin-bottom: var(--space-xl);
+  border: 1px solid var(--border-color);
+}
+
+.sectionLabel {
+  font-size: var(--font-md);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-lg);
+}
+
+/* ── Form fields (articles.html .form-group / .form-row) ── */
+.formGroup {
+  margin-bottom: var(--space-lg);
+}
+
+.formGroup:last-child {
+  margin-bottom: 0;
+}
+
+.formGroup label {
+  display: block;
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.formGroup input,
+.formGroup textarea,
+.formGroup select {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: var(--font-base);
+  font-family: inherit;
+  outline: none;
+}
+
+.formGroup input:focus,
+.formGroup textarea:focus,
+.formGroup select:focus {
+  border-color: var(--accent-gold);
+}
+
+.formGroup input[readonly] {
+  color: var(--text-secondary);
+  opacity: 0.8;
+  cursor: default;
+}
+
+.formGroup textarea {
+  min-height: 300px;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.formRow {
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.formRow .formGroup {
+  flex: 1;
+}
+
+/* ── Hero image preview ── */
+.heroPreview {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  margin-bottom: var(--space-lg);
+  display: block;
+}
+
+.fileInput {
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+}
+
+.uploadingText {
+  margin-left: var(--space-md);
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+}
+
+/* ── Loading / error states (article.html) ── */
+.loadingSpinner {
+  text-align: center;
+  padding: var(--space-2xl);
+  color: var(--text-muted);
+}
+
+.errorState {
+  text-align: center;
+  padding: var(--space-2xl);
+  color: var(--text-muted);
+}
+
+.errorState h2 {
+  color: var(--accent-red, #d13438);
+  margin-bottom: var(--space-md);
+}
+
+/* ── Actions row + buttons (article.html .article-actions / .btn) ── */
+.articleActions {
+  display: flex;
+  gap: var(--space-md);
+  justify-content: center;
+  padding: var(--space-xl);
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: var(--space-md) var(--space-xl);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: var(--font-base);
+  font-family: inherit;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnPrimary {
+  background: var(--accent-blue);
+  color: #fff;
+  border-color: var(--accent-blue);
+}
+
+.btnPrimary:not(:disabled):hover {
+  background: #006cbe;
+}
+
+.btnSecondary {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.btnSecondary:not(:disabled):hover {
+  background: var(--bg-card);
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+
+/* ── Toast (articles.html .toast) ── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: var(--font-sm);
+  color: #fff;
+  z-index: 9999;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast.success {
+  background: var(--accent-green, #107c10);
+}
+
+.toast.error {
+  background: var(--accent-red, #d13438);
+}

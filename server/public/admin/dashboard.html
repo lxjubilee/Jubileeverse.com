@@ -1,0 +1,4767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="JubileeVerse Admin Dashboard - Content Management">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Admin Dashboard - JubileeVerse (JIT v2.0)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&family=Playfair+Display:wght@700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        /* ============================================
+           JUBILEEVERSE ADMIN DASHBOARD
+           Two-Panel Layout: Categories | Articles
+           ============================================ */
+
+        :root {
+            /* MSN Dark Theme Colors */
+            --bg-primary: #1b1b1b;
+            --bg-secondary: #242424;
+            --bg-tertiary: #2d2d2d;
+            --bg-card: #2d2d2d;
+            --bg-card-hover: #3a3a3a;
+
+            /* Text Colors */
+            --text-primary: #ffffff;
+            --text-secondary: #c4c4c4;
+            --text-muted: #8a8a8a;
+
+            /* Accent Colors */
+            --accent-gold: #E6AC00;
+            --accent-gold-hover: #F5C518;
+            --accent-blue: #0078d4;
+            --accent-red: #d13438;
+            --accent-green: #107c10;
+
+            /* Borders */
+            --border-color: rgba(255, 255, 255, 0.1);
+            --border-hover: rgba(255, 255, 255, 0.2);
+
+            /* Spacing */
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 12px;
+            --space-lg: 16px;
+            --space-xl: 24px;
+            --space-2xl: 32px;
+
+            /* Font Sizes */
+            --font-xs: 11px;
+            --font-sm: 12px;
+            --font-base: 14px;
+            --font-md: 16px;
+            --font-lg: 18px;
+            --font-xl: 20px;
+            --font-2xl: 24px;
+            --font-3xl: 32px;
+
+            /* Panel Widths */
+            --category-panel-width: 35%;
+            --article-panel-width: 65%;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* ============================================
+           HEADER
+           ============================================ */
+
+        .admin-header {
+            background: var(--bg-secondary);
+            padding: var(--space-lg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
+
+        .admin-header h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: var(--font-xl);
+            font-weight: 700;
+            color: var(--accent-gold);
+            letter-spacing: 0.5px;
+        }
+
+        .admin-header .user-info {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            color: var(--text-secondary);
+            font-size: var(--font-sm);
+        }
+
+        .admin-header .btn-logout {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            padding: var(--space-sm) var(--space-lg);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .admin-header .btn-logout:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-hover);
+        }
+
+        /* ============================================
+           JUBILEE INSPIRE CHAT PANEL (RIGHT SIDE)
+           ============================================ */
+
+        /* FAB Toggle Button */
+        .chat-toggle-fab {
+            position: fixed;
+            bottom: 30px;
+            right: 33px;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            z-index: 999;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .chat-toggle-fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+        }
+
+        .chat-toggle-fab.hidden {
+            display: none;
+        }
+
+        /* Sliding Chat Panel */
+        .jubilee-chat-panel {
+            width: 400px;
+            min-width: 300px;
+            max-width: 600px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Chat Panel Header */
+        .chat-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 20px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .chat-header-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .chat-avatar-img {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .chat-title h3 {
+            margin: 0;
+            font-size: 8px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .chat-status {
+            font-size: 12px;
+            color: var(--accent-green);
+        }
+
+        .btn-chat-close {
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 16px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .btn-chat-close:hover {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            color: var(--accent-red);
+        }
+
+        /* Chat Body */
+        .chat-panel-body {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            scrollbar-width: thin;
+            scrollbar-color: #E6AC00 transparent;
+        }
+
+        .chat-messages::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #E6AC00;
+            border-radius: 4px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #FFD700;
+        }
+
+        .chat-message {
+            display: flex;
+            gap: 2px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .chat-message.user-message {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 21px;
+            height: 21px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .message-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .user-message .message-avatar {
+            background: var(--accent-gold);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+
+        .message-content {
+            flex: 1;
+            max-width: 100%;
+            margin-left: 0;
+        }
+
+        .user-message .message-content {
+            text-align: right;
+            margin-left: 0;
+        }
+
+        .message-header {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 4px;
+            align-items: center;
+        }
+
+        .user-message .message-header {
+            justify-content: flex-end;
+        }
+
+        .message-sender {
+            font-weight: 600;
+            font-size: 13px;
+            margin-left: 5px;
+            color: var(--text-primary);
+        }
+
+        .user-message .message-sender {
+            margin-left: 0;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .message-text {
+            background: var(--bg-tertiary);
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            width: calc(100% + 20px);
+            margin-left: -20px;
+            box-sizing: border-box;
+            text-align: justify;
+        }
+
+        .user-message .message-text {
+            background: var(--accent-blue);
+            color: white;
+            text-align: left;
+            margin-left: 0;
+            width: 100%;
+        }
+
+        .chat-input-container {
+            display: flex;
+            gap: 10px;
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px 14px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: 'Segoe UI', sans-serif;
+            resize: none;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .chat-input:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .btn-send-chat {
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .btn-send-chat:hover {
+            background: #1976d2;
+            transform: translateY(-1px);
+        }
+
+        .btn-send-chat:active {
+            transform: translateY(0);
+        }
+
+        .typing-indicator .message-text {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            padding: 10px 20px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            animation: typingBounce 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typingBounce {
+            0%, 60%, 100% {
+                transform: translateY(0);
+            }
+            30% {
+                transform: translateY(-10px);
+            }
+        }
+
+        /* ============================================
+           MAIN LAYOUT - TWO PANELS
+           ============================================ */
+
+        .dashboard-container {
+            display: flex;
+            height: calc(100vh - 60px); /* header only */
+            overflow: hidden;
+        }
+
+        /* LEFT PANEL - CATEGORIES */
+        .category-panel {
+            width: var(--category-panel-width);
+            min-width: 250px;
+            max-width: 60%;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* RESIZE HANDLE */
+        .resize-handle {
+            width: 4px;
+            background: var(--border-color);
+            cursor: col-resize;
+            position: relative;
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+
+        .resize-handle:hover,
+        .resize-handle.dragging {
+            background: var(--accent-blue);
+        }
+
+        .resize-handle::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -3px;
+            right: -3px;
+            bottom: 0;
+        }
+
+        .category-panel-header {
+            padding: 7px 11px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+        }
+
+        .category-panel-header h2 {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .category-panel-header .tree-controls {
+            display: flex;
+            gap: var(--space-sm);
+        }
+
+        .category-panel-header .btn-tree-control {
+            padding: 3px 6px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: var(--font-base);
+            transition: all 0.2s;
+        }
+
+        .category-panel-header .btn-tree-control:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+        }
+
+        .category-panel-header .search-box {
+            width: 100%;
+            padding: var(--space-sm) var(--space-md);
+            background: #2a2a2a;
+            border: 1px solid #E6AC00;
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: var(--font-sm);
+            outline: none;
+        }
+
+        .category-panel-header .search-box:focus {
+            border-color: #E6AC00;
+            box-shadow: 0 0 8px rgba(230, 172, 0, 0.5);
+        }
+
+        .category-panel-header .search-box::placeholder {
+            color: #999999;
+        }
+
+        .category-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-md);
+        }
+
+        /* ============================================
+           TREE VIEW STYLES
+           ============================================ */
+
+        .category-tree {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .category-tree-item {
+            margin: 0;
+            padding: 0;
+        }
+
+        .category-node {
+            display: flex;
+            align-items: center;
+            padding: 2px var(--space-md); /* Reduced from 4px to 2px for 50% height reduction */
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 4px;
+            margin-bottom: 1px;
+        }
+
+        .category-node:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .category-node.active {
+            background: var(--accent-blue);
+        }
+
+        .category-node.active .category-name {
+            color: white;
+            font-weight: 600;
+        }
+
+        /* Album node styling */
+        .category-node.album-node {
+            background: rgba(230, 172, 0, 0.05);
+            border-left: 2px solid var(--accent-gold);
+            padding-left: calc(var(--space-md) - 2px);
+        }
+
+        .category-node.album-node:hover {
+            background: rgba(230, 172, 0, 0.1);
+        }
+
+        .category-node.album-node .category-name {
+            color: var(--accent-gold);
+            font-style: italic;
+            font-size: 13px;
+        }
+
+        .tree-toggle {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: var(--space-sm);
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            user-select: none;
+        }
+
+        .tree-toggle.has-children {
+            cursor: pointer;
+        }
+
+        .tree-toggle.has-children:hover {
+            color: var(--accent-gold);
+        }
+
+        .tree-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: var(--space-sm);
+            flex-shrink: 0;
+        }
+
+        .category-name {
+            flex: 1;
+            font-size: var(--font-sm);
+            color: var(--text-primary);
+        }
+
+        .category-count {
+            font-size: var(--font-xs);
+            color: var(--text-muted);
+            margin-left: var(--space-sm);
+        }
+
+        .category-children {
+            list-style: none;
+            padding-left: 14px; /* Reduced from 24px to move level text 10px to the left */
+            margin: 0;
+        }
+
+        .category-children.collapsed {
+            display: none;
+        }
+
+        .category-children.expanded {
+            display: block;
+        }
+
+        /* Level-based styling */
+        .category-node[data-level="0"] {
+            font-weight: 600;
+            font-size: var(--font-md);
+        }
+
+        .category-node[data-level="1"] {
+            font-weight: 500;
+        }
+
+        .category-node[data-level="2"] {
+            font-weight: 400;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: var(--space-xl);
+            color: var(--text-muted);
+        }
+
+        .category-search-footer {
+            padding: var(--space-md);
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .category-search-footer .search-box {
+            width: 100%;
+            padding: var(--space-sm) var(--space-md);
+            background: #2a2a2a;
+            border: 1px solid #E6AC00;
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: var(--font-sm);
+            outline: none;
+        }
+
+        .category-search-footer .search-box:focus {
+            border-color: #E6AC00;
+            box-shadow: 0 0 8px rgba(230, 172, 0, 0.5);
+        }
+
+        .category-search-footer .search-box::placeholder {
+            color: #999999;
+        }
+
+        .btn-add-category {
+            margin: var(--space-md);
+            padding: var(--space-md);
+            background: var(--accent-green);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-add-category:hover {
+            background: #0e6b0e;
+        }
+
+        /* RIGHT PANEL - ARTICLES */
+        .article-panel {
+            width: var(--article-panel-width);
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .article-panel-header {
+            padding: 0;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .article-panel-tabs {
+            display: flex;
+            gap: 0;
+        }
+
+        .btn-new-content {
+            margin-right: var(--space-lg);
+            padding: var(--space-sm) var(--space-lg);
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: var(--font-sm);
+            font-weight: 600;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-new-content:hover {
+            background: #006cbe;
+        }
+
+        .tab-button {
+            padding: var(--space-md) var(--space-xl);
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: var(--font-base);
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .tab-button:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .tab-button.active {
+            background: var(--bg-secondary);
+            color: var(--accent-gold);
+            border-bottom-color: var(--accent-gold);
+        }
+
+        .article-panel-header h2 {
+            font-size: var(--font-lg);
+            font-weight: 600;
+            margin-bottom: var(--space-sm);
+        }
+
+        .article-panel-toolbar {
+            padding: var(--space-lg);
+        }
+
+        .article-panel-header .toolbar {
+            display: flex;
+            gap: var(--space-md);
+            align-items: center;
+        }
+
+        .article-panel-header .search-box {
+            flex: 1;
+            padding: var(--space-sm) var(--space-md);
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: var(--font-sm);
+            outline: none;
+        }
+
+        .article-panel-header .search-box:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .article-panel-header .btn-filter {
+            padding: var(--space-sm) var(--space-lg);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .article-panel-header .btn-filter:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-hover);
+        }
+
+        .article-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-lg);
+        }
+
+        .article-item {
+            background: var(--bg-card);
+            padding: var(--space-lg);
+            margin-bottom: var(--space-md);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
+        }
+
+        .article-item:hover {
+            border-color: var(--border-hover);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .article-item h3 {
+            font-size: var(--font-md);
+            font-weight: 600;
+            margin-bottom: var(--space-sm);
+            color: var(--text-primary);
+        }
+
+        .article-item .article-meta {
+            display: flex;
+            gap: var(--space-lg);
+            font-size: var(--font-xs);
+            color: var(--text-muted);
+            margin-bottom: var(--space-sm);
+        }
+
+        .article-item .article-excerpt {
+            font-size: var(--font-sm);
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: var(--space-md);
+        }
+
+        .article-item .article-actions {
+            display: flex;
+            gap: var(--space-sm);
+        }
+
+        .article-item .btn-action {
+            padding: var(--space-xs) var(--space-md);
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: var(--font-xs);
+            transition: all 0.2s;
+        }
+
+        .article-item .btn-action:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-hover);
+        }
+
+        .article-item .btn-action.edit {
+            color: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .article-item .btn-action.delete {
+            color: var(--accent-red);
+            border-color: var(--accent-red);
+        }
+
+        .btn-add-article {
+            margin: 0 var(--space-lg) var(--space-lg);
+            padding: var(--space-md);
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-add-article:hover {
+            background: #006cbe;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: var(--space-2xl);
+            color: var(--text-muted);
+        }
+
+        .empty-state h3 {
+            font-size: var(--font-lg);
+            margin-bottom: var(--space-sm);
+        }
+
+        /* TAB CONTENT CONTAINERS */
+        .tab-content {
+            display: none;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .tab-content.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* PULSE TASKS TABLE */
+        /* ============================================
+           PORTAL ARTICLES TAB
+           ============================================ */
+        .portal-articles-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .portal-articles-toolbar {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            padding: var(--space-md) var(--space-lg);
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            flex-shrink: 0;
+        }
+
+        .portal-filter-buttons {
+            display: flex;
+            gap: 4px;
+        }
+
+        .portal-filter-btn {
+            padding: 5px 14px;
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: var(--font-sm);
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .portal-filter-btn:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .portal-filter-btn.active {
+            background: var(--accent-gold);
+            color: #000;
+            border-color: var(--accent-gold);
+        }
+
+        .portal-articles-count {
+            font-size: var(--font-sm);
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        .portal-articles-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-md) var(--space-lg);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-sm);
+        }
+
+        .portal-article-row {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: var(--space-md);
+            display: flex;
+            gap: var(--space-md);
+            align-items: flex-start;
+            transition: border-color 0.2s;
+        }
+
+        .portal-article-row:hover {
+            border-color: var(--border-hover);
+        }
+
+        .portal-article-thumb {
+            width: 72px;
+            height: 54px;
+            object-fit: cover;
+            border-radius: 4px;
+            flex-shrink: 0;
+            background: var(--bg-tertiary);
+        }
+
+        .portal-article-thumb-placeholder {
+            width: 72px;
+            height: 54px;
+            border-radius: 4px;
+            flex-shrink: 0;
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: var(--text-muted);
+        }
+
+        .portal-article-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .portal-article-headline {
+            font-size: var(--font-base);
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .portal-article-meta {
+            font-size: var(--font-xs);
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .portal-article-reason {
+            font-size: var(--font-xs);
+            color: var(--accent-red);
+            margin-bottom: 4px;
+            font-style: italic;
+        }
+
+        .portal-article-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+            align-items: flex-start;
+        }
+
+        .portal-btn-approve {
+            padding: 5px 12px;
+            background: var(--accent-green);
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: var(--font-xs);
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+
+        .portal-btn-approve:hover { opacity: 0.85; }
+
+        .portal-btn-reject {
+            padding: 5px 12px;
+            background: var(--accent-red);
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: var(--font-xs);
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+
+        .portal-btn-reject:hover { opacity: 0.85; }
+
+        .portal-article-row.fading {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .pulse-tasks-container {
+            padding: var(--space-lg);
+            overflow-y: auto;
+        }
+
+        .pulse-tasks-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .pulse-tasks-table thead {
+            background: var(--bg-tertiary);
+        }
+
+        .pulse-tasks-table th {
+            padding: var(--space-md);
+            text-align: left;
+            font-size: var(--font-sm);
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .pulse-tasks-table td {
+            padding: 6px var(--space-md);
+            font-size: var(--font-base);
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .pulse-tasks-table tbody tr {
+            transition: background 0.2s;
+        }
+
+        .pulse-tasks-table tbody tr:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .pulse-tasks-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .task-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: var(--font-xs);
+            font-weight: 600;
+            text-transform: uppercase;
+            display: inline-block;
+            min-width: 82px;
+            text-align: center;
+        }
+
+        .task-status.pending {
+            background: #4a4a00;
+            color: #ffff00;
+        }
+
+        .task-status.in-progress {
+            background: #003d5c;
+            color: #00b7ff;
+        }
+
+        .task-status.completed {
+            background: #0a5c0a;
+            color: #0f0;
+        }
+
+        .task-status.cancelled {
+            background: #5c0a0a;
+            color: #ff4444;
+        }
+
+        .task-status.failed {
+            background: #5c0a0a;
+            color: #ff4444;
+        }
+
+        /* ============================================
+           FORM STYLING
+           ============================================ */
+
+        .form-group {
+            margin-bottom: var(--space-lg);
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: var(--space-sm);
+            color: var(--text-primary);
+            font-size: var(--font-sm);
+            font-weight: 600;
+        }
+
+        .form-input,
+        .form-textarea {
+            width: 100%;
+            padding: var(--space-md);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: var(--font-base);
+            font-family: 'Segoe UI', sans-serif;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus,
+        .form-textarea:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .form-input:read-only {
+            background: var(--bg-primary);
+            cursor: not-allowed;
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: var(--space-md);
+            justify-content: flex-end;
+            margin-top: var(--space-xl);
+        }
+
+        .delivery-options {
+            padding-left: 20px;
+            border-left: 3px solid var(--border-color);
+            margin-left: 10px;
+        }
+
+        .days-selector {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .days-selector label {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: normal;
+            margin-bottom: 0;
+        }
+
+        .days-selector label:hover {
+            background: var(--bg-secondary);
+        }
+
+        .days-selector input[type="checkbox"] {
+            margin: 0;
+        }
+
+        .execution-time-item {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .execution-time-item input {
+            flex: 1;
+        }
+
+        .execution-time-item button {
+            padding: 6px 12px;
+            background: var(--status-cancelled);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .execution-time-item button:hover {
+            opacity: 0.8;
+        }
+
+        .btn-primary,
+        .btn-secondary {
+            padding: var(--space-md) var(--space-xl);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: var(--font-base);
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #006cbe;
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-card-hover);
+        }
+
+        /* ============================================
+           SCROLLBAR STYLING
+           ============================================ */
+
+        .category-list::-webkit-scrollbar,
+        .article-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .category-list::-webkit-scrollbar-track,
+        .article-list::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        .category-list::-webkit-scrollbar-thumb,
+        .article-list::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        .category-list::-webkit-scrollbar-thumb:hover,
+        .article-list::-webkit-scrollbar-thumb:hover {
+            background: var(--bg-card-hover);
+        }
+
+        /* Article Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: var(--bg-secondary);
+            margin: 3% auto;
+            padding: 0;
+            border: 2px solid var(--accent-gold);
+            width: 85%;
+            max-width: 1200px;
+            max-height: 90vh;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal-close {
+            color: var(--text-muted);
+            position: absolute;
+            right: 20px;
+            top: 15px;
+            font-size: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .modal-close:hover {
+            color: var(--accent-gold);
+        }
+
+        /* Modal Header Section - Reduced by 50% */
+        .modal-header {
+            padding: 15px 20px; /* Reduced from 30px */
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            position: relative;
+        }
+
+        .modal-header-field {
+            margin-bottom: 8px; /* Reduced from 15px */
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .modal-header-field:hover {
+            background: rgba(230, 172, 0, 0.05);
+            padding: 3px; /* Reduced from 5px */
+            margin: -3px -3px 5px -3px; /* Reduced spacing */
+            border-radius: 4px;
+        }
+
+        .modal-header-label {
+            font-size: 9px; /* Reduced from 11px */
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px; /* Reduced from 1px */
+            margin-bottom: 3px; /* Reduced from 5px */
+        }
+
+        .modal-header-value {
+            font-size: 13px; /* Reduced from 16px */
+            color: var(--text-primary);
+        }
+
+        .modal-header-value.title {
+            font-size: 20px; /* Reduced from 28px */
+            font-weight: 600;
+            color: var(--accent-gold);
+            line-height: 1.2;
+        }
+
+        .modal-header-value input,
+        .modal-header-value select {
+            width: 100%;
+            background: var(--bg-primary);
+            border: 1px solid var(--accent-gold);
+            color: var(--text-primary);
+            padding: 6px 10px; /* Reduced from 8px 12px */
+            font-size: inherit;
+            border-radius: 4px;
+        }
+
+        .modal-header-value input.title-input {
+            font-size: 20px; /* Reduced from 28px */
+            font-weight: 600;
+        }
+
+        /* Modal Content Section */
+        .modal-body {
+            flex: 1;
+            overflow-y: scroll; /* Changed from auto to scroll to always show scrollbar */
+            padding: 20px 30px; /* Reduced top/bottom padding */
+            max-height: calc(90vh - 200px); /* Adjusted for smaller header and minimal footer */
+        }
+
+        .modal-body::-webkit-scrollbar {
+            width: 14px; /* Slightly wider for better visibility */
+        }
+
+        .modal-body::-webkit-scrollbar-track {
+            background: rgba(45, 45, 45, 0.5);
+            border-radius: 7px;
+            margin: 4px 0;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, var(--accent-gold) 0%, #B8860B 100%);
+            border-radius: 7px;
+            border: 3px solid var(--bg-secondary);
+        }
+
+        .modal-body::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, var(--accent-gold-hover) 0%, var(--accent-gold) 100%);
+            border: 2px solid var(--bg-secondary);
+        }
+
+        /* Firefox scrollbar */
+        .modal-body {
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-gold) var(--bg-primary);
+        }
+
+        /* Tab Navigation */
+        .modal-tabs {
+            display: flex;
+            gap: 10px;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 20px;
+            padding-bottom: 0;
+        }
+
+        .modal-tab {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+
+        .modal-tab:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .modal-tab.active {
+            color: var(--accent-gold);
+            border-bottom-color: var(--accent-gold);
+        }
+
+        /* Tab Panels */
+        .modal-tab-panel {
+            display: none;
+        }
+
+        .modal-tab-panel.active {
+            display: block;
+        }
+
+        .content-editor {
+            min-height: 300px;
+            line-height: 1.8;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            cursor: text;
+        }
+
+        .content-editor:focus {
+            outline: none;
+        }
+
+        .content-editor[contenteditable="true"] {
+            border: 1px solid var(--accent-gold);
+            padding: 15px;
+            border-radius: 4px;
+            background: var(--bg-tertiary);
+        }
+
+        /* Remove paragraph indentation */
+        .content-editor p {
+            text-indent: 0 !important;
+            margin: 0 0 1em 0;
+        }
+
+        .music-type-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: var(--bg-tertiary);
+            border-left: 3px solid var(--accent-gold);
+            border-radius: 4px;
+        }
+
+        .music-type-section h4 {
+            color: var(--accent-gold);
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+
+        .music-type-section p {
+            color: var(--text-secondary);
+            line-height: 1.6;
+            cursor: pointer;
+        }
+
+        .music-type-section input,
+        .music-type-input {
+            width: 100%;
+            background: var(--bg-primary);
+            border: 1px solid var(--accent-gold);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            font-size: 14px;
+            border-radius: 4px;
+            font-family: inherit;
+            resize: vertical;
+        }
+
+        .music-type-input:focus {
+            outline: none;
+            border-color: var(--accent-gold-hover);
+            background: var(--bg-secondary);
+        }
+
+        .christian-lesson-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: var(--bg-tertiary);
+            border-left: 3px solid var(--accent-gold);
+            border-radius: 4px;
+        }
+
+        .christian-lesson-section h4 {
+            color: var(--accent-gold);
+            margin-bottom: 10px;
+        }
+
+        .christian-lesson-section p {
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* Modal Footer Section */
+        .modal-footer {
+            padding: 20px 30px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .upload-area {
+            border: 3px dashed var(--border-color); /* Thicker border for visibility */
+            border-radius: 8px;
+            padding: 50px 40px; /* Increased vertical padding */
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(45, 45, 45, 0.3); /* Subtle background */
+        }
+
+        .upload-area:hover,
+        .upload-area.drag-over {
+            border-color: var(--accent-gold);
+            background: rgba(230, 172, 0, 0.1);
+            transform: scale(1.01);
+        }
+
+        .upload-area-icon {
+            font-size: 56px; /* Larger icon */
+            color: var(--accent-gold); /* Gold color for visibility */
+            margin-bottom: 15px;
+        }
+
+        .upload-area-text {
+            color: var(--text-primary); /* Brighter text */
+            font-size: 18px; /* Larger text */
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .upload-area-subtext {
+            color: var(--text-secondary); /* Brighter subtext */
+            font-size: 14px; /* Larger subtext */
+        }
+
+        .uploaded-files {
+            margin-top: 20px;
+        }
+
+        .uploaded-file {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+
+        .uploaded-file-name {
+            flex: 1;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .uploaded-file-size {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-right: 15px;
+        }
+
+        .save-button {
+            background: var(--accent-gold);
+            color: var(--bg-primary);
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.2s;
+        }
+
+        .save-button:hover {
+            background: var(--accent-gold-hover);
+            transform: translateY(-1px);
+        }
+
+        .save-button:active {
+            transform: translateY(0);
+        }
+
+        /* Attachments Dropdown */
+        .attachments-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .attachments-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .attachments-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .attachments-count {
+            font-size: 12px;
+            color: var(--text-muted);
+            background: var(--bg-primary);
+            padding: 4px 10px;
+            border-radius: 12px;
+        }
+
+        .attachments-dropdown {
+            position: relative;
+        }
+
+        .attachments-select {
+            width: 100%;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23c4c4c4' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 15px center;
+            padding-right: 40px;
+        }
+
+        .attachments-select:hover {
+            border-color: var(--accent-gold);
+        }
+
+        .attachments-select:focus {
+            outline: none;
+            border-color: var(--accent-gold);
+        }
+
+        .attachments-select option {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 10px;
+        }
+
+        .attachment-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 15px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+        }
+
+        .attachment-item:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--accent-gold);
+        }
+
+        .attachment-icon {
+            font-size: 20px;
+            color: var(--accent-gold);
+        }
+
+        .attachment-info {
+            flex: 1;
+        }
+
+        .attachment-name {
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .attachment-meta {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .attachment-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .attachment-action-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .attachment-action-btn:hover {
+            background: var(--accent-gold);
+            color: var(--bg-primary);
+            border-color: var(--accent-gold);
+        }
+
+        .no-attachments {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .articles-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .articles-table thead {
+            background: var(--bg-tertiary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .articles-table th {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: var(--font-sm);
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .articles-table td {
+            padding: 12px 16px;
+            font-size: var(--font-sm);
+            color: var(--text-primary);
+        }
+
+        .articles-table tbody tr {
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .articles-table tbody tr:hover {
+            background: var(--bg-card-hover);
+        }
+
+        /* ============================================
+           RESPONSIVE DESIGN
+           ============================================ */
+
+        @media (max-width: 1024px) {
+            :root {
+                --category-panel-width: 40%;
+                --article-panel-width: 60%;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-container {
+                flex-direction: column;
+            }
+
+            .category-panel,
+            .article-panel {
+                width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
+            }
+
+            .category-panel {
+                height: 40vh;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .article-panel {
+                height: 60vh;
+            }
+
+            /* Hide resize handle on mobile */
+            .resize-handle {
+                display: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .admin-header h1 {
+                font-size: var(--font-md);
+            }
+
+            .admin-header .user-info {
+                display: none;
+            }
+
+            .article-panel-header .toolbar {
+                flex-direction: column;
+                gap: var(--space-sm);
+            }
+
+            .article-panel-header .search-box {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Admin Header -->
+    <header class="admin-header">
+        <h1>
+            <span style="color: var(--text-primary);">Jubilee</span><span style="color: var(--accent-gold);">Verse</span><span style="color: var(--text-primary);">.com</span>
+            <div style="font-size: 14px; font-weight: 400; margin-top: 4px; letter-spacing: 0.3px;">Jubilee Intelligence Architecture (JIA)</div>
+        </h1>
+        <div class="user-info">
+            <span>Admin User</span>
+            <button class="btn-logout">Logout</button>
+        </div>
+    </header>
+
+    <!-- Chat Toggle Button -->
+    <button class="chat-toggle-fab" onclick="toggleChatPanel()" title="Open Jubilee Inspire" id="chatToggleFab">
+        <img src="/images/JubileeLogo.png" alt="Jubilee" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%232196F3%22/%3E%3Ctext x=%2250%22 y=%2265%22 font-size=%2260%22 text-anchor=%22middle%22%3EJ%3C/text%3E%3C/svg%3E'" style="width: 100%; height: 100%; border-radius: 50%;">
+    </button>
+
+    <!-- Main Dashboard Container -->
+    <div class="dashboard-container">
+        <!-- LEFT PANEL - CATEGORIES -->
+        <div class="category-panel" id="categoryPanel">
+            <div class="category-panel-header">
+                <h2>
+                    <span id="categoryTitle">Categories</span>
+                    <div class="tree-controls">
+                        <button class="btn-tree-control" onclick="refreshCategories()" title="Refresh Tree">🔄 Refresh</button>
+                        <button class="btn-tree-control" onclick="collapseAll()" title="Collapse All">Collapse All</button>
+                    </div>
+                </h2>
+            </div>
+
+            <div class="category-list" id="categoryList">
+                <!-- Categories will be loaded here -->
+                <div class="loading-spinner">
+                    <p>Loading categories...</p>
+                </div>
+            </div>
+
+            <div class="category-search-footer">
+                <input type="text" class="search-box" id="categorySearch" placeholder="Search categories..." oninput="filterCategories(this.value)">
+            </div>
+        </div>
+
+        <!-- RESIZE HANDLE -->
+        <div class="resize-handle" id="resizeHandle"></div>
+
+        <!-- RIGHT PANEL - CONTENT -->
+        <div class="article-panel" id="articlePanel">
+            <div class="article-panel-header">
+                <div class="article-panel-tabs">
+                    <button class="tab-button active" onclick="switchTab('content')">Content</button>
+                    <button class="tab-button" onclick="switchTab('pulse-tasks')">Pulse Tasks</button>
+                    <button class="tab-button" onclick="switchTab('portal-articles')">Portal Articles</button>
+                </div>
+                <button class="btn-new-content" onclick="createNewContent()">+ New Content</button>
+            </div>
+
+            <!-- CONTENT TAB -->
+            <div id="content-tab" class="tab-content active">
+                <div class="article-list" id="articleList">
+                    <!-- Content will be loaded here -->
+                    <div class="empty-state">
+                        <h3>Select a Category</h3>
+                        <p>Choose a category from the left panel to view content</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PULSE TASKS TAB -->
+            <div id="pulse-tasks-tab" class="tab-content">
+                <div class="pulse-tasks-container">
+                    <table class="pulse-tasks-table">
+                        <thead>
+                            <tr>
+                                <th>Task Title</th>
+                                <th>User</th>
+                                <th>Delivery</th>
+                                <th>Status</th>
+                                <th>Done Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pulseTasksBody">
+                            <!-- Tasks will be loaded here -->
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: var(--space-2xl);">
+                                    No tasks found
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PORTAL ARTICLES TAB -->
+            <div id="portal-articles-tab" class="tab-content">
+                <div class="portal-articles-container">
+                    <div class="portal-articles-toolbar">
+                        <div class="portal-filter-buttons">
+                            <button class="portal-filter-btn active" data-status="pending" onclick="loadPortalArticles('pending', this)">Pending</button>
+                            <button class="portal-filter-btn" data-status="approved" onclick="loadPortalArticles('approved', this)">Approved</button>
+                            <button class="portal-filter-btn" data-status="rejected" onclick="loadPortalArticles('rejected', this)">Rejected</button>
+                        </div>
+                        <span class="portal-articles-count" id="portalArticlesCount"></span>
+                    </div>
+                    <div class="portal-articles-list" id="portalArticlesList">
+                        <div style="text-align:center; color:var(--text-muted); padding:var(--space-2xl);">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CHAT RESIZE HANDLE -->
+        <div class="resize-handle" id="chatResizeHandle" style="display: none;"></div>
+
+        <!-- RIGHT PANEL - JUBILEE INSPIRE CHAT -->
+        <div class="jubilee-chat-panel" id="jubileeChatPanel" style="display: none;">
+            <div class="chat-panel-header">
+                <div class="chat-header-right" style="margin-left: auto;">
+                    <button class="btn-chat-close" onclick="toggleChatPanel()" title="Close">×</button>
+                </div>
+            </div>
+
+            <div class="chat-panel-body" id="chatPanelBody">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="chat-message jubilee-message">
+                        <div class="message-avatar">
+                            <img src="/images/JubileeLogo.png" alt="Jubilee" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%232196F3%22/%3E%3Ctext x=%2250%22 y=%2265%22 font-size=%2250%22 text-anchor=%22middle%22%3EJ%3C/text%3E%3C/svg%3E'">
+                        </div>
+                        <div class="message-content">
+                            <div class="message-header">
+                                <span class="message-sender">Jubilee Inspire</span>
+                                <span class="message-time" id="welcomeTime"></span>
+                            </div>
+                            <div class="message-text">Hello there! I'm Jubilee Inspire 😊 I'll keep you updated on all your task progress and help you stay organized with your content. What can I help you with today?</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input-container">
+                    <textarea
+                        id="chatInput"
+                        class="chat-input"
+                        placeholder="Type your message to Jubilee..."
+                        rows="2"
+                        onkeydown="handleChatKeydown(event)"></textarea>
+                    <button class="btn-send-chat" onclick="sendChatMessage()" title="Send message">
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // RESIZABLE PANEL FUNCTIONALITY
+        // ============================================
+
+        const categoryPanel = document.getElementById('categoryPanel');
+        const articlePanel = document.getElementById('articlePanel');
+        const resizeHandle = document.getElementById('resizeHandle');
+        const dashboardContainer = document.querySelector('.dashboard-container');
+
+        let isResizing = false;
+        let startX = 0;
+        let startWidth = 0;
+
+        // Load saved panel width from localStorage
+        function loadPanelWidth() {
+            const savedWidth = localStorage.getItem('categoryPanelWidth');
+            if (savedWidth && categoryPanel) {
+                categoryPanel.style.width = savedWidth;
+            }
+        }
+
+        // Save panel width to localStorage
+        function savePanelWidth(width) {
+            localStorage.setItem('categoryPanelWidth', width);
+        }
+
+        // Start resizing (with null checking)
+        if (resizeHandle && categoryPanel && dashboardContainer) {
+            resizeHandle.addEventListener('mousedown', function(e) {
+                isResizing = true;
+                startX = e.clientX;
+                startWidth = categoryPanel.offsetWidth;
+                resizeHandle.classList.add('dragging');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+
+            // Resize panel
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing) return;
+
+                const containerWidth = dashboardContainer.offsetWidth;
+                const deltaX = e.clientX - startX;
+                const newWidth = startWidth + deltaX;
+
+                // Enforce min and max widths
+                const minWidth = 250;
+                const maxWidth = containerWidth * 0.6;
+
+                if (newWidth >= minWidth && newWidth <= maxWidth) {
+                    const widthPercent = (newWidth / containerWidth) * 100;
+                    categoryPanel.style.width = widthPercent + '%';
+                }
+            });
+
+            // Stop resizing
+            document.addEventListener('mouseup', function() {
+                if (isResizing) {
+                    isResizing = false;
+                    resizeHandle.classList.remove('dragging');
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+
+                    // Save the new width
+                    savePanelWidth(categoryPanel.style.width);
+                }
+            });
+
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                const containerWidth = dashboardContainer.offsetWidth;
+                const currentWidth = categoryPanel.offsetWidth;
+                const minWidth = 250;
+                const maxWidth = containerWidth * 0.6;
+
+                if (currentWidth < minWidth) {
+                    categoryPanel.style.width = minWidth + 'px';
+                } else if (currentWidth > maxWidth) {
+                    categoryPanel.style.width = maxWidth + 'px';
+                }
+            });
+        } else {
+            console.warn('Category panel resize elements not found');
+        }
+
+        // ============================================
+        // CATEGORY TREE FUNCTIONALITY
+        // ============================================
+
+        let categoriesData = [];
+        let rootCategoryIds = new Set(); // True roots shown at top of tree
+        const loadingChildrenRequests = new Map(); // Prevent concurrent duplicate loads per parent
+        let expandedNodes = new Set(JSON.parse(localStorage.getItem('expandedNodes') || '[]'));
+
+        // Clear stale loadedParents data - it will be rebuilt as categories are actually loaded
+        // This prevents issues where localStorage says children are loaded but they're not in categoriesData
+        localStorage.removeItem('loadedParents');
+        let loadedParents = new Set(); // Track which parent nodes have loaded their children
+
+        // Version indicator for debugging
+        console.log('%c[JubileeVerse Dashboard] JIT v2.0 - Just-In-Time Loading Active', 'color: #E6AC00; font-weight: bold; font-size: 14px;');
+        console.log('[JIT] Lazy loading enabled - categories load on-demand');
+
+        // Merge category nodes by id so duplicate payloads/race conditions don't duplicate UI nodes
+        function mergeUniqueCategories(existing, incoming) {
+            const byId = new Map();
+
+            existing.forEach(cat => {
+                if (cat && cat.id !== undefined && cat.id !== null) {
+                    byId.set(String(cat.id), cat);
+                }
+            });
+
+            incoming.forEach(cat => {
+                if (cat && cat.id !== undefined && cat.id !== null) {
+                    byId.set(String(cat.id), cat);
+                }
+            });
+
+            return Array.from(byId.values());
+        }
+
+        // Fetch categories from API (JIT - Just In Time loading)
+        async function loadCategories() {
+            console.log('[JIT] loadCategories() called');
+            const categoryList = document.getElementById('categoryList');
+
+            try {
+                // Show loading state
+                categoryList.innerHTML = `
+                    <div class="loading-spinner">
+                        <p>Loading categories...</p>
+                    </div>
+                `;
+                console.log('[JIT] Fetching top-level content categories from API...');
+
+                // Load level-2 categories: the actual content sections visible to the user.
+                // jubileeverse.com (64166) and jubileeinspire.com (64148) are both at level 1,
+                // their direct children (Devotionals, Encouragement, Faith Builders, etc.) are level 2.
+                const response = await fetch('/api/admin/categories?level=2');
+                if (!response.ok) throw new Error('Failed to load categories');
+
+                const rootCategories = await response.json();
+                console.log(`[JIT] Loaded ${rootCategories.length} top-level content categories (level 2)`);
+                console.log('[JIT] Root categories:', rootCategories);
+
+                categoriesData = mergeUniqueCategories([], rootCategories);
+                rootCategoryIds = new Set(rootCategories.map(cat => cat.id));
+                loadedParents.add(null); // Mark root level as loaded
+                localStorage.setItem('loadedParents', JSON.stringify([...loadedParents])); // Save to localStorage
+                console.log('[JIT] categoriesData set:', categoriesData.length, 'items');
+
+                // Fetch and display total category count
+                const categoryTitle = document.getElementById('categoryTitle');
+                if (categoryTitle) {
+                    try {
+                        const countResponse = await fetch('/api/admin/categories/count');
+                        if (countResponse.ok) {
+                            const countData = await countResponse.json();
+                            categoryTitle.textContent = `Categories (${countData.total.toLocaleString()} total)`;
+                            console.log(`[JIT] Total categories in system: ${countData.total}`);
+                        } else {
+                            categoryTitle.textContent = `Categories (${rootCategories.length} root)`;
+                        }
+                    } catch (error) {
+                        console.error('Error fetching category count:', error);
+                        categoryTitle.textContent = `Categories (${rootCategories.length} root)`;
+                    }
+                }
+
+                console.log('[JIT] About to call renderCategoryTree()');
+                renderCategoryTree();
+                console.log('[JIT] renderCategoryTree() completed');
+
+                // Auto-load children for previously expanded nodes
+                await autoLoadExpandedNodes();
+
+            } catch (error) {
+                console.error('Error loading categories:', error);
+                categoryList.innerHTML = `
+                    <div class="empty-state">
+                        <h3>Error Loading Categories</h3>
+                        <p>${error.message}</p>
+                        <p style="margin-top: 8px; font-size: 12px;">Using mock data for demonstration</p>
+                    </div>
+                `;
+                // Use mock data for development
+                loadMockCategories();
+            }
+        }
+
+        // Load children for a specific parent (JIT lazy loading)
+        async function loadChildren(parentId) {
+            if (loadedParents.has(parentId)) {
+                console.log(`[JIT] Children for parent ${parentId} already loaded`);
+                // Return existing children from categoriesData
+                const existingChildren = categoriesData.filter(cat => cat.parent_id === parentId);
+                return existingChildren;
+            }
+
+            if (loadingChildrenRequests.has(parentId)) {
+                console.log(`[JIT] Children for parent ${parentId} are already loading`);
+                return loadingChildrenRequests.get(parentId);
+            }
+
+            const loadPromise = (async () => {
+                try {
+                    console.log(`[JIT] Fetching children and albums for parent ${parentId}...`);
+
+                    // Fetch both categories and albums in parallel
+                    const [categoriesResponse, albumsResponse] = await Promise.all([
+                        fetch(`/api/admin/categories?parent_id=${parentId}`),
+                        fetch(`/api/admin/albums?category_id=${parentId}`)
+                    ]);
+
+                    if (!categoriesResponse.ok) throw new Error('Failed to load children');
+
+                    const children = await categoriesResponse.json();
+                    const albums = albumsResponse.ok ? await albumsResponse.json() : [];
+
+                    console.log(`[JIT] Loaded ${children.length} categories + ${albums.length} albums for parent ${parentId}`);
+
+                    // Convert albums to pseudo-categories for tree display
+                    const albumNodes = albums.map(album => ({
+                        id: `album-${album.id}`,
+                        name: album.title,
+                        slug: album.slug,
+                        parent_id: parentId,
+                        level: 99, // Special level to identify as album
+                        sort_order: album.sort_order,
+                        is_album: true,
+                        album_data: album
+                    }));
+
+                    // Combine categories and albums
+                    const allChildren = mergeUniqueCategories([], [...children, ...albumNodes]);
+
+                    // Add unique children to categoriesData (protect against duplicate appends)
+                    categoriesData = mergeUniqueCategories(categoriesData, allChildren);
+                    loadedParents.add(parentId);
+
+                    // Save loadedParents to localStorage for persistence across page refreshes
+                    localStorage.setItem('loadedParents', JSON.stringify([...loadedParents]));
+
+                    return allChildren;
+                } catch (error) {
+                    console.error(`Error loading children for parent ${parentId}:`, error);
+                    return [];
+                }
+            })();
+
+            loadingChildrenRequests.set(parentId, loadPromise);
+
+            try {
+                return await loadPromise;
+            } finally {
+                loadingChildrenRequests.delete(parentId);
+            }
+        }
+
+        // Auto-load children for previously expanded nodes on page load
+        async function autoLoadExpandedNodes() {
+            console.log('[JIT] Auto-loading previously expanded nodes...');
+            console.log('[JIT] expandedNodes:', [...expandedNodes]);
+            console.log('[JIT] loadedParents:', [...loadedParents]);
+
+            // Get all expanded nodes that need their children loaded
+            const nodesToLoad = [...expandedNodes].filter(nodeId => {
+                // Skip album nodes (they don't have children)
+                if (String(nodeId).startsWith('album-')) {
+                    return false;
+                }
+                // Skip stale IDs that are not currently present in the loaded tree
+                if (!categoriesData.some(cat => String(cat.id) === String(nodeId))) {
+                    return false;
+                }
+                return !loadedParents.has(nodeId);
+            });
+
+            if (nodesToLoad.length === 0) {
+                console.log('[JIT] All expanded nodes already have children loaded');
+                return;
+            }
+
+            console.log(`[JIT] Loading children for ${nodesToLoad.length} expanded nodes:`, nodesToLoad);
+
+            // Load children for each expanded node sequentially
+            for (const nodeId of nodesToLoad) {
+                try {
+                    await loadChildren(nodeId);
+                } catch (error) {
+                    console.error(`[JIT] Error auto-loading children for node ${nodeId}:`, error);
+                }
+            }
+
+            // Re-render the tree once with all loaded children
+            console.log('[JIT] Re-rendering tree after auto-load');
+            renderCategoryTree();
+        }
+
+        // Load mock data for development
+        function loadMockCategories() {
+            // Generate mock data with realistic structure
+            const mockData = [
+                { id: 1, name: 'Jubilee Ministries', slug: 'jubilee-ministries', parent_id: null, level: 0, sort_order: 1 },
+                { id: 2, name: 'Business Services', slug: 'business-services', parent_id: null, level: 0, sort_order: 2 },
+            ];
+
+            // Add some Level 1 children for Jubilee Ministries
+            for (let i = 1; i <= 10; i++) {
+                mockData.push({
+                    id: 350 + i,
+                    name: `Theological Domain ${i}`,
+                    slug: `theological-domain-${i}`,
+                    parent_id: 1,
+                    level: 1,
+                    sort_order: i
+                });
+            }
+
+            // Add some Level 1 children for Business Services
+            for (let i = 1; i <= 5; i++) {
+                mockData.push({
+                    id: 2 + i,
+                    name: `Business Domain ${i}`,
+                    slug: `business-domain-${i}`,
+                    parent_id: 2,
+                    level: 1,
+                    sort_order: i
+                });
+            }
+
+            categoriesData = mockData;
+            rootCategoryIds = new Set(
+                mockData
+                    .filter(cat => cat.parent_id === null || cat.parent_id === undefined)
+                    .map(cat => cat.id)
+            );
+            console.log('Loaded mock data with', categoriesData.length, 'categories');
+            renderCategoryTree();
+        }
+
+        // Build hierarchical tree structure (JIT - only builds loaded nodes)
+        // Root pass renders only known root category IDs loaded by loadCategories().
+        function buildTree(categories, parentId = null) {
+            const isRootPass = parentId === null;
+
+            const children = categories
+                .filter(cat => {
+                    if (!isRootPass) return cat.parent_id === parentId;
+                    if (rootCategoryIds.size === 0) {
+                        return cat.parent_id === null || cat.parent_id === undefined;
+                    }
+                    return rootCategoryIds.has(cat.id);
+                })
+                // Alphabetical sorting (already done by API, but ensure consistency)
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(cat => ({
+                    ...cat,
+                    // Only build children if this parent has loaded them
+                    children: loadedParents.has(cat.id) ? buildTree(categories, cat.id) : []
+                }));
+
+            // Debug logging for root nodes
+            if (parentId === null && children.length > 0) {
+                console.log(`[JIT] Building tree from ${categories.length} loaded categories`);
+                children.forEach(node => {
+                    const childCount = categories.filter(c => c.parent_id === node.id).length;
+                    const status = loadedParents.has(node.id) ? 'loaded' : 'not loaded';
+                    console.log(`  "${node.name}" (id:${node.id}, level:${node.level}): ${childCount} children [${status}]`);
+                });
+            }
+
+            return children;
+        }
+
+        // Render category tree
+        function renderCategoryTree() {
+            console.log('[JIT] renderCategoryTree() called, categoriesData:', categoriesData.length);
+            const startTime = performance.now();
+
+            // Hard-stop duplicate IDs from rendering twice if state was polluted by prior race conditions
+            categoriesData = mergeUniqueCategories([], categoriesData);
+
+            const tree = buildTree(categoriesData);
+            console.log('[JIT] buildTree() returned', tree.length, 'nodes');
+            console.log('[JIT] Tree:', tree);
+
+            const container = document.getElementById('categoryList');
+            console.log('[JIT] container element:', container);
+            container.innerHTML = '';
+
+            // Use DocumentFragment for better performance
+            const fragment = document.createDocumentFragment();
+            const ul = document.createElement('ul');
+            ul.className = 'category-tree';
+
+            tree.forEach(node => {
+                ul.appendChild(renderTreeNode(node));
+            });
+
+            fragment.appendChild(ul);
+            container.appendChild(fragment);
+
+            console.log('[JIT] Tree appended to container, ul has', ul.children.length, 'children');
+
+            // If no categories, show a message
+            if (tree.length === 0) {
+                container.innerHTML = '<div style="padding: 20px; color: #E6AC00;">No categories found. Check console for errors.</div>';
+            }
+
+            // Restore selected category
+            const selectedId = localStorage.getItem('selectedCategoryId');
+            if (selectedId) {
+                const selectedElement = document.querySelector(`.category-node[data-id="${selectedId}"]`);
+                if (selectedElement) {
+                    selectedElement.classList.add('active');
+                    // Also load the content for the selected category
+                    loadArticlesForCategory(selectedId);
+                }
+            }
+
+            const endTime = performance.now();
+            console.log(`Tree rendered in ${(endTime - startTime).toFixed(2)}ms`);
+            console.log(`Tree structure: ${tree.length} root nodes`);
+            tree.forEach(node => {
+                console.log(`  ${node.name}: ${node.children ? node.children.length : 0} children`);
+            });
+        }
+
+        // Render individual tree node
+        function renderTreeNode(node) {
+            const li = document.createElement('li');
+            li.className = 'category-tree-item';
+            li.dataset.id = node.id;
+
+            // Albums are always leaf nodes
+            const isAlbum = node.is_album === true;
+
+            const hasLoadedChildren = node.children && node.children.length > 0;
+            const isExpanded = expandedNodes.has(node.id);
+            // If we've already loaded children, only show toggle if there are children
+            // If not loaded yet, show toggle for levels that typically have children (0-4)
+            // Albums never have children
+            const mightHaveChildren = !isAlbum && (loadedParents.has(node.id)
+                ? hasLoadedChildren  // Already loaded: only show if has children
+                : node.level < 5);     // Not loaded: show for levels that might have children (supports deeper hierarchies)
+
+            // Create node element
+            const nodeDiv = document.createElement('div');
+            nodeDiv.className = 'category-node' + (isAlbum ? ' album-node' : '');
+            nodeDiv.dataset.level = node.level;
+            nodeDiv.dataset.id = node.id;
+
+            // Toggle button
+            const toggle = document.createElement('span');
+            toggle.className = 'tree-toggle' + (mightHaveChildren ? ' has-children' : '');
+
+            // Show appropriate icon based on state
+            if (isAlbum) {
+                toggle.textContent = '🎵'; // Album icon
+                toggle.style.cursor = 'default';
+            } else if (!mightHaveChildren) {
+                toggle.textContent = '•'; // Leaf node
+            } else if (isExpanded && hasLoadedChildren) {
+                toggle.textContent = '−'; // Expanded with loaded children
+            } else if (isExpanded && !hasLoadedChildren) {
+                toggle.textContent = '⏳'; // Expanding/loading
+            } else {
+                toggle.textContent = '+'; // Collapsed
+            }
+
+            if (mightHaveChildren) {
+                toggle.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleNode(node.id);
+                };
+            }
+            nodeDiv.appendChild(toggle);
+
+            // Category name (with search highlighting)
+            const name = document.createElement('span');
+            name.className = 'category-name';
+            name.dataset.categoryId = node.id;
+            name.dataset.categoryName = node.name;
+
+            if (searchTerm && node.name.toLowerCase().includes(searchTerm)) {
+                // Highlight matching text
+                const regex = new RegExp(`(${searchTerm})`, 'gi');
+                const highlightedName = node.name.replace(regex, '<mark style="background-color: var(--accent-gold); color: var(--bg-primary); padding: 2px 4px; border-radius: 2px;">$1</mark>');
+                name.innerHTML = highlightedName;
+            } else {
+                name.textContent = node.name;
+            }
+
+            // Double-click to edit category name
+            name.style.cursor = 'pointer';
+            name.ondblclick = (e) => {
+                e.stopPropagation();
+                enterCategoryEditMode(node.id, node.name, name);
+            };
+
+            nodeDiv.appendChild(name);
+
+            // Child count (only show if children are loaded)
+            if (hasLoadedChildren) {
+                const count = document.createElement('span');
+                count.className = 'category-count';
+                count.textContent = `(${node.children.length})`;
+                nodeDiv.appendChild(count);
+            } else if (mightHaveChildren && !loadedParents.has(node.id)) {
+                // Show placeholder for nodes that might have children
+                const count = document.createElement('span');
+                count.className = 'category-count';
+                count.style.opacity = '0.5';
+                count.textContent = '(?)';
+                nodeDiv.appendChild(count);
+            }
+
+            // Click handler for selection
+            nodeDiv.onclick = (e) => {
+                // Don't trigger if clicking toggle
+                if (e.target === toggle) {
+                    return;
+                }
+                selectCategory(node.id, nodeDiv);
+            };
+
+            li.appendChild(nodeDiv);
+
+            // Render children using DocumentFragment for better performance
+            if (hasLoadedChildren) {
+                const childrenUl = document.createElement('ul');
+                childrenUl.className = 'category-children ' + (isExpanded ? 'expanded' : 'collapsed');
+
+                // Use DocumentFragment for batch DOM updates
+                const fragment = document.createDocumentFragment();
+                node.children.forEach(child => {
+                    fragment.appendChild(renderTreeNode(child));
+                });
+                childrenUl.appendChild(fragment);
+
+                li.appendChild(childrenUl);
+            } else if (isExpanded && !loadedParents.has(node.id)) {
+                // Show loading state for expanded nodes that are still loading
+                const childrenUl = document.createElement('ul');
+                childrenUl.className = 'category-children expanded';
+
+                const loadingLi = document.createElement('li');
+                loadingLi.style.padding = '8px 16px';
+                loadingLi.style.opacity = '0.6';
+                loadingLi.textContent = 'Loading...';
+                childrenUl.appendChild(loadingLi);
+
+                li.appendChild(childrenUl);
+            }
+
+            return li;
+        }
+
+        // Toggle node expansion (JIT - loads children on first expand)
+        async function toggleNode(nodeId) {
+            console.log(`[JIT] Toggling node ${nodeId}`);
+
+            if (expandedNodes.has(nodeId)) {
+                // Collapsing - just update UI
+                expandedNodes.delete(nodeId);
+                console.log(`[JIT] Collapsed node ${nodeId}`);
+
+                // Save to localStorage
+                localStorage.setItem('expandedNodes', JSON.stringify([...expandedNodes]));
+
+                // Re-render tree
+                requestAnimationFrame(() => {
+                    renderCategoryTree();
+                });
+            } else {
+                // Expanding - load children if not already loaded
+                expandedNodes.add(nodeId);
+                console.log(`[JIT] Expanding node ${nodeId}`);
+
+                // Save to localStorage
+                localStorage.setItem('expandedNodes', JSON.stringify([...expandedNodes]));
+
+                // Load children if not already loaded
+                if (!loadedParents.has(nodeId)) {
+                    // Show loading indicator for this node
+                    const nodeElement = document.querySelector(`.category-node[data-id="${nodeId}"]`);
+                    if (nodeElement) {
+                        const toggle = nodeElement.querySelector('.tree-toggle');
+                        if (toggle) {
+                            toggle.textContent = '⏳'; // Loading indicator
+                        }
+                    }
+
+                    const children = await loadChildren(nodeId);
+
+                    // If no children were found, remove from expanded nodes
+                    if (!children || children.length === 0) {
+                        expandedNodes.delete(nodeId);
+                        localStorage.setItem('expandedNodes', JSON.stringify([...expandedNodes]));
+                        console.log(`[JIT] Node ${nodeId} has no children, auto-collapsing`);
+                    }
+                }
+
+                // Re-render tree with loaded children
+                requestAnimationFrame(() => {
+                    renderCategoryTree();
+                });
+            }
+        }
+
+        // Select category
+        function selectCategory(categoryId, element) {
+            // Remove active class from all nodes
+            document.querySelectorAll('.category-node').forEach(node => {
+                node.classList.remove('active');
+            });
+
+            // Add active class to selected node
+            if (element) {
+                element.classList.add('active');
+            }
+
+            // Save selected category
+            localStorage.setItem('selectedCategoryId', categoryId);
+
+            // Load articles for this category
+            loadArticlesForCategory(categoryId);
+        }
+
+        // Enter edit mode for category name
+        function enterCategoryEditMode(categoryId, currentName, nameElement) {
+            // Exit if already in edit mode
+            if (nameElement.querySelector('input')) return;
+
+            // Create input field
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentName;
+            input.className = 'category-name-edit';
+            input.style.cssText = `
+                width: 200px;
+                padding: 4px 8px;
+                background: var(--bg-primary);
+                border: 1px solid var(--accent-gold);
+                color: var(--text-primary);
+                font-size: inherit;
+                font-family: inherit;
+                border-radius: 4px;
+            `;
+
+            // Create button container
+            const buttonContainer = document.createElement('span');
+            buttonContainer.style.cssText = 'display: inline-flex; gap: 5px; margin-left: 8px;';
+
+            // Create save button
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = '✓';
+            saveBtn.className = 'category-edit-btn';
+            saveBtn.title = 'Save';
+            saveBtn.style.cssText = `
+                background: var(--accent-gold);
+                color: var(--bg-primary);
+                border: none;
+                padding: 2px 8px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-weight: bold;
+            `;
+            saveBtn.onclick = () => saveCategoryName(categoryId, input.value, nameElement);
+
+            // Create cancel button
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = '✕';
+            cancelBtn.className = 'category-edit-btn';
+            cancelBtn.title = 'Cancel';
+            cancelBtn.style.cssText = `
+                background: var(--bg-tertiary);
+                color: var(--text-secondary);
+                border: 1px solid var(--border-color);
+                padding: 2px 8px;
+                border-radius: 4px;
+                cursor: pointer;
+            `;
+            cancelBtn.onclick = () => exitCategoryEditMode(categoryId, currentName, nameElement);
+
+            // Create delete button
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '🗑';
+            deleteBtn.className = 'category-edit-btn';
+            deleteBtn.title = 'Delete Category';
+            deleteBtn.style.cssText = `
+                background: #dc2626;
+                color: white;
+                border: none;
+                padding: 2px 8px;
+                border-radius: 4px;
+                cursor: pointer;
+            `;
+            deleteBtn.onclick = () => deleteCategory(categoryId, currentName);
+
+            buttonContainer.appendChild(saveBtn);
+            buttonContainer.appendChild(cancelBtn);
+            buttonContainer.appendChild(deleteBtn);
+
+            // Replace name with input and buttons
+            nameElement.textContent = '';
+            nameElement.appendChild(input);
+            nameElement.appendChild(buttonContainer);
+
+            // Focus input and select text
+            input.focus();
+            input.select();
+
+            // Save on Enter, cancel on Escape
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveCategoryName(categoryId, input.value, nameElement);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    exitCategoryEditMode(categoryId, currentName, nameElement);
+                }
+            };
+        }
+
+        // Save category name
+        async function saveCategoryName(categoryId, newName, nameElement) {
+            if (!newName.trim()) {
+                alert('Category name cannot be empty');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/categories/${categoryId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: newName.trim() })
+                });
+
+                if (!response.ok) throw new Error('Failed to update category');
+
+                // Update the category in local data
+                const category = categoriesData.find(c => c.id === categoryId);
+                if (category) {
+                    category.name = newName.trim();
+                }
+
+                // Exit edit mode and refresh
+                nameElement.textContent = newName.trim();
+                nameElement.dataset.categoryName = newName.trim();
+
+                console.log(`✅ Category ${categoryId} renamed to "${newName.trim()}"`);
+
+            } catch (error) {
+                console.error('Error updating category:', error);
+                alert('Failed to update category name');
+            }
+        }
+
+        // Exit edit mode without saving
+        function exitCategoryEditMode(categoryId, originalName, nameElement) {
+            nameElement.textContent = originalName;
+        }
+
+        // Delete category
+        async function deleteCategory(categoryId, categoryName) {
+            const confirmed = confirm(`Are you sure you want to delete "${categoryName}"?\n\nThis will also delete all subcategories and articles under it.`);
+
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch(`/api/admin/categories/${categoryId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) throw new Error('Failed to delete category');
+
+                // Remove from local data
+                categoriesData = categoriesData.filter(c => c.id !== categoryId && c.parent_id !== categoryId);
+
+                // Remove from expanded nodes if present
+                expandedNodes.delete(categoryId);
+                loadedParents.delete(categoryId);
+                localStorage.setItem('expandedNodes', JSON.stringify([...expandedNodes]));
+                localStorage.setItem('loadedParents', JSON.stringify([...loadedParents]));
+
+                // Refresh the tree
+                renderCategoryTree();
+
+                console.log(`✅ Category ${categoryId} deleted`);
+
+            } catch (error) {
+                console.error('Error deleting category:', error);
+                alert('Failed to delete category');
+            }
+        }
+
+        // Expand all nodes
+        function expandAll() {
+            // Add all category IDs to expanded nodes
+            categoriesData.forEach(cat => {
+                const hasChildren = categoriesData.some(c => c.parent_id === cat.id);
+                if (hasChildren) {
+                    expandedNodes.add(cat.id);
+                }
+            });
+
+            // Save and re-render
+            localStorage.setItem('expandedNodes', JSON.stringify([...expandedNodes]));
+            renderCategoryTree();
+        }
+
+        // Collapse all nodes
+        function collapseAll() {
+            // Clear all expanded nodes
+            expandedNodes.clear();
+
+            // Save and re-render
+            localStorage.setItem('expandedNodes', JSON.stringify([...expandedNodes]));
+            renderCategoryTree();
+        }
+
+        // Refresh category tree (clears cache and reloads from server)
+        async function refreshCategories() {
+            console.log('[JIT] Refreshing category tree...');
+
+            // Clear the loaded parents cache
+            loadedParents.clear();
+            rootCategoryIds.clear();
+            loadingChildrenRequests.clear();
+            localStorage.removeItem('loadedParents'); // Clear from localStorage
+
+            // Clear categories data
+            categoriesData = [];
+
+            // Reload root categories
+            await loadCategories();
+
+            console.log('[JIT] Category tree refreshed');
+        }
+
+        // Filter categories by search term
+        let searchTerm = '';
+        function filterCategories(term) {
+            searchTerm = term.toLowerCase().trim();
+
+            if (searchTerm) {
+                // When searching, expand all nodes that match or have matching descendants
+                const matchingIds = new Set();
+
+                // Find all matching categories
+                categoriesData.forEach(cat => {
+                    if (cat.name.toLowerCase().includes(searchTerm)) {
+                        matchingIds.add(cat.id);
+                        // Add all parents to ensure visibility
+                        addParentIds(cat.id, matchingIds);
+                    }
+                });
+
+                // Expand matching categories and their parents
+                matchingIds.forEach(id => expandedNodes.add(id));
+            }
+
+            renderCategoryTree();
+        }
+
+        // Helper to add all parent IDs
+        function addParentIds(categoryId, idSet) {
+            const category = categoriesData.find(c => c.id === categoryId);
+            if (category && category.parent_id) {
+                idSet.add(category.parent_id);
+                addParentIds(category.parent_id, idSet);
+            }
+        }
+
+        // Load articles for selected category
+        async function loadArticlesForCategory(categoryId) {
+            const category = categoriesData.find(c => c.id === categoryId);
+            const articleList = document.getElementById('articleList');
+
+            // Show loading state
+            articleList.innerHTML = `
+                <div class="loading-spinner">
+                    <p>Loading articles for: ${category ? category.name : 'Category'}</p>
+                </div>
+            `;
+
+            try {
+                // Determine if we should aggregate (Level 1 domains with children)
+                const hasChildren = categoriesData.some(c => c.parent_id === categoryId);
+                const shouldAggregate = category && category.level === 1 && hasChildren;
+
+                const url = `/api/admin/articles?category_id=${categoryId}${shouldAggregate ? '&aggregate=true' : ''}`;
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // Display articles or empty state
+                if (data.articles && data.articles.length > 0) {
+                    renderArticleList(data.articles, category, data.aggregated);
+                } else {
+                    articleList.innerHTML = `
+                        <div class="empty-state">
+                            <h3>No Content Found</h3>
+                            <p>Category: ${category ? category.name : 'Unknown'}</p>
+                            <p style="margin-top: 8px; color: var(--text-muted);">
+                                ${shouldAggregate ? 'This domain and its subcategories have no content yet.' : 'No content in this category yet.'}
+                            </p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading content:', error);
+                // Show empty state with mock data for development
+                renderMockArticles(category);
+            }
+        }
+
+        // Render article list as table
+        function renderArticleList(articles, category, isAggregated) {
+            const articleList = document.getElementById('articleList');
+            articleList.innerHTML = '';
+
+            // Add header with article count
+            const header = document.createElement('div');
+            header.style.padding = 'var(--space-lg)';
+            header.style.borderBottom = '1px solid var(--border-color)';
+            header.innerHTML = `
+                <h3 style="font-size: var(--font-md); margin-bottom: var(--space-xs);">
+                    ${category ? category.name : 'Articles'}
+                </h3>
+                <p style="font-size: var(--font-xs); color: var(--text-muted);">
+                    ${articles.length} article${articles.length !== 1 ? 's' : ''}
+                    ${isAggregated ? ' (including subcategories)' : ''}
+                </p>
+            `;
+            articleList.appendChild(header);
+
+            // Create table container
+            const container = document.createElement('div');
+            container.style.padding = 'var(--space-lg)';
+            container.style.overflowX = 'auto';
+
+            // Create table
+            const table = document.createElement('table');
+            table.className = 'articles-table';
+
+            // Create table header
+            const thead = document.createElement('thead');
+            thead.innerHTML = `
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Author</th>
+                    <th>Content Type</th>
+                    <th>Subtype</th>
+                    <th>Status</th>
+                    <th>Date Created</th>
+                </tr>
+            `;
+            table.appendChild(thead);
+
+            // Create table body
+            const tbody = document.createElement('tbody');
+            articles.forEach(article => {
+                const row = createArticleTableRow(article, isAggregated);
+                tbody.appendChild(row);
+            });
+            table.appendChild(tbody);
+
+            container.appendChild(table);
+            articleList.appendChild(container);
+        }
+
+        // Create article table row
+        function createArticleTableRow(article, showCategory) {
+            const row = document.createElement('tr');
+            row.dataset.articleId = article.id;
+
+            // Format date
+            const date = new Date(article.created_at);
+            const formattedDate = date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            // Create cells
+            row.innerHTML = `
+                <td>${article.id}</td>
+                <td>${escapeHtml(article.title)}</td>
+                <td>${escapeHtml(article.author || 'Rico')}</td>
+                <td>${escapeHtml(article.content_type || 'Web Article')}</td>
+                <td>${article.subtype ? escapeHtml(article.subtype) : '-'}</td>
+                <td>${escapeHtml(article.status || 'Published')}</td>
+                <td>${formattedDate}</td>
+            `;
+
+            // Add double-click handler to open modal
+            row.addEventListener('dblclick', () => openArticleModal(article.id));
+
+            return row;
+        }
+
+        // Open article in new window
+        function openArticle(articleId) {
+            const url = `/admin/article.html?id=${articleId}`;
+            window.open(url, '_blank', 'width=900,height=700,scrollbars=yes,resizable=yes');
+        }
+
+        // Global variable to store current article data
+        let currentArticle = null;
+        let articleChanges = {};
+
+        // Open article in modal
+        async function openArticleModal(articleId) {
+            const modal = document.getElementById('articleModal');
+            const content = document.getElementById('modalArticleContent');
+
+            content.innerHTML = '<div style="text-align: center; padding: 40px;">Loading...</div>';
+            modal.style.display = 'block';
+            articleChanges = {};
+
+            try {
+                const response = await fetch(`/api/admin/articles/${articleId}`);
+                const data = await response.json();
+
+                if (data.success && data.article) {
+                    currentArticle = data.article;
+                    renderArticleModal(currentArticle);
+                }
+            } catch (error) {
+                console.error('Error loading article:', error);
+                content.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--accent-red);">Error loading article</div>';
+            }
+        }
+
+        // Render the article modal with three sections
+        function renderArticleModal(article) {
+            const content = document.getElementById('modalArticleContent');
+            const date = new Date(article.created_at).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            content.innerHTML = `
+                <!-- Header Section -->
+                <div class="modal-header">
+                    <div class="modal-header-field" data-field="title">
+                        <div class="modal-header-label">Title</div>
+                        <div class="modal-header-value title" id="field-title">${escapeHtml(article.title)}</div>
+                    </div>
+                    <div style="display: flex; gap: 30px;">
+                        <div class="modal-header-field" style="flex: 1;" data-field="author">
+                            <div class="modal-header-label">Author</div>
+                            <div class="modal-header-value" id="field-author">${escapeHtml(article.author || 'Rico')}</div>
+                        </div>
+                        <div class="modal-header-field" style="flex: 1;" data-field="content_type">
+                            <div class="modal-header-label">Content Type</div>
+                            <div class="modal-header-value" id="field-content_type">${escapeHtml(article.content_type || 'Web Article')}</div>
+                        </div>
+                        <div class="modal-header-field" style="flex: 1;" data-field="subtype">
+                            <div class="modal-header-label">Subtype</div>
+                            <div class="modal-header-value" id="field-subtype">${article.subtype ? escapeHtml(article.subtype) : '-'}</div>
+                        </div>
+                        <div class="modal-header-field" style="flex: 1;">
+                            <div class="modal-header-label">Created</div>
+                            <div class="modal-header-value">${date}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Body Section -->
+                <div class="modal-body">
+                    <!-- Tab Navigation -->
+                    <div class="modal-tabs">
+                        <button class="modal-tab active" onclick="switchTab('content')">Content</button>
+                        <button class="modal-tab" onclick="switchTab('extensions')">Extensions</button>
+                        <button class="modal-tab" onclick="switchTab('attachments')">Attachments</button>
+                    </div>
+
+                    <!-- Content Tab Panel -->
+                    <div class="modal-tab-panel active" id="content-tab">
+                        <div class="content-editor" id="content-editor" contenteditable="false">${escapeHtml(article.content)}</div>
+
+                        ${article.christian_lesson ? `
+                            <div class="christian-lesson-section">
+                                <h4>Christian Lesson:</h4>
+                                <p>${escapeHtml(article.christian_lesson)}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <!-- Extensions Tab Panel -->
+                    <div class="modal-tab-panel" id="extensions-tab">
+                        <div class="music-type-section">
+                            <h4>Music Type</h4>
+                            <textarea id="field-music_type" class="music-type-input" rows="3" placeholder="Enter music type...">${article.music_type || ''}</textarea>
+                        </div>
+                        <div class="music-type-section" style="margin-top: 20px;">
+                            <h4>Generation Prompt</h4>
+                            <textarea id="field-prompt" class="music-type-input" rows="8" placeholder="No generation prompt set..." readonly style="background-color: #1f1f1f; color: #c4c4c4;">${article.prompt || ''}</textarea>
+                        </div>
+                    </div>
+
+                    <!-- Attachments Tab Panel -->
+                    <div class="modal-tab-panel" id="attachments-tab">
+                        <div class="upload-area" id="upload-area">
+                            <div class="upload-area-icon">📎</div>
+                            <div class="upload-area-text">Drag & drop files here</div>
+                            <div class="upload-area-subtext">or click to browse (MP3, PDF, and other files supported)</div>
+                            <input type="file" id="file-input" style="display: none;" multiple>
+                        </div>
+                        <div class="uploaded-files" id="uploaded-files"></div>
+
+                        <!-- Attachments Section -->
+                        <div class="attachments-section" id="attachments-section">
+                            <div class="attachments-header">
+                                <span class="attachments-label">Existing Attachments</span>
+                                <span class="attachments-count" id="attachments-count">0 files</span>
+                            </div>
+                            <div id="attachments-list" class="attachments-list">
+                                <div class="no-attachments">No attachments found</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Section -->
+                <div class="modal-footer">
+                    <button class="save-button" id="save-button">Save Changes</button>
+                </div>
+            `;
+
+            // Initialize editing functionality
+            initializeEditing();
+            initializeFileUpload();
+            loadExistingAttachments();
+        }
+
+        // Switch between modal tabs
+        function switchTab(tabName) {
+            // Update tab buttons
+            const tabs = document.querySelectorAll('.modal-tab');
+            tabs.forEach(tab => {
+                tab.classList.remove('active');
+                if ((tabName === 'content' && tab.textContent === 'Content') ||
+                    (tabName === 'extensions' && tab.textContent === 'Extensions') ||
+                    (tabName === 'attachments' && tab.textContent === 'Attachments')) {
+                    tab.classList.add('active');
+                }
+            });
+
+            // Update tab panels
+            const panels = document.querySelectorAll('.modal-tab-panel');
+            panels.forEach(panel => panel.classList.remove('active'));
+
+            if (tabName === 'content') {
+                document.getElementById('content-tab').classList.add('active');
+            } else if (tabName === 'extensions') {
+                document.getElementById('extensions-tab').classList.add('active');
+            } else if (tabName === 'attachments') {
+                document.getElementById('attachments-tab').classList.add('active');
+            }
+        }
+
+        // Load existing attachments for the article
+        async function loadExistingAttachments() {
+            if (!currentArticle) return;
+
+            const attachmentsList = document.getElementById('attachments-list');
+            const attachmentsCount = document.getElementById('attachments-count');
+
+            try {
+                // Build the expected path for this article's attachments
+                const articleId = currentArticle.id;
+                const categoryId = currentArticle.category_id;
+
+                // For now, show a message that attachments will be loaded from the file system
+                // In a full implementation, you would fetch this from an API endpoint
+                attachmentsList.innerHTML = `
+                    <div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 14px;">
+                        <p>Attachments are stored in:</p>
+                        <p style="color: var(--accent-gold); margin-top: 10px; font-family: monospace;">/content/[category-path]/article-${articleId}/</p>
+                        <p style="margin-top: 15px; font-size: 12px;">Files uploaded during this session will appear here</p>
+                    </div>
+                `;
+
+                attachmentsCount.textContent = '0 files';
+            } catch (error) {
+                console.error('Error loading attachments:', error);
+                attachmentsList.innerHTML = '<div class="no-attachments">Error loading attachments</div>';
+            }
+        }
+
+        // Initialize inline editing for header fields
+        function initializeEditing() {
+            // Title field double-click
+            const titleField = document.querySelector('[data-field="title"]');
+            if (titleField) {
+                titleField.addEventListener('dblclick', () => editField('title', 'title'));
+            }
+
+            // Author field double-click
+            const authorField = document.querySelector('[data-field="author"]');
+            if (authorField) {
+                authorField.addEventListener('dblclick', () => editField('author', 'text'));
+            }
+
+            // Content type field double-click
+            const contentTypeField = document.querySelector('[data-field="content_type"]');
+            if (contentTypeField) {
+                contentTypeField.addEventListener('dblclick', () => editField('content_type', 'select'));
+            }
+
+            // Subtype field double-click
+            const subtypeField = document.querySelector('[data-field="subtype"]');
+            if (subtypeField) {
+                subtypeField.addEventListener('dblclick', () => editField('subtype', 'select'));
+            }
+
+            // Content editor click
+            const contentEditor = document.getElementById('content-editor');
+            if (contentEditor) {
+                contentEditor.addEventListener('click', () => {
+                    contentEditor.setAttribute('contenteditable', 'true');
+                    contentEditor.focus();
+                });
+
+                contentEditor.addEventListener('blur', () => {
+                    articleChanges.content = contentEditor.textContent;
+                });
+            }
+
+            // Music type field double-click
+            const musicTypeField = document.getElementById('field-music_type');
+            if (musicTypeField && musicTypeField.dataset.editable === 'true') {
+                musicTypeField.addEventListener('dblclick', () => editMusicType());
+            }
+
+            // Save button
+            const saveButton = document.getElementById('save-button');
+            if (saveButton) {
+                saveButton.addEventListener('click', saveArticleChanges);
+            }
+        }
+
+        // Edit a specific field
+        function editField(fieldName, fieldType) {
+            const fieldElement = document.getElementById(`field-${fieldName}`);
+            if (!fieldElement) return;
+
+            const currentValue = currentArticle[fieldName] || '';
+
+            if (fieldType === 'select' && fieldName === 'content_type') {
+                // Content type dropdown
+                fieldElement.innerHTML = `
+                    <select class="field-input">
+                        <option value="Web Article" ${currentValue === 'Web Article' ? 'selected' : ''}>Web Article</option>
+                        <option value="Song Lyrics" ${currentValue === 'Song Lyrics' ? 'selected' : ''}>Song Lyrics</option>
+                        <option value="Story" ${currentValue === 'Story' ? 'selected' : ''}>Story</option>
+                        <option value="Devotional" ${currentValue === 'Devotional' ? 'selected' : ''}>Devotional</option>
+                    </select>
+                `;
+
+                const select = fieldElement.querySelector('select');
+                select.focus();
+                select.addEventListener('change', () => {
+                    articleChanges[fieldName] = select.value;
+                    currentArticle[fieldName] = select.value;
+                    fieldElement.textContent = select.value;
+
+                    // Re-render if switching to/from Song Lyrics to show/hide Music Type
+                    if (fieldName === 'content_type') {
+                        renderArticleModal(currentArticle);
+                    }
+                });
+                select.addEventListener('blur', () => {
+                    fieldElement.textContent = select.value;
+                });
+            } else if (fieldType === 'select' && fieldName === 'subtype') {
+                // Subtype dropdown
+                fieldElement.innerHTML = `
+                    <select class="field-input">
+                        <option value="" ${!currentValue ? 'selected' : ''}>None</option>
+                        <option value="Secret Mystery" ${currentValue === 'Secret Mystery' ? 'selected' : ''}>Secret Mystery</option>
+                        <option value="Fun Facts" ${currentValue === 'Fun Facts' ? 'selected' : ''}>Fun Facts</option>
+                        <option value="Behind the Scenes" ${currentValue === 'Behind the Scenes' ? 'selected' : ''}>Behind the Scenes</option>
+                    </select>
+                `;
+
+                const select = fieldElement.querySelector('select');
+                select.focus();
+                select.addEventListener('change', () => {
+                    const newValue = select.value || null;
+                    articleChanges[fieldName] = newValue;
+                    currentArticle[fieldName] = newValue;
+                    fieldElement.textContent = newValue || '-';
+                });
+                select.addEventListener('blur', () => {
+                    const displayValue = select.value || '-';
+                    fieldElement.textContent = displayValue;
+                });
+            } else {
+                // Text input
+                const inputClass = fieldType === 'title' ? 'title-input' : '';
+                fieldElement.innerHTML = `
+                    <input type="text" class="field-input ${inputClass}" value="${escapeHtml(currentValue)}">
+                `;
+
+                const input = fieldElement.querySelector('input');
+                input.focus();
+                input.select();
+
+                const saveValue = () => {
+                    articleChanges[fieldName] = input.value;
+                    currentArticle[fieldName] = input.value;
+                    fieldElement.textContent = input.value;
+                };
+
+                input.addEventListener('blur', saveValue);
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        saveValue();
+                        input.blur();
+                    }
+                });
+            }
+        }
+
+        // Edit music type field
+        function editMusicType() {
+            const fieldElement = document.getElementById('field-music_type');
+            if (!fieldElement) return;
+
+            const currentValue = currentArticle.music_type || '';
+            fieldElement.innerHTML = `<input type="text" value="${escapeHtml(currentValue)}" style="width: 100%;">`;
+
+            const input = fieldElement.querySelector('input');
+            input.focus();
+            input.select();
+
+            const saveValue = () => {
+                articleChanges.music_type = input.value;
+                currentArticle.music_type = input.value;
+                fieldElement.textContent = input.value;
+            };
+
+            input.addEventListener('blur', saveValue);
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveValue();
+                    input.blur();
+                }
+            });
+        }
+
+        // Save article changes
+        async function saveArticleChanges() {
+            if (Object.keys(articleChanges).length === 0) {
+                alert('No changes to save');
+                return;
+            }
+
+            const saveButton = document.getElementById('save-button');
+            saveButton.textContent = 'Saving...';
+            saveButton.disabled = true;
+
+            try {
+                const response = await fetch(`/api/admin/articles/${currentArticle.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(articleChanges)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('Article saved successfully!');
+                    articleChanges = {};
+
+                    // Reload the article list to show updated data
+                    if (window.currentCategory) {
+                        loadArticles(window.currentCategory);
+                    }
+                } else {
+                    alert('Error saving article: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error saving article:', error);
+                alert('Error saving article: ' + error.message);
+            } finally {
+                saveButton.textContent = 'Save Changes';
+                saveButton.disabled = false;
+            }
+        }
+
+        // Initialize file upload
+        function initializeFileUpload() {
+            const uploadArea = document.getElementById('upload-area');
+            const fileInput = document.getElementById('file-input');
+            const uploadedFilesDiv = document.getElementById('uploaded-files');
+
+            // Click to browse
+            uploadArea.addEventListener('click', (e) => {
+                if (e.target === uploadArea || uploadArea.contains(e.target)) {
+                    fileInput.click();
+                }
+            });
+
+            // File input change
+            fileInput.addEventListener('change', (e) => {
+                handleFiles(e.target.files);
+            });
+
+            // Drag and drop
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('drag-over');
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('drag-over');
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('drag-over');
+                handleFiles(e.dataTransfer.files);
+            });
+        }
+
+        // Handle file uploads
+        async function handleFiles(files) {
+            const uploadedFilesDiv = document.getElementById('uploaded-files');
+            const attachmentsList = document.getElementById('attachments-list');
+            const attachmentsCount = document.getElementById('attachments-count');
+            let successCount = 0;
+
+            for (let file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const fileDiv = document.createElement('div');
+                    fileDiv.className = 'uploaded-file';
+                    fileDiv.innerHTML = `
+                        <div class="uploaded-file-name">${escapeHtml(file.name)}</div>
+                        <div class="uploaded-file-size">${formatFileSize(file.size)}</div>
+                        <div style="color: var(--text-muted);">Uploading...</div>
+                    `;
+                    uploadedFilesDiv.appendChild(fileDiv);
+
+                    const response = await fetch(`/api/admin/articles/${currentArticle.id}/attachments`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        fileDiv.innerHTML = `
+                            <div class="uploaded-file-name">${escapeHtml(file.name)}</div>
+                            <div class="uploaded-file-size">${formatFileSize(file.size)}</div>
+                            <div style="color: var(--accent-gold);">✓ Uploaded</div>
+                        `;
+
+                        successCount++;
+
+                        // Add to attachments list
+                        addAttachmentToList(data.file);
+                    } else {
+                        fileDiv.innerHTML = `
+                            <div class="uploaded-file-name">${escapeHtml(file.name)}</div>
+                            <div class="uploaded-file-size">${formatFileSize(file.size)}</div>
+                            <div style="color: var(--accent-red);">✗ Failed</div>
+                        `;
+                    }
+                } catch (error) {
+                    console.error('Error uploading file:', error);
+                }
+            }
+
+            // Update attachments count
+            if (successCount > 0) {
+                const currentCount = parseInt(attachmentsCount.textContent) || 0;
+                attachmentsCount.textContent = `${currentCount + successCount} file${currentCount + successCount !== 1 ? 's' : ''}`;
+            }
+        }
+
+        // Add attachment to the attachments list
+        function addAttachmentToList(fileData) {
+            const attachmentsList = document.getElementById('attachments-list');
+
+            // Remove "no attachments" message if present
+            const noAttachments = attachmentsList.querySelector('.no-attachments');
+            if (noAttachments) {
+                attachmentsList.innerHTML = '';
+            }
+
+            // Determine file type icon
+            const fileExt = fileData.originalName.split('.').pop().toLowerCase();
+            let icon = '📄';
+            if (['mp3', 'wav', 'ogg'].includes(fileExt)) icon = '🎵';
+            else if (['pdf'].includes(fileExt)) icon = '📑';
+            else if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExt)) icon = '🖼️';
+            else if (['mp4', 'mov', 'avi'].includes(fileExt)) icon = '🎬';
+
+            const attachmentDiv = document.createElement('div');
+            attachmentDiv.className = 'attachment-item';
+            attachmentDiv.innerHTML = `
+                <div class="attachment-icon">${icon}</div>
+                <div class="attachment-info">
+                    <div class="attachment-name">${escapeHtml(fileData.originalName)}</div>
+                    <div class="attachment-meta">${formatFileSize(fileData.size)} • Uploaded just now</div>
+                </div>
+                <div class="attachment-actions">
+                    <button class="attachment-action-btn" onclick="window.open('${fileData.path}', '_blank')">View</button>
+                    <button class="attachment-action-btn" onclick="downloadAttachment('${fileData.path}', '${escapeHtml(fileData.originalName)}')">Download</button>
+                </div>
+            `;
+
+            attachmentsList.appendChild(attachmentDiv);
+        }
+
+        // Download attachment
+        function downloadAttachment(path, filename) {
+            const link = document.createElement('a');
+            link.href = path;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Format file size
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        // Close article modal
+        function closeArticleModal() {
+            document.getElementById('articleModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('articleModal');
+            if (event.target === modal) {
+                closeArticleModal();
+            }
+        }
+
+        // Render mock articles for development
+        function renderMockArticles(category) {
+            const mockArticles = [
+                {
+                    id: 1,
+                    category_id: category ? category.id : 1,
+                    category_name: category ? category.name : 'Sample Category',
+                    title: 'Sample Article 1 - Introduction to ' + (category ? category.name : 'Topic'),
+                    created_at: new Date(Date.now() - 86400000 * 2).toISOString()
+                },
+                {
+                    id: 2,
+                    category_id: category ? category.id : 1,
+                    category_name: category ? category.name : 'Sample Category',
+                    title: 'Sample Article 2 - Advanced Topics in ' + (category ? category.name : 'Topic'),
+                    created_at: new Date(Date.now() - 86400000).toISOString()
+                },
+                {
+                    id: 3,
+                    category_id: category ? category.id : 1,
+                    category_name: category ? category.name : 'Sample Category',
+                    title: 'Sample Article 3 - Best Practices for ' + (category ? category.name : 'Topic'),
+                    created_at: new Date().toISOString()
+                }
+            ];
+
+            renderArticleList(mockArticles, category, false);
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ============================================
+        // PLACEHOLDER FUNCTIONS
+        // ============================================
+
+        // ============================================
+        // TAB SWITCHING FUNCTIONALITY
+        // ============================================
+
+        function switchTab(tabName, fromRestore) {
+            // Get all tab buttons and content divs
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            // Remove active class from all tabs and content
+            tabButtons.forEach(button => button.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+
+            // Add active class to clicked tab and corresponding content
+            if (!fromRestore) event.target.classList.add('active');
+            else tabButtons.forEach(btn => { if (btn.textContent.trim().toLowerCase().replace(' ', '-') === tabName || btn.getAttribute('onclick')?.includes(`'${tabName}'`)) btn.classList.add('active'); });
+            document.getElementById(tabName + '-tab').classList.add('active');
+
+            // Persist active tab
+            localStorage.setItem('jubileeActiveTab', tabName);
+
+            // Update the action button text based on active tab
+            const newContentBtn = document.querySelector('.btn-new-content');
+            if (tabName === 'pulse-tasks') {
+                newContentBtn.textContent = '+ New Task';
+                newContentBtn.onclick = showNewTaskModal;
+                newContentBtn.style.display = '';
+                loadPulseTasks();
+            } else if (tabName === 'portal-articles') {
+                newContentBtn.style.display = 'none';
+                loadPortalArticles('pending');
+            } else {
+                newContentBtn.textContent = '+ New Content';
+                newContentBtn.onclick = createNewContent;
+                newContentBtn.style.display = '';
+            }
+        }
+
+        // ============================================
+        // PULSE TASKS FUNCTIONALITY
+        // ============================================
+
+        function formatDeliveryInfo(task) {
+            if (!task.delivery_type || task.delivery_type === 'one-time') {
+                if (task.start_date) {
+                    return `One-Time: ${new Date(task.start_date).toLocaleString()}`;
+                }
+                return 'One-Time (Immediate)';
+            }
+
+            const frequencyMap = {
+                'hourly': 'Hourly',
+                'daily': 'Daily',
+                'weekly': 'Weekly',
+                'monthly': 'Monthly',
+                'yearly': 'Yearly',
+                'custom': 'Custom'
+            };
+
+            let info = frequencyMap[task.delivery_type] || task.delivery_type;
+
+            if (task.start_date) {
+                info += ` from ${new Date(task.start_date).toLocaleDateString()}`;
+            }
+
+            return info;
+        }
+
+        async function loadPulseTasks() {
+            try {
+                const response = await fetch('/api/pulse-tasks');
+                const tasks = await response.json();
+
+                const tbody = document.getElementById('pulseTasksBody');
+
+                if (tasks.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: var(--text-muted); padding: var(--space-2xl);">
+                                No tasks found
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                tbody.innerHTML = tasks.map(task => `
+                    <tr>
+                        <td>${task.title}</td>
+                        <td>${task.user || '-'}</td>
+                        <td>${formatDeliveryInfo(task)}</td>
+                        <td><span class="task-status ${task.status.toLowerCase()}">${task.status}</span></td>
+                        <td>${task.done_date ? new Date(task.done_date).toLocaleString() : '-'}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading pulse tasks:', error);
+                document.getElementById('pulseTasksBody').innerHTML = `
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: var(--accent-red); padding: var(--space-2xl);">
+                            Error loading tasks
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        function addCategory() {
+            alert('Add Category functionality will be implemented in Phase 2');
+        }
+
+        function addArticle() {
+            alert('Add Article functionality will be implemented in Phase 2');
+        }
+
+        function createNewContent() {
+            alert('New Content functionality will be implemented in Phase 2');
+        }
+
+        // ============================================
+        // NEW TASK MODAL FUNCTIONALITY
+        // ============================================
+
+        function getCurrentCategoryPath() {
+            const selectedCategory = document.querySelector('.category-node.active');
+            if (!selectedCategory) {
+                return 'No category selected';
+            }
+
+            const path = [];
+            let current = selectedCategory;
+
+            while (current && current.classList.contains('category-node')) {
+                const label = current.querySelector('.node-label');
+                if (label) {
+                    path.unshift(label.textContent.trim());
+                }
+                current = current.parentElement?.closest('.category-node');
+            }
+
+            return path.join(' > ') || selectedCategory.querySelector('.node-label')?.textContent || 'Unknown';
+        }
+
+        function showNewTaskModal() {
+            const modal = document.getElementById('newTaskModal');
+            const categoryLocationInput = document.getElementById('taskCategoryLocation');
+
+            // Populate category location
+            categoryLocationInput.value = getCurrentCategoryPath();
+
+            // Show modal
+            modal.style.display = 'flex';
+
+            // Clear previous task data
+            document.getElementById('taskTitle').value = '';
+            document.getElementById('taskInstructions').value = '';
+        }
+
+        function closeNewTaskModal() {
+            const modal = document.getElementById('newTaskModal');
+            modal.style.display = 'none';
+
+            // Clear form fields
+            document.getElementById('taskTitle').value = '';
+            document.getElementById('taskInstructions').value = '';
+
+            // Reset delivery options
+            document.getElementById('deliveryType').value = 'one-time';
+            updateDeliveryOptions();
+        }
+
+        function updateDeliveryOptions() {
+            const deliveryType = document.getElementById('deliveryType').value;
+            const oneTimeOptions = document.getElementById('oneTimeOptions');
+            const recurringOptions = document.getElementById('recurringOptions');
+            const weeklyDaysGroup = document.getElementById('weeklyDaysGroup');
+            const frequencyGroup = document.getElementById('frequencyGroup');
+            const frequencyUnit = document.getElementById('frequencyUnit');
+
+            // Hide all options first
+            oneTimeOptions.style.display = 'none';
+            recurringOptions.style.display = 'none';
+            weeklyDaysGroup.style.display = 'none';
+
+            if (deliveryType === 'one-time') {
+                oneTimeOptions.style.display = 'block';
+            } else {
+                recurringOptions.style.display = 'block';
+
+                // Set frequency unit based on delivery type
+                if (deliveryType === 'hourly') {
+                    frequencyUnit.value = 'hours';
+                    frequencyGroup.style.display = 'block';
+                } else if (deliveryType === 'daily') {
+                    frequencyUnit.value = 'days';
+                    frequencyGroup.style.display = 'block';
+                } else if (deliveryType === 'weekly') {
+                    frequencyUnit.value = 'weeks';
+                    frequencyGroup.style.display = 'block';
+                    weeklyDaysGroup.style.display = 'block';
+                } else if (deliveryType === 'monthly') {
+                    frequencyUnit.value = 'months';
+                    frequencyGroup.style.display = 'block';
+                } else if (deliveryType === 'yearly') {
+                    frequencyUnit.value = 'years';
+                    frequencyGroup.style.display = 'block';
+                } else if (deliveryType === 'custom') {
+                    frequencyGroup.style.display = 'block';
+                }
+            }
+        }
+
+        function toggleScheduledTime() {
+            const checkbox = document.getElementById('scheduleForLater');
+            const timeGroup = document.getElementById('scheduledTimeGroup');
+            timeGroup.style.display = checkbox.checked ? 'block' : 'none';
+        }
+
+        function toggleEndDate() {
+            const checkbox = document.getElementById('hasEndDate');
+            const endDateGroup = document.getElementById('endDateGroup');
+            endDateGroup.style.display = checkbox.checked ? 'block' : 'none';
+        }
+
+        function addExecutionTime() {
+            const timesList = document.getElementById('executionTimesList');
+            const timeItem = document.createElement('div');
+            timeItem.className = 'execution-time-item';
+            timeItem.innerHTML = `
+                <input type="time" class="form-input execution-time" required>
+                <button type="button" onclick="removeExecutionTime(this)">Remove</button>
+            `;
+            timesList.appendChild(timeItem);
+        }
+
+        function removeExecutionTime(button) {
+            button.parentElement.remove();
+        }
+
+        async function submitNewTask(event) {
+            event.preventDefault();
+
+            const categoryLocation = document.getElementById('taskCategoryLocation').value;
+            const taskTitle = document.getElementById('taskTitle').value;
+            const taskInstructions = document.getElementById('taskInstructions').value;
+
+            if (!taskTitle.trim()) {
+                alert('Please enter a task title');
+                return;
+            }
+
+            if (!taskInstructions.trim()) {
+                alert('Please enter task instructions');
+                return;
+            }
+
+            // Gather delivery data
+            const deliveryType = document.getElementById('deliveryType').value;
+            const deliveryData = {
+                delivery_type: deliveryType,
+                immediate_execution: 1
+            };
+
+            if (deliveryType === 'one-time') {
+                const scheduleForLater = document.getElementById('scheduleForLater').checked;
+                if (scheduleForLater) {
+                    deliveryData.immediate_execution = 0;
+                    deliveryData.start_date = document.getElementById('scheduledDateTime').value;
+                }
+            } else {
+                // Recurring task
+                deliveryData.immediate_execution = 0;
+                deliveryData.start_date = document.getElementById('startDateTime').value;
+                deliveryData.interval_value = parseInt(document.getElementById('frequencyInterval').value);
+                deliveryData.frequency_type = document.getElementById('frequencyUnit').value;
+
+                // End date (optional)
+                if (document.getElementById('hasEndDate').checked) {
+                    deliveryData.end_date = document.getElementById('endDateTime').value;
+                }
+
+                // Days of week (for weekly tasks)
+                if (deliveryType === 'weekly' || deliveryType === 'custom') {
+                    const selectedDays = Array.from(document.querySelectorAll('#weeklyDaysGroup input[type="checkbox"]:checked'))
+                        .map(cb => parseInt(cb.value));
+                    if (selectedDays.length > 0) {
+                        deliveryData.days_of_week = selectedDays;
+                    }
+                }
+
+                // Execution times
+                const executionTimes = Array.from(document.querySelectorAll('.execution-time'))
+                    .map(input => input.value)
+                    .filter(time => time);
+                if (executionTimes.length > 0) {
+                    deliveryData.execution_times = executionTimes;
+                }
+            }
+
+            try {
+                // Create the task
+                const response = await fetch('/api/pulse-tasks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title: taskTitle,
+                        instructions: taskInstructions,
+                        category_location: categoryLocation,
+                        status: 'pending',
+                        user: 'Admin User',
+                        ...deliveryData
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+
+                    // Close modal
+                    closeNewTaskModal();
+
+                    // Reload tasks
+                    loadPulseTasks();
+
+                    // Show success message
+                    alert('Task created successfully! Heartbeat will begin execution.');
+
+                    // Start heartbeat for this task
+                    startTaskHeartbeat(result.task_id);
+                } else {
+                    throw new Error('Failed to create task');
+                }
+            } catch (error) {
+                console.error('Error creating task:', error);
+                alert('Error creating task. Check console for details.');
+            }
+        }
+
+        async function startTaskHeartbeat(taskId) {
+            try {
+                const response = await fetch('/api/pulse-tasks/start-heartbeat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ task_id: taskId })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to start heartbeat');
+                }
+
+                console.log(`Heartbeat started for task ${taskId}`);
+
+                // Start monitoring this task for progress updates
+                startMonitoringTask(taskId);
+
+            } catch (error) {
+                console.error('Error starting heartbeat:', error);
+                addChatMessage(`Failed to start task #${taskId}. Please try again.`, false);
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const taskModal = document.getElementById('newTaskModal');
+            if (event.target === taskModal) {
+                closeNewTaskModal();
+            }
+        };
+
+        function editArticle(articleId) {
+            alert(`Edit Article ID ${articleId} - functionality will be implemented in Phase 2`);
+        }
+
+        function deleteArticle(articleId) {
+            if (confirm(`Are you sure you want to delete article ID ${articleId}?`)) {
+                alert('Delete functionality will be implemented in Phase 2');
+            }
+        }
+
+        // ============================================
+        // JUBILEE CHAT FUNCTIONALITY
+        // ============================================
+
+        function toggleChatPanel() {
+            const chatPanel = document.getElementById('jubileeChatPanel');
+            const chatResizeHandle = document.getElementById('chatResizeHandle');
+            const fab = document.getElementById('chatToggleFab');
+
+            if (chatPanel.style.display === 'none') {
+                // Show panel
+                chatPanel.style.display = 'flex';
+                chatResizeHandle.style.display = 'block';
+                if (fab) fab.classList.add('hidden');
+                localStorage.setItem('jubileeChatOpen', 'true');
+
+                // Scroll to bottom
+                setTimeout(() => {
+                    const chatMessages = document.getElementById('chatMessages');
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }, 100);
+            } else {
+                // Hide panel
+                chatPanel.style.display = 'none';
+                chatResizeHandle.style.display = 'none';
+                if (fab) fab.classList.remove('hidden');
+                localStorage.setItem('jubileeChatOpen', 'false');
+            }
+        }
+
+        // Initialize chat panel resize functionality
+        let chatResizing = false;
+        let chatStartX = 0;
+        let chatStartWidth = 0;
+
+        function initializeChatResize() {
+            const chatPanel = document.getElementById('jubileeChatPanel');
+            const resizeHandle = document.getElementById('chatResizeHandle');
+
+            if (!chatPanel) {
+                console.warn('Chat panel element not found');
+                return;
+            }
+
+            if (!resizeHandle) {
+                console.warn('Chat resize handle element not found');
+                return;
+            }
+
+            resizeHandle.addEventListener('mousedown', function(e) {
+                chatResizing = true;
+                chatStartX = e.clientX;
+                chatStartWidth = chatPanel.offsetWidth;
+                resizeHandle.classList.add('dragging');
+                document.body.style.cursor = 'ew-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!chatResizing) return;
+
+                const deltaX = chatStartX - e.clientX; // Reversed because we're dragging left
+                const newWidth = chatStartWidth + deltaX;
+
+                // Enforce min and max widths
+                const minWidth = 300;
+                const maxWidth = 600;
+
+                if (newWidth >= minWidth && newWidth <= maxWidth) {
+                    chatPanel.style.width = newWidth + 'px';
+                }
+            });
+
+            document.addEventListener('mouseup', function() {
+                if (chatResizing) {
+                    chatResizing = false;
+                    resizeHandle.classList.remove('dragging');
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                }
+            });
+        }
+
+        function addChatMessage(text, isUser = false, skipSave = false) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${isUser ? 'user-message' : 'jubilee-message'}`;
+
+            const now = new Date();
+            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const avatarHtml = isUser
+                ? ''
+                : `<div class="message-avatar"><img src="/images/JubileeLogo.png" alt="Jubilee" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%232196F3%22/%3E%3Ctext x=%2250%22 y=%2265%22 font-size=%2250%22 text-anchor=%22middle%22%3EJ%3C/text%3E%3C/svg%3E'"></div>`;
+
+            const headerHtml = isUser
+                ? ''
+                : `<div class="message-header">
+                        <span class="message-sender">Jubilee Inspire</span>
+                        <span class="message-time">${timeString}</span>
+                   </div>`;
+
+            messageDiv.innerHTML = `
+                ${avatarHtml}
+                <div class="message-content">
+                    ${headerHtml}
+                    <div class="message-text">${escapeHtml(text)}</div>
+                </div>
+            `;
+
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            // Save message to localStorage (unless it's being restored)
+            if (!skipSave) {
+                saveChatMessage(text, isUser, timeString);
+            }
+
+            // Save scroll position
+            localStorage.setItem('jubileeChatScroll', chatMessages.scrollTop.toString());
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Save chat message to localStorage
+        function saveChatMessage(text, isUser, timeString) {
+            const messages = JSON.parse(localStorage.getItem('jubileeChatMessages') || '[]');
+            messages.push({ text, isUser, timeString, timestamp: Date.now() });
+
+            // Keep only last 100 messages to avoid storage issues
+            if (messages.length > 100) {
+                messages.shift();
+            }
+
+            localStorage.setItem('jubileeChatMessages', JSON.stringify(messages));
+        }
+
+        // Load chat messages from localStorage
+        function loadChatMessages() {
+            const messages = JSON.parse(localStorage.getItem('jubileeChatMessages') || '[]');
+            const chatMessages = document.getElementById('chatMessages');
+
+            // Clear existing messages except the welcome message
+            const welcomeMessage = chatMessages.querySelector('.jubilee-message');
+            chatMessages.innerHTML = '';
+            if (welcomeMessage) {
+                chatMessages.appendChild(welcomeMessage);
+            }
+
+            // Restore saved messages
+            messages.forEach(msg => {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `chat-message ${msg.isUser ? 'user-message' : 'jubilee-message'}`;
+
+                const avatarHtml = msg.isUser
+                    ? ''
+                    : `<div class="message-avatar"><img src="/images/JubileeLogo.png" alt="Jubilee" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%232196F3%22/%3E%3Ctext x=%2250%22 y=%2265%22 font-size=%2250%22 text-anchor=%22middle%22%3EJ%3C/text%3E%3C/svg%3E'"></div>`;
+
+                const headerHtml = msg.isUser
+                    ? ''
+                    : `<div class="message-header">
+                            <span class="message-sender">Jubilee Inspire</span>
+                            <span class="message-time">${msg.timeString}</span>
+                       </div>`;
+
+                messageDiv.innerHTML = `
+                    ${avatarHtml}
+                    <div class="message-content">
+                        ${headerHtml}
+                        <div class="message-text">${escapeHtml(msg.text)}</div>
+                    </div>
+                `;
+
+                chatMessages.appendChild(messageDiv);
+            });
+
+            // Scroll to bottom
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Clear chat history (optional - can be called manually)
+        function clearChatHistory() {
+            localStorage.removeItem('jubileeChatMessages');
+            localStorage.removeItem('jubileeChatScroll');
+            const chatMessages = document.getElementById('chatMessages');
+            const welcomeMessage = chatMessages.querySelector('.jubilee-message');
+            chatMessages.innerHTML = '';
+            if (welcomeMessage) {
+                chatMessages.appendChild(welcomeMessage);
+            }
+        }
+
+        // Generate or retrieve a persistent session ID for this browser
+        function getChatSessionId() {
+            let sessionId = localStorage.getItem('jubileeChatSessionId');
+            if (!sessionId) {
+                sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('jubileeChatSessionId', sessionId);
+            }
+            return sessionId;
+        }
+
+        async function sendChatMessage() {
+            const chatInput = document.getElementById('chatInput');
+            const message = chatInput.value.trim();
+
+            if (!message) return;
+
+            // Add user message to chat
+            addChatMessage(message, true);
+            chatInput.value = '';
+
+            // Show typing indicator
+            const typingIndicator = addTypingIndicator();
+
+            try {
+                // Send message to backend with session ID
+                const response = await fetch('/api/chat/message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-session-id': getChatSessionId()
+                    },
+                    body: JSON.stringify({ message })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+
+                    // Remove typing indicator
+                    typingIndicator.remove();
+
+                    // Add Jubilee's response
+                    addChatMessage(data.response, false);
+
+                    // If a task was created, start monitoring it
+                    if (data.taskId) {
+                        console.log(`Task #${data.taskId} created from chat`);
+                        startMonitoringTask(data.taskId);
+                        loadPulseTasks(); // Refresh task list
+                    }
+                } else {
+                    throw new Error('Failed to get response');
+                }
+            } catch (error) {
+                console.error('Error sending chat message:', error);
+                typingIndicator.remove();
+                addChatMessage('Sorry, I encountered an error. Please try again.', false);
+            }
+        }
+
+        function addTypingIndicator() {
+            const chatMessages = document.getElementById('chatMessages');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'chat-message jubilee-message typing-indicator';
+            typingDiv.id = 'typingIndicator';
+            typingDiv.innerHTML = `
+                <div class="message-avatar">J</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <span class="typing-dot"></span>
+                        <span class="typing-dot"></span>
+                        <span class="typing-dot"></span>
+                    </div>
+                </div>
+            `;
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return typingDiv;
+        }
+
+        function handleChatKeydown(event) {
+            // Send message on Ctrl+Enter or Cmd+Enter
+            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+                event.preventDefault();
+                sendChatMessage();
+            }
+        }
+
+        function sendTaskProgressUpdate(taskId, status, message) {
+            const progressMessage = `Task #${taskId} - ${status}: ${message}`;
+            addChatMessage(progressMessage, false);
+        }
+
+        // Task monitoring system
+        const monitoredTasks = new Set();
+        let taskMonitorInterval = null;
+
+        function startMonitoringTask(taskId) {
+            monitoredTasks.add(taskId);
+
+            // Send initial message
+            addChatMessage(`Task #${taskId} has been started. I'll keep you updated on its progress.`, false);
+
+            // Start monitoring if not already running
+            if (!taskMonitorInterval) {
+                taskMonitorInterval = setInterval(checkTasksProgress, 3000); // Check every 3 seconds
+            }
+        }
+
+        async function checkTasksProgress() {
+            if (monitoredTasks.size === 0) {
+                clearInterval(taskMonitorInterval);
+                taskMonitorInterval = null;
+                return;
+            }
+
+            for (const taskId of monitoredTasks) {
+                try {
+                    const response = await fetch(`/api/pulse-tasks/${taskId}`);
+                    if (response.ok) {
+                        const task = await response.json();
+
+                        // Check if task completed or failed
+                        if (task.status === 'completed') {
+                            monitoredTasks.delete(taskId);
+                            addChatMessage(`✅ Task #${taskId} "${task.title}" has completed successfully!`, false);
+                            loadPulseTasks(); // Refresh task list
+                        } else if (task.status === 'failed') {
+                            monitoredTasks.delete(taskId);
+                            addChatMessage(`❌ Task #${taskId} "${task.title}" has failed. Error: ${task.error_message || 'Unknown error'}`, false);
+                            loadPulseTasks(); // Refresh task list
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error checking task ${taskId}:`, error);
+                }
+            }
+        }
+
+        // ============================================
+        // PORTAL ARTICLES FUNCTIONALITY
+        // ============================================
+
+        let _portalCurrentStatus = 'pending';
+
+        async function loadPortalArticles(status, btnEl) {
+            _portalCurrentStatus = status || 'pending';
+
+            // Update filter button active state
+            if (btnEl) {
+                document.querySelectorAll('.portal-filter-btn').forEach(b => b.classList.remove('active'));
+                btnEl.classList.add('active');
+            } else {
+                // Restore active button without a click event
+                document.querySelectorAll('.portal-filter-btn').forEach(b => {
+                    b.classList.toggle('active', b.dataset.status === _portalCurrentStatus);
+                });
+            }
+
+            const list = document.getElementById('portalArticlesList');
+            const countEl = document.getElementById('portalArticlesCount');
+            list.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:32px;">Loading…</div>';
+
+            try {
+                const res = await fetch(`/api/admin/current-events?status=${_portalCurrentStatus}&limit=200`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                countEl.textContent = `${data.total} article${data.total !== 1 ? 's' : ''}`;
+                list.innerHTML = '';
+
+                if (!data.articles.length) {
+                    list.innerHTML = `<div style="text-align:center;color:var(--text-muted);padding:32px;">No ${_portalCurrentStatus} articles</div>`;
+                    return;
+                }
+
+                for (const art of data.articles) {
+                    list.appendChild(renderPortalArticleRow(art));
+                }
+            } catch (err) {
+                list.innerHTML = `<div style="text-align:center;color:var(--accent-red);padding:32px;">Error: ${err.message}</div>`;
+            }
+        }
+
+        function renderPortalArticleRow(art) {
+            const row = document.createElement('div');
+            row.className = 'portal-article-row';
+            row.dataset.id = art.id;
+
+            const imgSrc = art.cached_image_path || art.image_url || '';
+            const thumb = imgSrc
+                ? `<img class="portal-article-thumb" src="${imgSrc}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+                : '';
+            const placeholder = `<div class="portal-article-thumb-placeholder" style="${imgSrc ? 'display:none' : ''}">🖼</div>`;
+
+            const words = art.word_count || 0;
+            const wordBadge = words < 400
+                ? `<span style="color:var(--accent-red)">${words}w ⚠</span>`
+                : `<span style="color:var(--accent-green)">${words}w ✓</span>`;
+
+            const hasImage = art.cached_image_path || art.image_url;
+            const imageBadge = hasImage
+                ? `<span style="color:var(--accent-green)">image ✓</span>`
+                : `<span style="color:var(--accent-red)">no image ⚠</span>`;
+
+            const reasonHtml = art.approval_reason
+                ? `<div class="portal-article-reason">Reason: ${art.approval_reason}</div>`
+                : '';
+
+            const topicBadge = art.topic ? `<span>${art.topic}</span>` : '';
+
+            let actionsHtml = '';
+            if (_portalCurrentStatus === 'pending') {
+                actionsHtml = `
+                    <button class="portal-btn-approve" onclick="portalApprove(${art.id})">Approve</button>
+                    <button class="portal-btn-reject" onclick="portalReject(${art.id})">Reject</button>`;
+            } else if (_portalCurrentStatus === 'approved') {
+                actionsHtml = `<button class="portal-btn-reject" onclick="portalReject(${art.id})">Reject</button>`;
+            } else if (_portalCurrentStatus === 'rejected') {
+                actionsHtml = `<button class="portal-btn-approve" onclick="portalApprove(${art.id})">Approve</button>`;
+            }
+
+            row.innerHTML = `
+                ${thumb}${placeholder}
+                <div class="portal-article-body">
+                    <div class="portal-article-headline" title="${(art.headline || '').replace(/"/g, '&quot;')}">${art.headline || '(no headline)'}</div>
+                    <div class="portal-article-meta">
+                        ${topicBadge}
+                        ${wordBadge}
+                        ${imageBadge}
+                    </div>
+                    ${reasonHtml}
+                </div>
+                <div class="portal-article-actions">${actionsHtml}</div>`;
+
+            return row;
+        }
+
+        async function portalApprove(id) {
+            const row = document.querySelector(`.portal-article-row[data-id="${id}"]`);
+            if (row) row.classList.add('fading');
+            try {
+                const res = await fetch(`/api/current-events/${id}/approve`, { method: 'POST' });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Failed');
+                if (row) setTimeout(() => row.remove(), 300);
+                const countEl = document.getElementById('portalArticlesCount');
+                if (countEl) {
+                    const n = parseInt(countEl.textContent) - 1;
+                    countEl.textContent = `${n} article${n !== 1 ? 's' : ''}`;
+                }
+            } catch (err) {
+                if (row) row.classList.remove('fading');
+                alert(`Approve failed: ${err.message}`);
+            }
+        }
+
+        async function portalReject(id) {
+            const reason = prompt('Rejection reason (optional):') ?? '';
+            if (reason === null) return; // cancelled
+            const row = document.querySelector(`.portal-article-row[data-id="${id}"]`);
+            if (row) row.classList.add('fading');
+            try {
+                const res = await fetch(`/api/current-events/${id}/reject`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: reason || 'Manually rejected' })
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Failed');
+                if (row) setTimeout(() => row.remove(), 300);
+                const countEl = document.getElementById('portalArticlesCount');
+                if (countEl) {
+                    const n = parseInt(countEl.textContent) - 1;
+                    countEl.textContent = `${n} article${n !== 1 ? 's' : ''}`;
+                }
+            } catch (err) {
+                if (row) row.classList.remove('fading');
+                alert(`Reject failed: ${err.message}`);
+            }
+        }
+
+        // ============================================
+        // INITIALIZE DASHBOARD
+        // ============================================
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('JubileeVerse Admin Dashboard loaded');
+
+            // Set welcome message time
+            const welcomeTime = document.getElementById('welcomeTime');
+            if (welcomeTime) {
+                welcomeTime.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+
+            // Initialize chat panel resize (with error handling)
+            try {
+                console.log('Initializing chat panel resize...');
+                initializeChatResize();
+                console.log('Chat panel resize initialized successfully');
+            } catch (error) {
+                console.error('Error initializing chat resize:', error);
+            }
+
+            // Load saved panel width (with error handling)
+            try {
+                console.log('Loading saved panel width...');
+                loadPanelWidth();
+                console.log('Panel width loaded successfully');
+            } catch (error) {
+                console.error('Error loading panel width:', error);
+            }
+
+            // Load categories (critical - must run)
+            try {
+                console.log('Loading categories...');
+                loadCategories();
+                console.log('Categories loading initiated');
+            } catch (error) {
+                console.error('CRITICAL ERROR loading categories:', error);
+            }
+
+            // Restore chat state and messages
+            try {
+                console.log('Restoring chat state...');
+
+                // Load saved messages
+                loadChatMessages();
+
+                // Restore chat panel open/closed state
+                const chatWasOpen = localStorage.getItem('jubileeChatOpen') === 'true';
+                if (chatWasOpen) {
+                    const chatPanel = document.getElementById('jubileeChatPanel');
+                    const chatResizeHandle = document.getElementById('chatResizeHandle');
+                    const fab = document.getElementById('chatToggleFab');
+
+                    if (chatPanel) {
+                        chatPanel.style.display = 'flex';
+                        if (chatResizeHandle) chatResizeHandle.style.display = 'block';
+                        if (fab) fab.classList.add('hidden');
+                    }
+                }
+
+                console.log('Chat state restored successfully');
+            } catch (error) {
+                console.error('Error restoring chat state:', error);
+            }
+
+            // Restore active tab
+            try {
+                const savedTab = localStorage.getItem('jubileeActiveTab');
+                if (savedTab && savedTab !== 'content') {
+                    switchTab(savedTab, true);
+                }
+            } catch (error) {
+                console.error('Error restoring active tab:', error);
+            }
+        });
+    </script>
+
+    <!-- Article Modal -->
+    <div id="articleModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeArticleModal()">&times;</span>
+            <div id="modalArticleContent"></div>
+        </div>
+    </div>
+
+    <!-- New Task Modal -->
+    <div id="newTaskModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>Create New Task</h2>
+                <span class="modal-close" onclick="closeNewTaskModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="newTaskForm" onsubmit="submitNewTask(event)">
+                    <div class="form-group">
+                        <label for="taskCategoryLocation">Category Location</label>
+                        <input type="text" id="taskCategoryLocation" class="form-input" readonly>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="taskTitle">Task Title</label>
+                        <input type="text" id="taskTitle" class="form-input" placeholder="Enter a descriptive title for this task..." required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="taskInstructions">Task Instructions</label>
+                        <textarea id="taskInstructions" class="form-textarea" rows="6" placeholder="Enter your task instructions here..." required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="deliveryType">Delivery</label>
+                        <select id="deliveryType" class="form-input" onchange="updateDeliveryOptions()">
+                            <option value="one-time" selected>One-Time (Immediate)</option>
+                            <option value="hourly">Hourly</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="yearly">Yearly</option>
+                            <option value="custom">Custom Recurring</option>
+                        </select>
+                    </div>
+
+                    <!-- One-Time Options -->
+                    <div id="oneTimeOptions" class="delivery-options">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="scheduleForLater" onchange="toggleScheduledTime()">
+                                Schedule for a specific date/time
+                            </label>
+                        </div>
+                        <div id="scheduledTimeGroup" class="form-group" style="display: none;">
+                            <label for="scheduledDateTime">Date & Time</label>
+                            <input type="datetime-local" id="scheduledDateTime" class="form-input">
+                        </div>
+                    </div>
+
+                    <!-- Recurring Options -->
+                    <div id="recurringOptions" class="delivery-options" style="display: none;">
+                        <div class="form-group">
+                            <label for="startDateTime">Start Date & Time</label>
+                            <input type="datetime-local" id="startDateTime" class="form-input">
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="hasEndDate" onchange="toggleEndDate()">
+                                Set end date
+                            </label>
+                        </div>
+                        <div id="endDateGroup" class="form-group" style="display: none;">
+                            <label for="endDateTime">End Date & Time</label>
+                            <input type="datetime-local" id="endDateTime" class="form-input">
+                        </div>
+
+                        <div id="frequencyGroup" class="form-group">
+                            <label for="frequencyInterval">Repeat every</label>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="number" id="frequencyInterval" class="form-input" value="1" min="1" style="width: 80px;">
+                                <select id="frequencyUnit" class="form-input" style="flex: 1;">
+                                    <option value="hours">Hour(s)</option>
+                                    <option value="days">Day(s)</option>
+                                    <option value="weeks">Week(s)</option>
+                                    <option value="months">Month(s)</option>
+                                    <option value="years">Year(s)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="weeklyDaysGroup" class="form-group" style="display: none;">
+                            <label>Days of the Week</label>
+                            <div class="days-selector">
+                                <label><input type="checkbox" value="0"> Sun</label>
+                                <label><input type="checkbox" value="1"> Mon</label>
+                                <label><input type="checkbox" value="2"> Tue</label>
+                                <label><input type="checkbox" value="3"> Wed</label>
+                                <label><input type="checkbox" value="4"> Thu</label>
+                                <label><input type="checkbox" value="5"> Fri</label>
+                                <label><input type="checkbox" value="6"> Sat</label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Execution Times (optional - leave empty for once per interval)</label>
+                            <div id="executionTimesList"></div>
+                            <button type="button" class="btn-secondary" onclick="addExecutionTime()" style="margin-top: 5px;">+ Add Time</button>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="closeNewTaskModal()">Cancel</button>
+                        <button type="submit" class="btn-primary">Create Task</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

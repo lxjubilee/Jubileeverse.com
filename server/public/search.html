@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Results - JubileeVerse</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1b1b1b;
+            --bg-secondary: #242424;
+            --bg-tertiary: #2d2d2d;
+            --bg-card: #2d2d2d;
+            --bg-card-hover: #3a3a3a;
+            --text-primary: #ffffff;
+            --text-secondary: #c4c4c4;
+            --text-muted: #8a8a8a;
+            --accent-gold: #E6AC00;
+            --accent-gold-hover: #F5C518;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --max-width: 1548px;
+            --header-height: 48px;
+            --card-radius: 8px;
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 12px;
+            --space-lg: 16px;
+            --space-xl: 24px;
+            --font-xs: 11px;
+            --font-sm: 12px;
+            --font-base: 14px;
+            --font-md: 16px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        a { color: inherit; text-decoration: none; transition: color 0.2s; }
+        a:hover { color: var(--accent-gold); }
+
+        /* Header - Matching Homepage */
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-inner {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 0 10px;
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .logo-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .logo-text span {
+            color: var(--accent-gold);
+        }
+        .logo-text .logo-verse { color: var(--accent-gold); }
+        .logo-text .logo-dotcom { color: #ffffff; }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+        }
+
+        .btn-sign-in {
+            background: transparent;
+            color: var(--text-secondary);
+            padding: var(--space-sm) var(--space-md);
+            border-radius: 4px;
+            font-size: var(--font-sm);
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border: 1px solid var(--border-color);
+            text-decoration: none;
+        }
+
+        .btn-sign-in:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .user-profile {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .user-profile:hover { background: var(--bg-tertiary); }
+
+        .user-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f0ad4e, #ec971f);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: #000;
+        }
+
+        .user-name {
+            font-size: var(--font-sm);
+            color: var(--text-secondary);
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .user-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 4px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            min-width: 180px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            display: none;
+            overflow: hidden;
+        }
+
+        .user-dropdown.open { display: block; }
+
+        .user-dropdown-item {
+            display: block;
+            width: 100%;
+            padding: 10px 16px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: var(--font-sm);
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-decoration: none;
+        }
+
+        .user-dropdown-item:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .user-dropdown-divider {
+            height: 1px;
+            background: var(--border-color);
+        }
+
+        /* Results Container */
+        .results-container {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 24px 10px 40px;
+        }
+
+        .results-heading {
+            font-size: 15px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .results-heading strong { color: var(--text-primary); }
+        .results-heading .query { color: var(--accent-gold); font-weight: 600; }
+
+        .btn-back-home {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            padding: 6px 14px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            transition: all 0.15s;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .btn-back-home:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        /* Result list */
+        .result-list {
+            list-style: none;
+        }
+
+        .result-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .result-item:first-child {
+            border-top: 1px solid var(--border-color);
+        }
+
+        .result-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .result-item-img {
+            width: 56px;
+            height: 56px;
+            border-radius: 6px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .result-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .result-item-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            line-height: 1.35;
+            margin-bottom: 3px;
+        }
+
+        .result-item-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .result-item-category {
+            color: var(--accent-gold);
+            font-weight: 600;
+        }
+
+        .result-item-arrow {
+            color: var(--text-muted);
+            flex-shrink: 0;
+            transition: transform 0.15s;
+        }
+
+        .result-item:hover .result-item-arrow {
+            transform: translateX(3px);
+            color: var(--accent-gold);
+        }
+
+        .match-highlight {
+            background: rgba(230, 172, 0, 0.2);
+            color: var(--accent-gold);
+            border-radius: 2px;
+            padding: 0 1px;
+        }
+
+        /* Empty / No Results */
+        .no-results {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-muted);
+        }
+
+        .no-results svg { margin-bottom: 16px; opacity: 0.4; }
+
+        .no-results h3 {
+            font-size: 18px;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .no-results p { font-size: 14px; line-height: 1.6; }
+
+        /* Loading */
+        .search-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 60px 20px;
+            gap: 16px;
+            color: var(--text-muted);
+        }
+
+        .search-loading-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--bg-tertiary);
+            border-top-color: var(--accent-gold);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* More Good News Section */
+        .more-good-news {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 0 10px 60px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--space-md);
+            padding-bottom: var(--space-sm);
+        }
+
+        .section-title {
+            font-size: var(--font-md);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .more-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+        }
+
+        .more-card {
+            height: 304px;
+            background: var(--bg-card);
+            border-radius: var(--card-radius);
+            overflow: hidden;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .more-card:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .more-card-image {
+            aspect-ratio: 16/9;
+            background: var(--bg-tertiary);
+            overflow: hidden;
+        }
+
+        .more-card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .more-card:hover .more-card-image img {
+            transform: scale(1.02);
+        }
+
+        .more-card-body {
+            padding: var(--space-md);
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        .more-card-category {
+            font-size: 10px;
+            color: var(--accent-gold);
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .more-card-title {
+            font-size: 20px;
+            font-weight: 600;
+            line-height: 26px;
+            margin-top: 4px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            color: var(--text-primary);
+        }
+
+        .more-card-date {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        @media (max-width: 1280px) {
+            .more-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+
+        @media (max-width: 1024px) {
+            .more-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+
+        @media (max-width: 768px) {
+            .more-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 480px) {
+            .more-grid { grid-template-columns: 1fr; }
+            .more-card { height: auto; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header - Same as Homepage -->
+    <header class="header">
+        <div class="header-inner">
+            <a href="/" class="logo">
+                <img src="/images/JubileeLogo.png" alt="Jubilee" class="logo-icon">
+                <div class="logo-text">Jubilee<span class="logo-verse">Verse</span><span class="logo-dotcom">.com</span></div>
+            </a>
+            <div class="header-actions">
+                <a href="/signin" class="btn-sign-in" id="signInBtn">Sign In</a>
+                <div class="user-profile" id="userProfile" style="display: none;" onclick="toggleUserDropdown(event)">
+                    <div class="user-avatar" id="userAvatar"></div>
+                    <span class="user-name" id="userName"></span>
+                    <div class="user-dropdown" id="userDropdown">
+                        <button class="user-dropdown-item" onclick="window.location.href='/signin'">My Profile</button>
+                        <div class="user-dropdown-divider"></div>
+                        <button class="user-dropdown-item" onclick="signOut()">Sign Out</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Results -->
+    <div class="results-container">
+        <div id="resultsArea">
+            <div class="search-loading">
+                <div class="search-loading-spinner"></div>
+                <span>Searching...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- More Good News -->
+    <div class="more-good-news" id="moreGoodNews" style="display:none;">
+        <div class="section-header">
+            <h2 class="section-title">More Good News</h2>
+        </div>
+        <div class="more-grid" id="moreGrid"></div>
+    </div>
+
+    <script>
+        let searchIndex = [];
+        let allResults = [];
+
+        function getQueryParam(name) {
+            return new URLSearchParams(window.location.search).get(name) || '';
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            const now = new Date();
+            const diffDays = Math.floor((now - d) / 86400000);
+            if (diffDays === 0) return 'Today';
+            if (diffDays === 1) return 'Yesterday';
+            if (diffDays < 7) return diffDays + 'd ago';
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function highlightMatch(text, query) {
+            if (!text || !query) return escapeHtml(text || '');
+            const escaped = escapeHtml(text);
+            const regex = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+            return escaped.replace(regex, '<span class="match-highlight">$1</span>');
+        }
+
+        function generateArticleContent(title, summary, category) {
+            const categoryContent = {
+                faith: [
+                    `<p>In a world that often feels uncertain and overwhelming, the power of faith continues to serve as an anchor for millions of people across the globe. ${summary} This truth has been reaffirmed time and again through the testimonies of believers who have experienced God's faithfulness in every season of life, from moments of great joy to the deepest valleys of despair.</p>`,
+                    `<p>The Scriptures remind us in Hebrews 11:1 that "faith is the substance of things hoped for, the evidence of things not seen." This timeless truth speaks directly to the human condition — our innate need to believe in something greater than ourselves, to trust in a plan that extends beyond what our eyes can see. Throughout history, men and women of faith have drawn upon this promise to navigate the complexities of their lives with courage and conviction.</p>`,
+                    `<p>Community plays an essential role in nurturing and sustaining faith. When believers gather together — whether in grand cathedrals or humble living rooms — something powerful happens. Burdens are shared, prayers are lifted, and hope is renewed. The early church understood this principle deeply, as described in Acts 2:42-47, where believers devoted themselves to fellowship, breaking of bread, and prayer. This model of community continues to inspire congregations around the world today.</p>`,
+                    `<p>Modern research increasingly validates what people of faith have known for centuries: spiritual practices like prayer, meditation on Scripture, and communal worship have measurable positive effects on mental health, emotional resilience, and overall well-being. Studies from leading universities have found that individuals who maintain an active spiritual life report higher levels of life satisfaction, lower rates of depression, and stronger social connections.</p>`,
+                    `<p>One of the most remarkable aspects of faith is its ability to transform perspective. When we view our circumstances through the lens of God's sovereignty, even our greatest challenges take on new meaning. The apostle Paul, writing from a Roman prison, declared in Philippians 4:11-13 that he had learned to be content in every situation — whether in plenty or in want — because of the strength he found in Christ. This radical contentment is available to every believer who chooses to anchor their identity in God's unchanging character rather than in shifting circumstances.</p>`,
+                    `<p>Churches and faith-based organizations are also leading the charge in addressing some of society's most pressing issues. From feeding the hungry and sheltering the homeless to providing counseling services and addiction recovery programs, communities of faith are making tangible differences in the lives of those who need it most. These acts of service flow naturally from a genuine faith that compels believers to love their neighbors in practical, meaningful ways.</p>`,
+                    `<p>For those who may be exploring faith for the first time or returning after a season away, the invitation remains open and genuine. God's grace knows no bounds, and His love is not reserved for those who have it all figured out. In fact, Jesus Himself said, "It is not the healthy who need a doctor, but the sick" (Mark 2:17). This message of radical inclusion continues to draw people from every walk of life into a relationship with the Creator who made them and loves them unconditionally.</p>`,
+                    `<p>As we look toward the future, the landscape of faith continues to evolve while its core truths remain steadfast. New expressions of worship emerge, creative approaches to ministry develop, and technology opens doors for the Gospel to reach corners of the world previously untouched. Through it all, the message remains the same: God is faithful, His love endures forever, and those who put their trust in Him will never be put to shame.</p>`,
+                    `<p>The journey of faith is not always easy. There will be seasons of doubt, moments of confusion, and times when the path forward seems unclear. But it is precisely in these moments that faith grows deepest. Like a tree whose roots grow stronger in the wind, believers who persevere through trials develop a resilience and depth of character that cannot be achieved any other way. As James 1:2-4 encourages us, we can "consider it pure joy" when we face trials, because the testing of our faith produces perseverance, and perseverance leads to maturity and completeness.</p>`,
+                    `<p>Ultimately, faith is not merely an intellectual exercise or a cultural tradition — it is a living, breathing relationship with the God who created us, sustains us, and has prepared an eternal future for us. It is the confident assurance that we are known, loved, and held in the palm of His hand, no matter what tomorrow may bring. And that assurance changes everything.</p>`
+                ],
+                default: [
+                    `<p>${summary} This story reflects a growing movement that is touching communities across the nation and around the world. As more people embrace the values of compassion, generosity, and hope, the ripple effects are being felt in homes, workplaces, schools, and neighborhoods everywhere.</p>`,
+                    `<p>The foundation of this movement lies in the simple yet powerful belief that every person has inherent worth and dignity. When communities operate from this principle, remarkable things begin to happen. Neighbors reach out to one another, strangers become friends, and barriers that once seemed insurmountable begin to crumble. This is the transformative power of love in action — not merely as an abstract ideal, but as a daily practice that shapes every interaction and decision.</p>`,
+                    `<p>Across the country, faith-based organizations are at the forefront of this cultural shift. Churches, ministries, and nonprofit organizations are partnering together in unprecedented ways to address the needs of their communities. Food pantries are stocked, clothing drives are organized, tutoring programs are launched, and mentoring relationships are formed. Each initiative, no matter how small, contributes to a larger tapestry of goodness that is redefining what it means to be a neighbor.</p>`,
+                    `<p>The impact extends far beyond material provision. Perhaps the most significant contribution of these efforts is the restoration of hope. In a media landscape often dominated by negative headlines and divisive rhetoric, communities of faith are offering an alternative narrative — one centered on the belief that better days are not only possible but inevitable when people commit to working together with shared purpose and mutual respect.</p>`,
+                    `<p>Education and mentorship have emerged as particularly powerful tools in this movement. Young people who receive guidance and encouragement from caring adults are more likely to succeed academically, develop healthy relationships, and contribute positively to their communities. Churches and youth organizations are investing heavily in the next generation, recognizing that the seeds planted today will bear fruit for decades to come.</p>`,
+                    `<p>Technology is also playing an increasingly important role in connecting people with resources and opportunities. Online platforms make it possible for individuals to find volunteer opportunities, access educational content, connect with counselors and mentors, and participate in virtual faith communities. While technology can never replace the warmth of in-person connection, it serves as a valuable complement that extends the reach of compassion beyond geographical boundaries.</p>`,
+                    `<p>The economic dimension of community care is also noteworthy. When people invest in one another — through job training programs, small business incubators, financial literacy classes, and micro-lending initiatives — entire communities experience uplift. Families achieve stability, local economies strengthen, and a cycle of generosity is established that perpetuates itself across generations.</p>`,
+                    `<p>Health and wellness initiatives represent another critical area of community investment. Congregations are increasingly recognizing the connection between physical health, mental well-being, and spiritual vitality. Programs that address all three dimensions — through exercise groups, support groups, nutritional education, and spiritual formation — are producing holistic transformation in the lives of participants.</p>`,
+                    `<p>The arts and creative expression also play a vital role in community building. Music, visual arts, theater, and storytelling bring people together in ways that transcend language and cultural barriers. Faith-inspired creative works have the unique ability to touch hearts, open minds, and inspire action. From worship music that lifts the spirit to films that challenge perspectives, the creative arts continue to be a powerful vehicle for communicating truth and beauty.</p>`,
+                    `<p>Looking ahead, the momentum of this movement shows no signs of slowing. New leaders are emerging, innovative approaches are being developed, and partnerships are forming across denominational and organizational lines. The shared conviction that binds these diverse efforts together is simple yet profound: when people choose love over fear, generosity over greed, and hope over despair, the world becomes a better place for everyone. This is the good news that communities of faith are living out each and every day, and it is making all the difference.</p>`
+                ]
+            };
+
+            const paragraphs = categoryContent[category] || categoryContent.default;
+            return paragraphs.join('\n');
+        }
+
+        function openArticle(index, source) {
+            const items = source === 'more' ? moreGoodNewsItems : allResults;
+            const item = items[index];
+            if (!item) return;
+            const category = (item.category || 'faith').toLowerCase();
+            const sidebarData = {
+                title: item.title,
+                rewrittenTitle: item.title,
+                rewrittenContent: generateArticleContent(item.title, item.summary || '', category),
+                imageUrl: item.image,
+                storyCluster: category,
+                timestamp: Date.now()
+            };
+            sessionStorage.setItem('selectedArticle', JSON.stringify(sidebarData));
+            window.location.href = '/article.html';
+        }
+
+        function loadSearchIndex() {
+            try {
+                const stored = sessionStorage.getItem('jubileeSearchIndex');
+                if (stored) { searchIndex = JSON.parse(stored); return true; }
+            } catch (e) {}
+            return false;
+        }
+
+        async function fetchSearchIndex() {
+            try {
+                const res = await fetch('/');
+                const html = await res.text();
+                const scriptMatch = html.match(/<script>([\s\S]*?)<\/script>/);
+                if (!scriptMatch) return false;
+                const scriptContent = scriptMatch[1];
+                const arrays = ['sampleContent', 'sampleDevotionals', 'moreStories', 'carouselSlides'];
+                const items = [];
+                for (const arrName of arrays) {
+                    const regex = new RegExp('const\\s+' + arrName + '\\s*=\\s*(\\[)', 'g');
+                    const match = regex.exec(scriptContent);
+                    if (!match) continue;
+                    let depth = 1, pos = match.index + match[0].length;
+                    while (depth > 0 && pos < scriptContent.length) {
+                        if (scriptContent[pos] === '[') depth++;
+                        else if (scriptContent[pos] === ']') depth--;
+                        pos++;
+                    }
+                    const arrayStr = scriptContent.substring(match.index + match[0].length - 1, pos);
+                    try {
+                        const parsed = (new Function('return ' + arrayStr))();
+                        const type = arrName === 'carouselSlides' ? 'carousel' :
+                                     arrName === 'sampleDevotionals' ? 'devotional' :
+                                     arrName === 'moreStories' ? 'moreStories' : 'content';
+                        parsed.forEach((item, i) => items.push({ ...item, _type: type, _index: i }));
+                    } catch (e) {}
+                }
+                if (items.length > 0) {
+                    searchIndex = items;
+                    sessionStorage.setItem('jubileeSearchIndex', JSON.stringify(items));
+                    return true;
+                }
+            } catch (e) {}
+            return false;
+        }
+
+        function runSearch(query) {
+            const q = query.toLowerCase();
+            allResults = searchIndex.filter(item => {
+                const title = (item.title || '').toLowerCase();
+                const category = (item.category || '').toLowerCase();
+                const summary = (item.summary || '').toLowerCase();
+                return title.includes(q) || category.includes(q) || summary.includes(q);
+            });
+            renderResults(query);
+            renderMoreGoodNews(query);
+        }
+
+        function renderResults(query) {
+            const area = document.getElementById('resultsArea');
+
+            if (allResults.length === 0) {
+                area.innerHTML = `
+                    <div class="no-results">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="M21 21l-4.35-4.35"></path>
+                        </svg>
+                        <h3>No results found</h3>
+                        <p>We couldn't find anything matching "<strong>${escapeHtml(query)}</strong>".<br>Try a different search term from the <a href="/" style="color:var(--accent-gold)">homepage</a>.</p>
+                    </div>`;
+                return;
+            }
+
+            let html = `<div class="results-heading"><span>Found <strong>${allResults.length}</strong> result${allResults.length !== 1 ? 's' : ''} for "<span class="query">${escapeHtml(query)}</span>"</span><a href="/" class="btn-back-home"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"></polyline></svg>Back to Home</a></div>`;
+            html += '<ul class="result-list">';
+            allResults.forEach((item, idx) => {
+                html += `
+                    <li class="result-item" onclick="openArticle(${idx}, 'search')">
+                        <img class="result-item-img" src="${escapeHtml(item.image)}" alt="" loading="lazy">
+                        <div class="result-item-info">
+                            <div class="result-item-title">${highlightMatch(item.title, query)}</div>
+                            <div class="result-item-meta">
+                                <span class="result-item-category">${escapeHtml(item.category)}</span>
+                            </div>
+                        </div>
+                        <svg class="result-item-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 6 15 12 9 18"></polyline></svg>
+                    </li>`;
+            });
+            html += '</ul>';
+            area.innerHTML = html;
+        }
+
+        let moreGoodNewsItems = [];
+
+        function renderMoreGoodNews(query) {
+            // Pick items NOT in search results (different content) shuffled
+            const resultTitles = new Set(allResults.map(r => r.title));
+            const candidates = searchIndex.filter(item => !resultTitles.has(item.title) && item.image && item.title);
+
+            // Shuffle and pick up to 10
+            for (let i = candidates.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+            }
+            moreGoodNewsItems = candidates.slice(0, 10);
+
+            if (moreGoodNewsItems.length === 0) return;
+
+            const section = document.getElementById('moreGoodNews');
+            const grid = document.getElementById('moreGrid');
+            section.style.display = '';
+
+            let html = '';
+            moreGoodNewsItems.forEach((item, idx) => {
+                html += `
+                    <article class="more-card" onclick="openArticle(${idx}, 'more')">
+                        <div class="more-card-image">
+                            <img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" loading="lazy">
+                        </div>
+                        <div class="more-card-body">
+                            <span class="more-card-category">${escapeHtml(item.category)}</span>
+                            <h3 class="more-card-title">${escapeHtml(item.title)}</h3>
+                        </div>
+                    </article>`;
+            });
+            grid.innerHTML = html;
+        }
+
+        /* Auth State - same logic as homepage */
+        function checkAuthState() {
+            try {
+                const authData = localStorage.getItem('jubileeVerseAuth');
+                if (authData) {
+                    const auth = JSON.parse(authData);
+                    if (auth && auth.user) {
+                        document.getElementById('signInBtn').style.display = 'none';
+                        const profile = document.getElementById('userProfile');
+                        profile.style.display = 'flex';
+                        const name = auth.user.displayName || auth.user.email || 'User';
+                        document.getElementById('userName').textContent = name;
+                        document.getElementById('userAvatar').textContent = name.charAt(0).toUpperCase();
+                    }
+                }
+            } catch (e) {}
+        }
+
+        function toggleUserDropdown(e) {
+            e.stopPropagation();
+            const dd = document.getElementById('userDropdown');
+            dd.classList.toggle('open');
+        }
+
+        function signOut() {
+            localStorage.removeItem('jubileeVerseAuth');
+            window.location.reload();
+        }
+
+        document.addEventListener('click', function() {
+            const dd = document.getElementById('userDropdown');
+            if (dd) dd.classList.remove('open');
+        });
+
+        async function init() {
+            checkAuthState();
+
+            const query = getQueryParam('q');
+            if (!query) { window.location.href = '/'; return; }
+
+            document.title = '"' + query + '" - Search - JubileeVerse';
+
+            let loaded = loadSearchIndex();
+            if (!loaded) {
+                loaded = await fetchSearchIndex();
+            }
+
+            if (!loaded) {
+                document.getElementById('resultsArea').innerHTML = `
+                    <div class="no-results">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path>
+                        </svg>
+                        <h3>Unable to load content</h3>
+                        <p>Please go to the <a href="/" style="color:var(--accent-gold)">homepage</a> and search from there.</p>
+                    </div>`;
+                return;
+            }
+
+            runSearch(query);
+        }
+
+        init();
+    </script>
+    <script src="/js/site-translate.js"></script>
+</body>
+</html>

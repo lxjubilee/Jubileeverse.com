@@ -1,0 +1,42 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+
+# typescript
+*.tsbuildinfo
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+
+# Express backend (copied in as ./server) keeps its own ignores; never commit its
+# secrets, deps, model weights, generated images, or logs from here.
+/server/node_modules
+/server/.env
+/server/logs
+/server/models
+/server/*.log
+/server/public/images/deprecated
+/server/public/images/prominence
+/server/public/images/current-events
+/server/public/images/generated
+/server/data/*.db
+/server/data/*.db-shm
+/server/data/*.db-wal

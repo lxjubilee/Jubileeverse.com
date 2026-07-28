@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JubileeVerse - Sign In</title>
+  <link rel="icon" type="image/png" href="/images/jubilee-profile.png">
+  <script>
+    // Consolidate to single OIDC login flow — preserve any ?redirect= param
+    var params = new URLSearchParams(window.location.search);
+    var redirect = params.get('redirect') || params.get('next') || '';
+    var dest = '/auth/login' + (redirect ? '?redirect=' + encodeURIComponent(redirect) : '');
+    window.location.replace(dest);
+  </script>
+</head>
+<body></body>
+</html>

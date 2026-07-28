@@ -1,0 +1,3166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="JubileeVerse Prayer - Guided Christian prayers for every moment of your day">
+    <title>Prayer - JubileeVerse</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1b1b1b;
+            --bg-secondary: #242424;
+            --bg-tertiary: #2d2d2d;
+            --bg-card: #2d2d2d;
+            --bg-card-hover: #3a3a3a;
+            --text-primary: #ffffff;
+            --text-secondary: #c4c4c4;
+            --text-muted: #8a8a8a;
+            --accent-gold: #E6AC00;
+            --accent-gold-hover: #F5C518;
+            --accent-red: #e74c3c;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --header-height: 48px;
+            --player-height: 80px;
+            --card-radius: 8px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        a { color: inherit; text-decoration: none; transition: color 0.2s; }
+        a:hover { color: var(--accent-gold); }
+
+        /* Header */
+        .header {
+            height: var(--header-height);
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-inner {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 0 16px;
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .logo-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .logo-text span { color: var(--accent-gold); }
+        .logo-text .logo-verse { color: var(--accent-gold); }
+        .logo-text .logo-dotcom { color: #ffffff; }
+
+        .back-link {
+            color: var(--text-secondary);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 14px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            transition: all 0.15s;
+        }
+
+        .back-link:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        /* Main Layout */
+        .prayer-layout {
+            display: grid;
+            grid-template-columns: 280px 1fr 300px;
+            height: calc(100vh - var(--header-height) - var(--player-height));
+            overflow: hidden;
+        }
+
+        /* Left Sidebar */
+        .prayer-sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .prayer-sidebar-header {
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .prayer-sidebar-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .prayer-sidebar-title svg { opacity: 0.7; }
+
+        .prayer-filters {
+            padding: 0 16px 12px;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .filter-chip {
+            background: var(--bg-tertiary);
+            border: none;
+            color: var(--text-secondary);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: inherit;
+        }
+
+        .filter-chip:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+        .filter-chip.active { background: var(--accent-gold); color: #000; }
+
+        .prayer-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 8px;
+        }
+
+        .prayer-list::-webkit-scrollbar { width: 6px; }
+        .prayer-list::-webkit-scrollbar-track { background: transparent; }
+        .prayer-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        .prayer-list::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+        .prayer-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .prayer-item:hover { background: var(--bg-tertiary); }
+        .prayer-item.active { background: var(--bg-tertiary); border-left: 3px solid var(--accent-gold); }
+
+        .prayer-item-art {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .prayer-item-info { flex: 1; min-width: 0; }
+
+        .prayer-item-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .prayer-item.active .prayer-item-name { color: var(--accent-gold); }
+
+        .prayer-item-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .prayer-item-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-morning { background: rgba(255,183,77,0.2); color: #ffb74d; }
+        .badge-evening { background: rgba(121,134,203,0.2); color: #7986cb; }
+        .badge-healing { background: rgba(129,199,132,0.2); color: #81c784; }
+        .badge-comfort { background: rgba(186,104,200,0.2); color: #ba68c8; }
+        .badge-gratitude { background: rgba(230,172,0,0.2); color: var(--accent-gold); }
+        .badge-protection { background: rgba(231,76,60,0.2); color: #e74c3c; }
+        .badge-guidance { background: rgba(79,195,247,0.2); color: #4fc3f7; }
+        .badge-family { background: rgba(240,98,146,0.2); color: #f06292; }
+
+        /* Center Content */
+        .main-content {
+            overflow-y: auto;
+            background: var(--bg-primary);
+        }
+
+        .main-content::-webkit-scrollbar { width: 8px; }
+        .main-content::-webkit-scrollbar-track { background: transparent; }
+        .main-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+        .main-content::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+        /* Prayer Banner */
+        .prayer-banner {
+            padding: 32px 32px 24px;
+            display: flex;
+            align-items: flex-end;
+            gap: 24px;
+            background: linear-gradient(135deg, #2d1a1a 0%, var(--bg-primary) 100%);
+        }
+
+        .prayer-banner.cat-morning { background: linear-gradient(135deg, #3a2d1a 0%, var(--bg-primary) 100%); }
+        .prayer-banner.cat-evening { background: linear-gradient(135deg, #1a1a3a 0%, var(--bg-primary) 100%); }
+        .prayer-banner.cat-healing { background: linear-gradient(135deg, #1a3a1a 0%, var(--bg-primary) 100%); }
+        .prayer-banner.cat-comfort { background: linear-gradient(135deg, #2d1a3a 0%, var(--bg-primary) 100%); }
+        .prayer-banner.cat-gratitude { background: linear-gradient(135deg, #3a2d1a 0%, var(--bg-primary) 100%); }
+        .prayer-banner.cat-protection { background: linear-gradient(135deg, #3a1a1a 0%, var(--bg-primary) 100%); }
+        .prayer-banner.cat-guidance { background: linear-gradient(135deg, #1a2d3a 0%, var(--bg-primary) 100%); }
+        .prayer-banner.cat-family { background: linear-gradient(135deg, #3a1a2d 0%, var(--bg-primary) 100%); }
+
+        .prayer-banner-art {
+            width: 200px;
+            height: 200px;
+            border-radius: 12px;
+            object-fit: cover;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            flex-shrink: 0;
+            border: 3px solid rgba(255,255,255,0.1);
+        }
+
+        .prayer-banner-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .prayer-banner-label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .prayer-banner-title {
+            font-size: 38px;
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+
+        .prayer-banner-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .prayer-banner-meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+        }
+
+        .prayer-banner-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        /* Prayer Actions */
+        .prayer-actions {
+            padding: 20px 32px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .btn-play-large {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--accent-gold);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            flex-shrink: 0;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn-play-large:hover { transform: scale(1.05); background: var(--accent-gold-hover); }
+        .btn-play-large:active { transform: scale(0.95); }
+        .btn-play-large svg { color: #000; width: 24px; height: 24px; fill: #000; pointer-events: none; }
+
+        .btn-follow {
+            padding: 6px 24px;
+            border-radius: 20px;
+            border: 1px solid var(--text-muted);
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: inherit;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            min-width: 44px;
+            min-height: 44px;
+        }
+
+        .btn-follow:hover { border-color: var(--text-primary); transform: scale(1.02); }
+        .btn-follow:active { transform: scale(0.95); }
+        .btn-follow.following { border-color: var(--accent-gold); color: var(--accent-gold); }
+
+        .voice-selector {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: auto;
+            background: var(--bg-tertiary);
+            border-radius: 24px;
+            padding: 3px;
+        }
+
+        .voice-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            min-width: 44px;
+            min-height: 44px;
+        }
+
+        .voice-btn:hover { color: var(--text-primary); }
+        .voice-btn:active { transform: scale(0.95); }
+
+        .voice-btn.active {
+            background: var(--accent-gold);
+            color: #000;
+        }
+
+        .voice-btn svg { width: 16px; height: 16px; pointer-events: none; }
+
+        .voice-selector-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            padding: 0 8px;
+            white-space: nowrap;
+        }
+
+        .duration-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 12px;
+            border-radius: 12px;
+            background: rgba(230,172,0,0.15);
+            color: var(--accent-gold);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Scripture Section */
+        .scripture-section {
+            padding: 0 32px 24px;
+        }
+
+        .scripture-card {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 20px;
+            border-left: 4px solid var(--accent-gold);
+        }
+
+        .scripture-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--accent-gold);
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .scripture-text {
+            font-size: 16px;
+            font-style: italic;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+            line-height: 1.6;
+        }
+
+        .scripture-ref {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        /* Prayer Text Section */
+        .prayer-text-section {
+            padding: 0 32px 100px;
+        }
+
+        .prayer-text-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .prayer-text-body {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 24px;
+            font-size: 16px;
+            line-height: 1.8;
+            color: var(--text-secondary);
+            white-space: pre-line;
+        }
+
+        .prayer-text-body .prayer-line {
+            margin-bottom: 12px;
+            transition: color 0.3s;
+        }
+
+        .prayer-text-body .prayer-line.speaking {
+            color: var(--accent-gold);
+            font-weight: 500;
+        }
+
+        /* Right Sidebar */
+        .discover-sidebar {
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .discover-sidebar::-webkit-scrollbar { width: 6px; }
+        .discover-sidebar::-webkit-scrollbar-track { background: transparent; }
+        .discover-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+        .discover-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
+
+        .discover-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+            margin-bottom: 4px;
+        }
+
+        .discover-card:hover { background: var(--bg-tertiary); }
+
+        .discover-card-art {
+            width: 52px;
+            height: 52px;
+            border-radius: 8px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .discover-card-info { flex: 1; min-width: 0; }
+
+        .discover-card-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .discover-card-cat {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .discover-card-duration {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .discover-divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 16px 0;
+        }
+
+        .discover-section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        /* Your Library Section */
+        .library-section {
+            margin-bottom: 20px;
+        }
+
+        .library-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s;
+            border-radius: 6px;
+        }
+
+        .library-header:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .library-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .library-toggle {
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+
+        .library-toggle.expanded {
+            transform: rotate(180deg);
+        }
+
+        .library-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .library-content.expanded {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .library-empty {
+            padding: 20px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .library-empty-icon {
+            font-size: 32px;
+            opacity: 0.3;
+            margin-bottom: 8px;
+        }
+
+        .playlist-header {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            padding: 12px 16px 8px 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Heart Icon for Favorites */
+        .discover-heart-btn {
+            background: none;
+            border: none;
+            padding: 8px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .discover-heart-btn:hover {
+            color: var(--accent-gold);
+            transform: scale(1.1);
+        }
+
+        .discover-heart-btn.favorited {
+            color: var(--accent-gold);
+        }
+
+        .discover-heart-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Remove button for library items (trash icon) */
+        .discover-remove-btn {
+            background: none;
+            border: none;
+            padding: 8px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.2s;
+            flex-shrink: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .discover-card:hover .discover-remove-btn {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .discover-remove-btn:hover {
+            color: #ff4444;
+            transform: scale(1.1);
+        }
+
+        .discover-remove-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Sticky Footer Player */
+        .prayer-player {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: var(--player-height);
+            background: #181818;
+            border-top: 1px solid var(--border-color);
+            z-index: 1070;
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            align-items: center;
+            padding: 0 16px;
+        }
+
+        /* Player Left */
+        .player-prayer-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .player-prayer-art {
+            width: 56px;
+            height: 56px;
+            border-radius: 8px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .player-prayer-text { min-width: 0; }
+
+        .player-prayer-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .player-prayer-category {
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .player-like-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            flex-shrink: 0;
+            transition: color 0.15s;
+        }
+
+        .player-like-btn:hover { color: var(--accent-gold); }
+
+        /* Player Center */
+        .player-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .player-buttons {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .player-btn-secondary {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 8px;
+            display: flex;
+            transition: color 0.15s;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            min-width: 44px;
+            min-height: 44px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .player-btn-secondary:hover { color: var(--text-primary); }
+        .player-btn-secondary:active { opacity: 0.7; }
+        .player-btn-secondary svg { width: 18px; height: 18px; pointer-events: none; }
+
+        .player-btn-play {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .player-btn-play:hover { transform: scale(1.06); }
+        .player-btn-play:active { transform: scale(0.95); }
+        .player-btn-play svg { width: 18px; height: 18px; fill: #000; color: #000; pointer-events: none; }
+
+        /* Progress Bar */
+        .player-progress-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .player-time {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+            min-width: 36px;
+            text-align: center;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .progress-bar:hover { height: 6px; }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--text-secondary);
+            border-radius: 2px;
+            position: relative;
+            transition: width 0.1s linear;
+        }
+
+        .progress-bar:hover .progress-fill { background: var(--accent-gold); }
+
+        .progress-knob {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            position: absolute;
+            right: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 0;
+        }
+
+        .progress-bar:hover .progress-knob { opacity: 1; }
+
+        /* Player Right - Volume & Speed */
+        .player-right {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .speed-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+
+        .speed-btn:hover { background: rgba(255,255,255,0.2); color: var(--text-primary); }
+
+        .volume-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            transition: color 0.15s;
+        }
+
+        .volume-btn:hover { color: var(--text-primary); }
+        .volume-btn svg { width: 16px; height: 16px; }
+
+        .volume-bar {
+            width: 100px;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .volume-bar:hover { height: 6px; }
+
+        .volume-fill {
+            height: 100%;
+            width: 70%;
+            background: var(--text-secondary);
+            border-radius: 2px;
+            position: relative;
+        }
+
+        .volume-bar:hover .volume-fill { background: var(--accent-gold); }
+
+        .volume-knob {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            position: absolute;
+            right: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 0;
+        }
+
+        .volume-bar:hover .volume-knob { opacity: 1; }
+
+        /* Empty state */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 40px;
+        }
+
+        .empty-state svg { margin-bottom: 16px; opacity: 0.3; }
+        .empty-state h3 { font-size: 18px; color: var(--text-primary); margin-bottom: 8px; }
+        .empty-state p { font-size: 14px; }
+
+        /* Favorite Icon in Prayer List */
+        .prayer-item-fav {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            flex-shrink: 0;
+            transition: color 0.2s, transform 0.15s;
+            display: flex;
+            align-items: center;
+        }
+
+        .prayer-item-fav:hover { color: var(--accent-gold); transform: scale(1.15); }
+        .prayer-item-fav.favorited { color: var(--accent-gold); }
+        .prayer-item-fav.favorited svg { fill: var(--accent-gold); }
+
+        /* Favorites Button (before voice-selector) */
+        .btn-favorites {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 1px solid var(--text-muted);
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .btn-favorites:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
+        .btn-favorites svg { width: 18px; height: 18px; }
+
+        .btn-favorites .fav-count {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: var(--accent-gold);
+            color: #000;
+            font-size: 9px;
+            font-weight: 700;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Favorites Panel */
+        .favorites-panel {
+            position: fixed;
+            top: 0;
+            right: -360px;
+            width: 360px;
+            height: 100vh;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            transition: right 0.3s ease;
+            box-shadow: -4px 0 24px rgba(0,0,0,0.4);
+        }
+
+        .favorites-panel.open { right: 0; }
+
+        .favorites-panel-header {
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .favorites-panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .favorites-panel-title svg { color: var(--accent-gold); }
+
+        .favorites-panel-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            transition: color 0.15s;
+        }
+
+        .favorites-panel-close:hover { color: var(--text-primary); }
+
+        .favorites-panel-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .favorites-panel-list::-webkit-scrollbar { width: 6px; }
+        .favorites-panel-list::-webkit-scrollbar-track { background: transparent; }
+        .favorites-panel-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+        .fav-panel-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .fav-panel-item:hover { background: var(--bg-tertiary); }
+
+        .fav-panel-item-art {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .fav-panel-item-info { flex: 1; min-width: 0; }
+
+        .fav-panel-item-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .fav-panel-item-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .fav-panel-remove {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 4px;
+            display: flex;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+
+        .fav-panel-remove:hover { color: var(--accent-red); background: rgba(231,76,60,0.1); }
+
+        .favorites-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 40px;
+        }
+
+        .favorites-empty svg { margin-bottom: 12px; opacity: 0.3; }
+        .favorites-empty p { font-size: 14px; line-height: 1.5; }
+
+        .favorites-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .favorites-overlay.visible { opacity: 1; pointer-events: auto; }
+
+        /* Mobile Hamburger Button */
+        .hamburger-btn {
+            display: none;
+            position: fixed;
+            top: 56px;
+            left: 16px;
+            z-index: 1100;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            width: 44px;
+            height: 44px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 0;
+        }
+
+        .hamburger-btn:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .hamburger-btn.active {
+            left: 296px;
+            background: var(--bg-tertiary);
+        }
+
+        .hamburger-icon {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            gap: 5px;
+        }
+
+        .hamburger-icon span {
+            display: block;
+            width: 20px;
+            height: 2px;
+            background: var(--text-primary);
+            transition: all 0.3s ease;
+            border-radius: 2px;
+        }
+
+        .hamburger-btn.active .hamburger-icon span:nth-child(1) {
+            transform: rotate(45deg) translate(6px, 6px);
+        }
+
+        .hamburger-btn.active .hamburger-icon span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .hamburger-btn.active .hamburger-icon span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        /* Mobile Sidebar Overlay */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1050;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .sidebar-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Mobile Accordion */
+        .mobile-accordion {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .accordion-section {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .accordion-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .accordion-header:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .accordion-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .accordion-title svg {
+            opacity: 0.7;
+        }
+
+        .accordion-badge {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 12px;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .accordion-toggle {
+            transition: transform 0.3s ease;
+            opacity: 0.5;
+        }
+
+        .accordion-toggle.expanded {
+            transform: rotate(180deg);
+        }
+
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .accordion-content.expanded {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .accordion-filters {
+            padding: 12px 16px;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .accordion-list {
+            padding: 8px;
+        }
+
+        .accordion-empty {
+            padding: 32px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .prayer-layout { grid-template-columns: 280px 1fr; }
+            .discover-sidebar { display: none; }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                overflow-y: auto;
+                overflow-x: hidden;
+            }
+
+            .prayer-layout {
+                grid-template-columns: 1fr;
+                height: auto;
+                min-height: calc(100vh - var(--header-height));
+                overflow: visible;
+                padding-bottom: var(--player-height);
+            }
+
+            .main-content {
+                height: auto;
+                overflow-y: visible;
+            }
+
+            /* Show hamburger button on mobile */
+            .hamburger-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            /* Show overlay on mobile */
+            .sidebar-overlay {
+                display: block;
+            }
+
+            /* Make sidebar slide in from left */
+            .prayer-sidebar {
+                position: fixed;
+                top: var(--header-height);
+                left: -280px;
+                bottom: 0;
+                width: 280px;
+                z-index: 1080;
+                transition: left 0.3s ease;
+                display: flex;
+            }
+
+            .prayer-sidebar.active {
+                left: 0;
+            }
+
+            /* Hide desktop sidebar elements on mobile */
+            .prayer-sidebar-header,
+            .prayer-filters,
+            .prayer-list {
+                display: none !important;
+            }
+
+            /* Show mobile accordion on mobile */
+            .mobile-accordion {
+                display: flex !important;
+            }
+            .prayer-banner { padding: 20px 16px 16px; gap: 16px; }
+            .prayer-banner-art { width: 120px; height: 120px; }
+            .prayer-banner-title { font-size: 24px; }
+            .prayer-actions {
+                padding: 16px;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            .scripture-section { padding: 0 16px 16px; }
+            .prayer-text-section { padding: 0 16px 100px; }
+            .player-right { display: none; }
+            .prayer-player { grid-template-columns: 1fr 1fr; }
+
+            /* Voice selector responsive */
+            .voice-selector {
+                margin-left: 0;
+                width: 100%;
+                order: 3;
+            }
+            .voice-selector-label {
+                display: none;
+            }
+            .voice-btn {
+                flex: 1;
+                justify-content: center;
+                padding: 8px 12px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-inner">
+            <a href="/" class="logo">
+                <img src="/images/JubileeLogo.png" alt="Jubilee" class="logo-icon">
+                <div class="logo-text">Jubilee<span class="logo-verse">Verse</span><span class="logo-dotcom">.com</span></div>
+            </a>
+            <a href="/" class="back-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                Back to Home
+            </a>
+        </div>
+    </header>
+
+    <!-- Mobile Hamburger Menu Button -->
+    <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleMobileSidebar()">
+        <div class="hamburger-icon">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </button>
+
+    <!-- Mobile Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileSidebar()"></div>
+
+    <!-- Three-Column Layout -->
+    <div class="prayer-layout">
+        <!-- Left Sidebar - Prayer List -->
+        <aside class="prayer-sidebar">
+            <div class="prayer-sidebar-header">
+                <div class="prayer-sidebar-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/></svg>
+                    Prayers
+                </div>
+            </div>
+            <div class="prayer-filters" id="prayerFilters">
+                <button class="filter-chip active" onclick="filterPrayers('all')">All</button>
+                <button class="filter-chip" onclick="filterPrayers('morning')">Morning</button>
+                <button class="filter-chip" onclick="filterPrayers('evening')">Evening</button>
+                <button class="filter-chip" onclick="filterPrayers('healing')">Healing</button>
+                <button class="filter-chip" onclick="filterPrayers('comfort')">Comfort</button>
+                <button class="filter-chip" onclick="filterPrayers('gratitude')">Gratitude</button>
+                <button class="filter-chip" onclick="filterPrayers('guidance')">Guidance</button>
+                <button class="filter-chip" onclick="filterPrayers('protection')">Protection</button>
+                <button class="filter-chip" onclick="filterPrayers('family')">Family</button>
+            </div>
+            <div class="prayer-list" id="prayerList"></div>
+
+            <!-- Mobile Accordion -->
+            <div class="mobile-accordion">
+                <!-- Prayers Tab -->
+                <div class="accordion-section">
+                    <div class="accordion-header" onclick="toggleAccordion('prayers')">
+                        <div class="accordion-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/></svg>
+                            Prayers
+                        </div>
+                        <span class="accordion-badge" id="prayersBadge">0</span>
+                        <svg class="accordion-toggle expanded" id="prayersToggle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                    <div class="accordion-content expanded" id="prayersContent">
+                        <div class="accordion-filters" id="mobileFilters">
+                            <button class="filter-chip active" onclick="filterMobilePrayers('all')">All</button>
+                            <button class="filter-chip" onclick="filterMobilePrayers('morning')">Morning</button>
+                            <button class="filter-chip" onclick="filterMobilePrayers('evening')">Evening</button>
+                            <button class="filter-chip" onclick="filterMobilePrayers('healing')">Healing</button>
+                            <button class="filter-chip" onclick="filterMobilePrayers('comfort')">Comfort</button>
+                            <button class="filter-chip" onclick="filterMobilePrayers('gratitude')">Gratitude</button>
+                            <button class="filter-chip" onclick="filterMobilePrayers('guidance')">Guidance</button>
+                            <button class="filter-chip" onclick="filterMobilePrayers('protection')">Protection</button>
+                            <button class="filter-chip" onclick="filterMobilePrayers('family')">Family</button>
+                        </div>
+                        <div class="accordion-list" id="mobilePrayerList"></div>
+                    </div>
+                </div>
+
+                <!-- Favorite Prayers Tab -->
+                <div class="accordion-section">
+                    <div class="accordion-header" onclick="toggleAccordion('favorites')">
+                        <div class="accordion-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                            Favorite Prayers
+                        </div>
+                        <span class="accordion-badge" id="favoritesBadge">0</span>
+                        <svg class="accordion-toggle" id="favoritesToggle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                    <div class="accordion-content" id="favoritesContent">
+                        <div class="accordion-list" id="mobileFavoritesList"></div>
+                    </div>
+                </div>
+
+                <!-- Most Popular Tab -->
+                <div class="accordion-section">
+                    <div class="accordion-header" onclick="toggleAccordion('popular')">
+                        <div class="accordion-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                            Most Popular
+                        </div>
+                        <span class="accordion-badge" id="popularBadge">4</span>
+                        <svg class="accordion-toggle" id="popularToggle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                    <div class="accordion-content" id="popularContent">
+                        <div class="accordion-list" id="mobilePopularList"></div>
+                    </div>
+                </div>
+
+                <!-- Recommended For You Tab -->
+                <div class="accordion-section">
+                    <div class="accordion-header" onclick="toggleAccordion('recommended')">
+                        <div class="accordion-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            Recommended For You
+                        </div>
+                        <span class="accordion-badge" id="recommendedBadge">4</span>
+                        <svg class="accordion-toggle" id="recommendedToggle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                    <div class="accordion-content" id="recommendedContent">
+                        <div class="accordion-list" id="mobileRecommendedList"></div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center - Prayer Content -->
+        <main class="main-content" id="mainContent">
+            <div class="empty-state">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/></svg>
+                <h3>Select a prayer</h3>
+                <p>Choose a prayer from the list to begin</p>
+            </div>
+        </main>
+
+        <!-- Right Sidebar - Discover -->
+        <aside class="discover-sidebar" id="discoverSidebar"></aside>
+    </div>
+
+    <!-- Sticky Footer Player -->
+    <div class="prayer-player" id="prayerPlayer">
+        <!-- Left - Prayer Info -->
+        <div class="player-prayer-info">
+            <img class="player-prayer-art" id="playerArt" src="https://images.unsplash.com/photo-1507692049790-de58290a4334?w=120&h=120&fit=crop" alt="">
+            <div class="player-prayer-text">
+                <div class="player-prayer-name" id="playerPrayerName">No prayer selected</div>
+                <div class="player-prayer-category" id="playerCategory">-</div>
+            </div>
+            <button class="player-like-btn" onclick="toggleLike()" title="Like">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            </button>
+        </div>
+
+        <!-- Center - Controls -->
+        <div class="player-controls">
+            <div class="player-buttons">
+                <button class="player-btn-secondary" onclick="prevPrayer()" title="Previous">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6V6zm3.5 6l8.5 6V6l-8.5 6z"/></svg>
+                </button>
+                <button class="player-btn-play" id="playBtn" onclick="togglePlay()" title="Play">
+                    <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </button>
+                <button class="player-btn-secondary" onclick="nextPrayer()" title="Next">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 18h2V6h-2v12zM6 18l8.5-6L6 6v12z"/></svg>
+                </button>
+            </div>
+            <div class="player-progress-row">
+                <span class="player-time" id="currentTime">0:00</span>
+                <div class="progress-bar" id="progressBar" onclick="handleProgressClick(event)">
+                    <div class="progress-fill" id="progressFill">
+                        <div class="progress-knob"></div>
+                    </div>
+                </div>
+                <span class="player-time" id="totalTime">0:00</span>
+            </div>
+        </div>
+
+        <!-- Right - Speed & Volume -->
+        <div class="player-right">
+            <button class="speed-btn" id="speedBtn" onclick="cycleSpeed()" title="Playback speed">1x</button>
+            <button class="volume-btn" id="volumeBtn" title="Volume" onclick="toggleMute()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            </button>
+            <div class="volume-bar" id="volumeBar" onclick="handleVolumeClick(event)">
+                <div class="volume-fill" id="volumeFill">
+                    <div class="volume-knob"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Favorites Overlay -->
+    <div class="favorites-overlay" id="favoritesOverlay" onclick="closeFavoritesPanel()"></div>
+
+    <!-- Favorites Panel -->
+    <div class="favorites-panel" id="favoritesPanel">
+        <div class="favorites-panel-header">
+            <div class="favorites-panel-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--accent-gold)" stroke="var(--accent-gold)" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                Favorite Prayers
+            </div>
+            <button class="favorites-panel-close" onclick="closeFavoritesPanel()" title="Close">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="favorites-panel-list" id="favoritesPanelList"></div>
+    </div>
+
+    <script>
+        // ============================================
+        // MOBILE SIDEBAR FUNCTIONS
+        // ============================================
+
+        function toggleMobileSidebar() {
+            const sidebar = document.querySelector('.prayer-sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const hamburgerBtn = document.getElementById('hamburgerBtn');
+
+            if (sidebar.classList.contains('active')) {
+                closeMobileSidebar();
+            } else {
+                openMobileSidebar();
+            }
+        }
+
+        function openMobileSidebar() {
+            const sidebar = document.querySelector('.prayer-sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const hamburgerBtn = document.getElementById('hamburgerBtn');
+
+            sidebar.classList.add('active');
+            overlay.classList.add('active');
+            hamburgerBtn.classList.add('active');
+
+            // Prevent body scroll on mobile when sidebar is open
+            if (window.innerWidth <= 768) {
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        function closeMobileSidebar() {
+            const sidebar = document.querySelector('.prayer-sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const hamburgerBtn = document.getElementById('hamburgerBtn');
+
+            sidebar.classList.remove('active');
+            overlay.classList.remove('active');
+            hamburgerBtn.classList.remove('active');
+
+            // Restore body scroll
+            if (window.innerWidth <= 768) {
+                document.body.style.overflow = 'auto';
+            }
+        }
+
+        // ============================================
+        // MOBILE ACCORDION FUNCTIONS
+        // ============================================
+
+        let currentMobileFilter = 'all';
+
+        function toggleAccordion(section) {
+            const content = document.getElementById(`${section}Content`);
+            const toggle = document.getElementById(`${section}Toggle`);
+            const isExpanded = content.classList.contains('expanded');
+
+            // Close all sections first
+            document.querySelectorAll('.accordion-content.expanded').forEach(el => {
+                el.classList.remove('expanded');
+            });
+            document.querySelectorAll('.accordion-toggle.expanded').forEach(el => {
+                el.classList.remove('expanded');
+            });
+
+            // If the clicked section wasn't open, open it
+            if (!isExpanded) {
+                content.classList.add('expanded');
+                toggle.classList.add('expanded');
+            }
+        }
+
+        function renderMobilePrayerList() {
+            const container = document.getElementById('mobilePrayerList');
+            if (!container) return;
+
+            const filtered = currentMobileFilter === 'all'
+                ? prayers
+                : prayers.filter(p => p.category === currentMobileFilter);
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="accordion-empty">No prayers found</div>';
+                return;
+            }
+
+            const favorites = getFavorites();
+
+            container.innerHTML = filtered.map((prayer, idx) => {
+                const realIdx = prayers.indexOf(prayer);
+                const isFav = favorites.includes(realIdx);
+
+                return `
+                    <div class="prayer-item ${realIdx === currentPrayerIdx ? 'active' : ''}" onclick="selectPrayer(${realIdx})" id="mobilePrayerItem${realIdx}">
+                        <button class="prayer-item-fav ${isFav ? 'favorited' : ''}" onclick="toggleFavorite(${realIdx}, event)" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="${isFav ? 'var(--accent-gold)' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                        </button>
+                        <img class="prayer-item-art" src="${prayer.image}" alt="${prayer.name}" loading="lazy">
+                        <div class="prayer-item-info">
+                            <div class="prayer-item-name">${prayer.name}</div>
+                            <div class="prayer-item-category">
+                                <span class="prayer-item-badge badge-${prayer.category}">${prayer.category.charAt(0).toUpperCase() + prayer.category.slice(1)}</span>
+                                <span class="prayer-item-duration">${prayer.duration}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const prayersBadge = document.getElementById('prayersBadge');
+            if (prayersBadge) {
+                prayersBadge.textContent = filtered.length;
+            }
+        }
+
+        function renderMobileFavorites() {
+            const container = document.getElementById('mobileFavoritesList');
+            if (!container) return;
+
+            const favorites = getFavorites();
+            const favs = favorites.map(idx => {
+                return { idx, prayer: prayers[idx] };
+            }).filter(f => f.prayer);
+
+            if (favs.length === 0) {
+                container.innerHTML = '<div class="accordion-empty">No favorite prayers yet<br><span style="font-size:11px;margin-top:4px;display:block;">Tap the heart icon to save prayers</span></div>';
+            } else {
+                container.innerHTML = favs.map(({ idx, prayer }) => {
+                    return `
+                        <div class="prayer-item ${idx === currentPrayerIdx ? 'active' : ''}" onclick="selectPrayer(${idx})">
+                            <button class="prayer-item-fav favorited" onclick="toggleFavorite(${idx}, event)" title="Remove from favorites">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--accent-gold)" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                            </button>
+                            <img class="prayer-item-art" src="${prayer.image}" alt="${prayer.name}" loading="lazy">
+                            <div class="prayer-item-info">
+                                <div class="prayer-item-name">${prayer.name}</div>
+                                <div class="prayer-item-category">
+                                    <span class="prayer-item-badge badge-${prayer.category}">${prayer.category.charAt(0).toUpperCase() + prayer.category.slice(1)}</span>
+                                    <span class="prayer-item-duration">${prayer.duration}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            const favoritesBadge = document.getElementById('favoritesBadge');
+            if (favoritesBadge) {
+                favoritesBadge.textContent = favs.length;
+            }
+        }
+
+        function renderMobilePopular() {
+            const container = document.getElementById('mobilePopularList');
+            if (!container) return;
+
+            const popular = [0, 1, 2, 3]; // Morning Offering, Strength, Evening Prayer, Healing
+            const favorites = getFavorites();
+            const validPopular = popular.filter(idx => prayers[idx]); // Only existing prayers
+
+            container.innerHTML = validPopular.map(idx => {
+                const prayer = prayers[idx];
+                const isFav = favorites.includes(idx);
+
+                return `
+                    <div class="prayer-item ${idx === currentPrayerIdx ? 'active' : ''}" onclick="selectPrayer(${idx})">
+                        <button class="prayer-item-fav ${isFav ? 'favorited' : ''}" onclick="toggleFavorite(${idx}, event)" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="${isFav ? 'var(--accent-gold)' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                        </button>
+                        <img class="prayer-item-art" src="${prayer.image}" alt="${prayer.name}" loading="lazy">
+                        <div class="prayer-item-info">
+                            <div class="prayer-item-name">${prayer.name}</div>
+                            <div class="prayer-item-category">
+                                <span class="prayer-item-badge badge-${prayer.category}">${prayer.category.charAt(0).toUpperCase() + prayer.category.slice(1)}</span>
+                                <span class="prayer-item-duration">${prayer.duration}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Update badge
+            const popularBadge = document.getElementById('popularBadge');
+            if (popularBadge) {
+                popularBadge.textContent = validPopular.length;
+            }
+        }
+
+        function renderMobileRecommended() {
+            const container = document.getElementById('mobileRecommendedList');
+            if (!container) return;
+
+            const recommended = [4, 6, 8, 10]; // Thanksgiving, Family Blessing, Guidance, Protection
+            const favorites = getFavorites();
+
+            container.innerHTML = recommended
+                .filter(idx => prayers[idx]) // Only include prayers that exist
+                .map(idx => {
+                    const prayer = prayers[idx];
+                    const isFav = favorites.includes(idx);
+
+                    return `
+                    <div class="prayer-item ${idx === currentPrayerIdx ? 'active' : ''}" onclick="selectPrayer(${idx})">
+                        <button class="prayer-item-fav ${isFav ? 'favorited' : ''}" onclick="toggleFavorite(${idx}, event)" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="${isFav ? 'var(--accent-gold)' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                        </button>
+                        <img class="prayer-item-art" src="${prayer.image}" alt="${prayer.name}" loading="lazy">
+                        <div class="prayer-item-info">
+                            <div class="prayer-item-name">${prayer.name}</div>
+                            <div class="prayer-item-category">
+                                <span class="prayer-item-badge badge-${prayer.category}">${prayer.category.charAt(0).toUpperCase() + prayer.category.slice(1)}</span>
+                                <span class="prayer-item-duration">${prayer.duration}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                }).join('');
+
+            // Update badge
+            const validRecommended = recommended.filter(idx => prayers[idx]);
+            const recommendedBadge = document.getElementById('recommendedBadge');
+            if (recommendedBadge) {
+                recommendedBadge.textContent = validRecommended.length;
+            }
+        }
+
+        function filterMobilePrayers(category) {
+            currentMobileFilter = category;
+
+            // Update filter chip active state
+            const mobileFilters = document.getElementById('mobileFilters');
+            if (mobileFilters) {
+                mobileFilters.querySelectorAll('.filter-chip').forEach(chip => {
+                    chip.classList.remove('active');
+                });
+                event.target.classList.add('active');
+            }
+
+            renderMobilePrayerList();
+        }
+
+        // ============================================
+        // PRAYER DATA
+        // ============================================
+
+        const prayers = [
+            {
+                name: "Morning Offering",
+                category: "morning",
+                image: "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?w=400&h=400&fit=crop",
+                description: "Begin your day by offering it to the Lord with gratitude and purpose.",
+                duration: "2 min",
+                author: "Traditional",
+                scripture: { text: "\u201CThis is the day the LORD has made; let us rejoice and be glad in it.\u201D", ref: "Psalm 118:24" },
+                lines: [
+                    "Heavenly Father, I thank You for the gift of this new day.",
+                    "As the morning light breaks through, I offer this day to You.",
+                    "Guide my steps, Lord, and let every word I speak bring glory to Your name.",
+                    "Fill my heart with Your peace that surpasses all understanding.",
+                    "Help me to see Your hand at work in every moment of this day.",
+                    "Grant me the strength to face whatever challenges may come,",
+                    "and the wisdom to make choices that honor You.",
+                    "May my actions reflect Your love to everyone I encounter.",
+                    "I surrender my plans and my worries into Your mighty hands.",
+                    "In Jesus\u2019 name, I pray. Amen."
+                ]
+            },
+            {
+                name: "Prayer for Strength",
+                category: "morning",
+                image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=400&fit=crop",
+                description: "Ask the Lord for strength to face the day ahead with courage.",
+                duration: "2 min",
+                author: "Traditional",
+                scripture: { text: "\u201CI can do all things through Christ who strengthens me.\u201D", ref: "Philippians 4:13" },
+                lines: [
+                    "Lord God Almighty, I come before You this morning seeking Your strength.",
+                    "You are my rock and my fortress, my shield and my deliverer.",
+                    "When I feel weak, remind me that Your power is made perfect in weakness.",
+                    "Give me the courage to stand firm in my faith,",
+                    "even when the world around me seems uncertain.",
+                    "Strengthen my body, renew my mind, and fortify my spirit.",
+                    "Help me to run the race set before me with perseverance,",
+                    "keeping my eyes fixed on You, the author and perfecter of my faith.",
+                    "Let Your strength flow through me today, Lord.",
+                    "In the mighty name of Jesus, Amen."
+                ]
+            },
+            {
+                name: "Evening Reflection",
+                category: "evening",
+                image: "https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=400&h=400&fit=crop",
+                description: "End your day reflecting on God's faithfulness and grace.",
+                duration: "3 min",
+                author: "Traditional",
+                scripture: { text: "\u201CIn peace I will lie down and sleep, for you alone, LORD, make me dwell in safety.\u201D", ref: "Psalm 4:8" },
+                lines: [
+                    "Dear Lord, as this day comes to a close, I pause to reflect on Your goodness.",
+                    "Thank You for every blessing You poured out today,",
+                    "both the ones I noticed and the ones I overlooked.",
+                    "Forgive me for the moments when I fell short of Your grace.",
+                    "Where I spoke harshly, bring healing. Where I acted selfishly, bring restoration.",
+                    "I release the worries and burdens of this day into Your hands.",
+                    "Guard my mind from anxious thoughts as I prepare for rest.",
+                    "Cover my home and loved ones with Your protective wings.",
+                    "Let me sleep in the peace that only You can give,",
+                    "and awaken me tomorrow refreshed and ready to serve You.",
+                    "Watch over me through the night, Father.",
+                    "In Jesus\u2019 precious name, Amen."
+                ]
+            },
+            {
+                name: "Bedtime Prayer",
+                category: "evening",
+                image: "https://images.unsplash.com/photo-1532767153582-b1a0e5145009?w=400&h=400&fit=crop",
+                description: "A gentle prayer to close the night in God's comforting presence.",
+                duration: "2 min",
+                author: "Traditional",
+                scripture: { text: "\u201CHe who watches over Israel will neither slumber nor sleep.\u201D", ref: "Psalm 121:4" },
+                lines: [
+                    "Father in Heaven, the day is done and night has come.",
+                    "I lay down my burdens at the foot of the cross.",
+                    "Thank You for carrying me through another day.",
+                    "As I close my eyes, let me feel Your presence beside me.",
+                    "Calm my restless thoughts and quiet my soul.",
+                    "Send Your angels to keep watch over my household.",
+                    "Let the rhythm of my breathing remind me of Your steady love.",
+                    "Grant me restful sleep and peaceful dreams.",
+                    "And when morning comes, let me rise with joy in my heart.",
+                    "Goodnight, Lord. I trust You with everything. Amen."
+                ]
+            },
+            {
+                name: "Prayer for Healing",
+                category: "healing",
+                image: "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=400&h=400&fit=crop",
+                description: "Seek the Lord's healing touch for body, mind, and spirit.",
+                duration: "3 min",
+                author: "Traditional",
+                scripture: { text: "\u201CHe heals the brokenhearted and binds up their wounds.\u201D", ref: "Psalm 147:3" },
+                lines: [
+                    "Merciful Father, I come to You as the Great Physician.",
+                    "You formed my body, and You alone have the power to restore it.",
+                    "I ask for Your healing hand to touch every area of pain and sickness.",
+                    "Lord, heal me physically \u2014 restore health to my body.",
+                    "Heal me emotionally \u2014 mend the wounds that others cannot see.",
+                    "Heal me spiritually \u2014 draw me closer to You through this trial.",
+                    "I believe that by Your stripes, I am healed.",
+                    "Remove every fear and doubt that tries to steal my hope.",
+                    "Fill me with the faith to trust Your perfect timing.",
+                    "Whether You heal in an instant or through a journey,",
+                    "I will praise You, for You are good in all You do.",
+                    "In the healing name of Jesus Christ, Amen."
+                ]
+            },
+            {
+                name: "Prayer for the Sick",
+                category: "healing",
+                image: "https://images.unsplash.com/photo-1459862515011-816c1b41d9a2?w=400&h=400&fit=crop",
+                description: "Intercede on behalf of someone who is suffering from illness.",
+                duration: "2 min",
+                author: "Traditional",
+                scripture: { text: "\u201CThe LORD sustains them on their sickbed and restores them from their bed of illness.\u201D", ref: "Psalm 41:3" },
+                lines: [
+                    "Loving God, I lift up to You those who are battling illness.",
+                    "You see their suffering and You know their every need.",
+                    "Place Your healing hand upon them and restore their strength.",
+                    "Give their doctors wisdom and their caregivers compassion.",
+                    "Surround them with Your comfort when the nights are long.",
+                    "Remind them that they are not alone, for You are with them.",
+                    "Renew their hope and give them patience in their recovery.",
+                    "Lord, let Your will be done, and let them feel Your love.",
+                    "In the powerful name of Jesus, I pray. Amen."
+                ]
+            },
+            {
+                name: "Prayer for Comfort",
+                category: "comfort",
+                image: "https://images.unsplash.com/photo-1507692049790-de58290a4334?w=400&h=400&fit=crop",
+                description: "Find solace and peace in the arms of the Lord during difficult times.",
+                duration: "3 min",
+                author: "Traditional",
+                scripture: { text: "\u201CBlessed are those who mourn, for they will be comforted.\u201D", ref: "Matthew 5:4" },
+                lines: [
+                    "O Lord, my Comforter, I come to You with a heavy heart.",
+                    "The weight of this season feels like more than I can bear.",
+                    "But You have promised that You are near to the brokenhearted,",
+                    "and that You save those who are crushed in spirit.",
+                    "Wrap me in Your everlasting arms and hold me close.",
+                    "Let Your peace, which surpasses all understanding,",
+                    "guard my heart and mind in Christ Jesus.",
+                    "When tears fall, catch them in Your hands.",
+                    "When grief overwhelms, be my steady anchor.",
+                    "I trust that You are working all things together for good,",
+                    "even when I cannot see the way forward.",
+                    "Carry me, Lord, until I can walk again.",
+                    "In Jesus\u2019 comforting name, Amen."
+                ]
+            },
+            {
+                name: "Prayer in Times of Grief",
+                category: "comfort",
+                image: "https://images.unsplash.com/photo-1474552226712-ac0f0961a954?w=400&h=400&fit=crop",
+                description: "A prayer for those walking through the valley of loss and sorrow.",
+                duration: "3 min",
+                author: "Traditional",
+                scripture: { text: "\u201CEven though I walk through the valley of the shadow of death, I will fear no evil, for you are with me.\u201D", ref: "Psalm 23:4" },
+                lines: [
+                    "Heavenly Father, my heart is broken with grief.",
+                    "The loss I carry feels unbearable, and the emptiness is so deep.",
+                    "But even in my darkest hour, I know You are with me.",
+                    "You are the God who weeps with us and holds us in our sorrow.",
+                    "Help me to grieve with hope \u2014 the hope that death is not the end.",
+                    "Remind me of Your promise of eternal life through Jesus Christ.",
+                    "Comfort me with the assurance that my loved one is at peace in Your presence.",
+                    "When the waves of sadness threaten to pull me under,",
+                    "be my lifeline and pull me back to solid ground.",
+                    "Give me the strength to take one more step, one more breath.",
+                    "Surround me with people who bring Your light into my darkness.",
+                    "In time, Lord, turn my mourning into dancing.",
+                    "Until then, simply hold me. In Jesus\u2019 name, Amen."
+                ]
+            },
+            {
+                name: "Prayer of Thanksgiving",
+                category: "gratitude",
+                image: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=400&h=400&fit=crop",
+                description: "Express your heartfelt gratitude for God's abundant blessings.",
+                duration: "2 min",
+                author: "Traditional",
+                scripture: { text: "\u201CGive thanks to the LORD, for he is good; his love endures forever.\u201D", ref: "Psalm 107:1" },
+                lines: [
+                    "Gracious God, I come with a heart overflowing with gratitude.",
+                    "You have blessed me beyond what I deserve.",
+                    "Thank You for the breath in my lungs and the beating of my heart.",
+                    "Thank You for the people You\u2019ve placed in my life,",
+                    "who love me and walk beside me on this journey.",
+                    "Thank You for provision \u2014 for daily bread and shelter and warmth.",
+                    "Thank You for Your Word, which is a lamp to my feet.",
+                    "Most of all, thank You for the gift of salvation through Jesus Christ.",
+                    "Help me never to take Your blessings for granted.",
+                    "Let gratitude be my constant companion. Amen."
+                ]
+            },
+            {
+                name: "Psalm of Praise",
+                category: "gratitude",
+                image: "https://images.unsplash.com/photo-1508963493744-76fce69379c0?w=400&h=400&fit=crop",
+                description: "Lift your voice in praise and adoration of the Most High God.",
+                duration: "2 min",
+                author: "Traditional",
+                scripture: { text: "\u201CLet everything that has breath praise the LORD.\u201D", ref: "Psalm 150:6" },
+                lines: [
+                    "Lord God Almighty, I lift my voice in praise to You!",
+                    "You are worthy of all honor and all glory.",
+                    "The heavens declare Your splendor and the earth sings of Your majesty.",
+                    "From the rising of the sun to its setting, Your name is to be praised.",
+                    "You are the Alpha and the Omega, the Beginning and the End.",
+                    "Your love never fails, Your mercy is new every morning.",
+                    "I praise You for who You are \u2014 holy, righteous, faithful, and true.",
+                    "Let my life be a living praise offering to You.",
+                    "Hallelujah! Blessed be the name of the Lord! Amen."
+                ]
+            },
+            {
+                name: "Prayer for Protection",
+                category: "protection",
+                image: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&h=400&fit=crop",
+                description: "Ask God to shield you and your loved ones from harm.",
+                duration: "2 min",
+                author: "Traditional",
+                scripture: { text: "\u201CThe LORD is my light and my salvation \u2014 whom shall I fear?\u201D", ref: "Psalm 27:1" },
+                lines: [
+                    "Mighty God, I come to You seeking Your divine protection.",
+                    "You are my fortress, my refuge, and my strong tower.",
+                    "Shield me from the arrows of the enemy,",
+                    "and guard my heart from every scheme of darkness.",
+                    "Place a hedge of protection around my home, my family, and my life.",
+                    "Send Your angels to stand guard over us day and night.",
+                    "When danger lurks, be my warning. When evil threatens, be my shield.",
+                    "I will not fear, for You are with me.",
+                    "No weapon formed against me shall prosper.",
+                    "I rest securely in the shadow of Your wings.",
+                    "In the protective name of Jesus, Amen."
+                ]
+            },
+            {
+                name: "Armor of God Prayer",
+                category: "protection",
+                image: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&h=400&fit=crop",
+                description: "Put on the full armor of God to stand against spiritual warfare.",
+                duration: "3 min",
+                author: "Based on Ephesians 6:10-18",
+                scripture: { text: "\u201CPut on the full armor of God, so that you can take your stand against the devil\u2019s schemes.\u201D", ref: "Ephesians 6:11" },
+                lines: [
+                    "Lord, I put on the full armor of God today.",
+                    "I fasten the belt of truth around my waist \u2014",
+                    "let me walk in honesty and integrity in all I do.",
+                    "I put on the breastplate of righteousness \u2014",
+                    "guard my heart with Your purity and justice.",
+                    "I fit my feet with the readiness that comes from the gospel of peace \u2014",
+                    "let me carry Your good news wherever I go.",
+                    "I take up the shield of faith \u2014",
+                    "with it, I will extinguish every flaming arrow of the evil one.",
+                    "I put on the helmet of salvation \u2014",
+                    "protect my mind and fill my thoughts with Your truth.",
+                    "I take up the sword of the Spirit, which is the Word of God \u2014",
+                    "Your Word is my weapon and my strength.",
+                    "I pray in the Spirit on all occasions, with all kinds of prayers.",
+                    "I am dressed for battle and standing firm. In Jesus\u2019 name, Amen."
+                ]
+            },
+            {
+                name: "Prayer for Wisdom",
+                category: "guidance",
+                image: "https://images.unsplash.com/photo-1456428746267-a1756408f782?w=400&h=400&fit=crop",
+                description: "Seek God's wisdom and direction for the decisions ahead.",
+                duration: "2 min",
+                author: "Traditional",
+                scripture: { text: "\u201CIf any of you lacks wisdom, you should ask God, who gives generously to all.\u201D", ref: "James 1:5" },
+                lines: [
+                    "All-knowing God, I stand at a crossroads and I need Your guidance.",
+                    "Your Word promises that if I ask for wisdom, You will give it generously.",
+                    "So I ask, Lord \u2014 open my eyes to see the path You\u2019ve prepared.",
+                    "Silence the noise of the world and help me hear Your still, small voice.",
+                    "Give me discernment to know what is true, noble, right, and pure.",
+                    "When I am confused, bring clarity. When I am afraid, bring courage.",
+                    "Lead me not by my own understanding,",
+                    "but help me to trust in You with all my heart.",
+                    "Direct my steps according to Your perfect will.",
+                    "In the name of Jesus, who is the Way, the Truth, and the Life, Amen."
+                ]
+            },
+            {
+                name: "Prayer for Direction",
+                category: "guidance",
+                image: "https://images.unsplash.com/photo-1510797215324-95aa89f43c33?w=400&h=400&fit=crop",
+                description: "When you're unsure of the way forward, ask God to light the path.",
+                duration: "2 min",
+                author: "Traditional",
+                scripture: { text: "\u201CYour word is a lamp for my feet, a light on my path.\u201D", ref: "Psalm 119:105" },
+                lines: [
+                    "Lord, I feel lost and uncertain about which way to go.",
+                    "The road ahead is unclear, and I need Your light to guide me.",
+                    "You know the plans You have for me \u2014 plans to prosper and not to harm.",
+                    "Help me to be patient as I wait for Your direction.",
+                    "Close every door that is not of You,",
+                    "and open wide the doors You want me to walk through.",
+                    "Give me the faith to take the first step,",
+                    "even when I cannot see the whole staircase.",
+                    "I choose to follow You, Lord, wherever You lead.",
+                    "In Jesus\u2019 faithful name, Amen."
+                ]
+            },
+            {
+                name: "Prayer for My Family",
+                category: "family",
+                image: "https://images.unsplash.com/photo-1511895426328-dc8714191300?w=400&h=400&fit=crop",
+                description: "Lift your family into the loving and protective hands of the Lord.",
+                duration: "3 min",
+                author: "Traditional",
+                scripture: { text: "\u201CAs for me and my household, we will serve the LORD.\u201D", ref: "Joshua 24:15" },
+                lines: [
+                    "Dear Lord, I bring my family before Your throne of grace.",
+                    "You are the God who knit us together and called us a family.",
+                    "I pray for unity \u2014 bind us together with cords of love that cannot be broken.",
+                    "I pray for protection \u2014 keep each member safe under Your watchful eye.",
+                    "I pray for health \u2014 strengthen our bodies and guard our minds.",
+                    "I pray for wisdom \u2014 help us make decisions that honor You.",
+                    "Where there is conflict, bring reconciliation.",
+                    "Where there is distance, bridge the gap with Your love.",
+                    "Bless our home and let it be a place of peace, joy, and worship.",
+                    "May the love of Christ be the foundation on which our family stands.",
+                    "Raise our children in the knowledge and love of Jesus.",
+                    "In His precious name, we pray. Amen."
+                ]
+            },
+            {
+                name: "Prayer for My Children",
+                category: "family",
+                image: "https://images.unsplash.com/photo-1476703993599-0035a21b17a9?w=400&h=400&fit=crop",
+                description: "A parent's prayer for the protection and spiritual growth of their children.",
+                duration: "3 min",
+                author: "Traditional",
+                scripture: { text: "\u201CTrain up a child in the way he should go; even when he is old he will not depart from it.\u201D", ref: "Proverbs 22:6" },
+                lines: [
+                    "Father God, my children are the greatest gift You have given me.",
+                    "I entrust them to Your care, for they belong to You.",
+                    "Protect them from every danger, seen and unseen.",
+                    "Guard their hearts from the lies of the enemy.",
+                    "Plant seeds of faith deep within their souls,",
+                    "and let those seeds grow into a mighty, unshakeable faith.",
+                    "Give them friends who will encourage them in righteousness.",
+                    "Help them to be kind, brave, honest, and compassionate.",
+                    "When they face temptation, give them the strength to resist.",
+                    "When they stumble, be quick to catch them and set them upright.",
+                    "Lord, let them know how deeply they are loved \u2014 by me and by You.",
+                    "Guide them all the days of their lives.",
+                    "In Jesus\u2019 name, Amen."
+                ]
+            },
+            {
+                name: "Prayer for Peace",
+                category: "comfort",
+                image: "https://images.unsplash.com/photo-1499002238440-d264edd596ec?w=400&h=400&fit=crop",
+                description: "Ask the Prince of Peace to calm every storm within and around you.",
+                duration: "2 min",
+                author: "Traditional",
+                scripture: { text: "\u201CPeace I leave with you; my peace I give you. I do not give to you as the world gives.\u201D", ref: "John 14:27" },
+                lines: [
+                    "Prince of Peace, I desperately need Your calming presence.",
+                    "My mind is racing and my heart is anxious.",
+                    "Speak \u201CPeace, be still\u201D over every storm in my life.",
+                    "Replace my worry with worship and my fear with faith.",
+                    "Help me to cast all my cares upon You, for You care for me.",
+                    "Let Your peace, which transcends all understanding,",
+                    "stand guard over my heart and mind.",
+                    "Quiet the chaos and let me rest in Your sovereignty.",
+                    "You are in control, and that is enough.",
+                    "In the peaceful name of Jesus, Amen."
+                ]
+            },
+            {
+                name: "The Lord's Prayer",
+                category: "morning",
+                image: "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=400&h=400&fit=crop",
+                description: "The prayer that Jesus taught His disciples, a model for all prayer.",
+                duration: "1 min",
+                author: "Jesus Christ (Matthew 6:9-13)",
+                scripture: { text: "\u201CThis, then, is how you should pray.\u201D", ref: "Matthew 6:9" },
+                lines: [
+                    "Our Father, who art in heaven, hallowed be Thy name.",
+                    "Thy kingdom come, Thy will be done,",
+                    "on earth as it is in heaven.",
+                    "Give us this day our daily bread,",
+                    "and forgive us our trespasses,",
+                    "as we forgive those who trespass against us.",
+                    "And lead us not into temptation,",
+                    "but deliver us from evil.",
+                    "For Thine is the kingdom, and the power,",
+                    "and the glory, forever and ever.",
+                    "Amen."
+                ]
+            },
+            {
+                name: "Serenity Prayer",
+                category: "guidance",
+                image: "https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?w=400&h=400&fit=crop",
+                description: "A beloved prayer for acceptance, courage, and wisdom.",
+                duration: "1 min",
+                author: "Reinhold Niebuhr",
+                scripture: { text: "\u201CTrust in the LORD with all your heart and lean not on your own understanding.\u201D", ref: "Proverbs 3:5" },
+                lines: [
+                    "God, grant me the serenity to accept the things I cannot change,",
+                    "the courage to change the things I can,",
+                    "and the wisdom to know the difference.",
+                    "Living one day at a time, enjoying one moment at a time.",
+                    "Accepting hardship as a pathway to peace.",
+                    "Taking, as Jesus did, this sinful world as it is,",
+                    "not as I would have it.",
+                    "Trusting that You will make all things right",
+                    "if I surrender to Your will.",
+                    "That I may be reasonably happy in this life",
+                    "and supremely happy with You forever in the next.",
+                    "Amen."
+                ]
+            },
+            {
+                name: "Prayer of St. Francis",
+                category: "guidance",
+                image: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&h=400&fit=crop",
+                description: "Make me an instrument of Your peace \u2014 a timeless prayer of service.",
+                duration: "2 min",
+                author: "Attributed to St. Francis of Assisi",
+                scripture: { text: "\u201CBlessed are the peacemakers, for they will be called children of God.\u201D", ref: "Matthew 5:9" },
+                lines: [
+                    "Lord, make me an instrument of Your peace.",
+                    "Where there is hatred, let me sow love.",
+                    "Where there is injury, pardon.",
+                    "Where there is doubt, faith.",
+                    "Where there is despair, hope.",
+                    "Where there is darkness, light.",
+                    "Where there is sadness, joy.",
+                    "O Divine Master, grant that I may not so much seek",
+                    "to be consoled as to console,",
+                    "to be understood as to understand,",
+                    "to be loved as to love.",
+                    "For it is in giving that we receive,",
+                    "it is in pardoning that we are pardoned,",
+                    "and it is in dying that we are born to eternal life.",
+                    "Amen."
+                ]
+            }
+        ];
+
+        // State
+        let currentPrayerIdx = -1;
+        let isPlaying = false;
+        let currentFilter = 'all';
+        let speechUtterance = null;
+        let speechStartTime = 0;
+        let speechDuration = 0;
+        let totalDuration = 0;
+        let progressInterval = null;
+        let currentLineIdx = -1;
+        let speechRate = 1;
+        const speedOptions = [0.75, 1, 1.25, 1.5];
+        let currentSpeedIdx = 1;
+        let selectedVoiceGender = 'female'; // default: female (Jubilee avatar)
+        let isPaused = false;
+        let pausedAtLineIdx = 0;
+        let pausedCharWithinLine = 0;
+        let elapsedBeforePause = 0;
+        let totalPrayerChars = 0;
+        let spokenAbsCharIdx = 0;
+        let charBaseOffset = 0;
+
+        // ============================================
+        // FAVORITES MANAGEMENT
+        // ============================================
+
+        function getFavorites() {
+            try {
+                return JSON.parse(localStorage.getItem('jubilee_prayer_favorites') || '[]');
+            } catch { return []; }
+        }
+
+        function saveFavorites(favs) {
+            localStorage.setItem('jubilee_prayer_favorites', JSON.stringify(favs));
+        }
+
+        // Library section state
+        let libraryExpanded = true;
+
+        // Toggle library section
+        function toggleLibrary() {
+            libraryExpanded = !libraryExpanded;
+            const content = document.getElementById('favoritePrayersContent');
+            const toggle = document.querySelector('.library-toggle');
+
+            if (libraryExpanded) {
+                content.classList.add('expanded');
+                toggle.classList.add('expanded');
+            } else {
+                content.classList.remove('expanded');
+                toggle.classList.remove('expanded');
+            }
+        }
+
+        function isFavorite(idx) {
+            return getFavorites().includes(idx);
+        }
+
+        function toggleFavorite(idx, e) {
+            if (e) e.stopPropagation();
+            let favs = getFavorites();
+            if (favs.includes(idx)) {
+                favs = favs.filter(i => i !== idx);
+            } else {
+                favs.push(idx);
+            }
+            saveFavorites(favs);
+            renderPrayerList();
+            renderFavoritesPanel();
+            updateFavoritesCount();
+            updateFavoritePrayersContent();
+            updatePlayerLikeButton();
+            // Update mobile accordion
+            renderMobilePrayerList();
+            renderMobileFavorites();
+            renderMobilePopular();
+            renderMobileRecommended();
+        }
+
+        function removeFavorite(idx, e) {
+            if (e) e.stopPropagation();
+            let favs = getFavorites().filter(i => i !== idx);
+            saveFavorites(favs);
+            renderPrayerList();
+            renderFavoritesPanel();
+            updateFavoritesCount();
+            updateFavoritePrayersContent();
+            updatePlayerLikeButton();
+            // Update mobile accordion
+            renderMobilePrayerList();
+            renderMobileFavorites();
+            renderMobilePopular();
+            renderMobileRecommended();
+        }
+
+        function updateFavoritePrayersContent() {
+            const content = document.getElementById('favoritePrayersContent');
+            if (!content) return;
+
+            const favs = getFavorites();
+
+            if (favs.length === 0) {
+                content.innerHTML = `
+                    <div class="library-empty">
+                        <div class="library-empty-icon">♡</div>
+                        <div>No favorite prayers yet</div>
+                        <div style="font-size: 11px; margin-top: 4px;">Click the heart icon to save prayers</div>
+                    </div>
+                `;
+                return;
+            }
+
+            content.innerHTML = `
+                <div class="playlist-header">Favorite Prayers</div>
+                ${favs.map(idx => {
+                    const prayer = prayers[idx];
+                    if (!prayer) return '';
+                    return `
+                        <div class="discover-card" onclick="selectPrayer(${idx})">
+                            <img class="discover-card-art" src="${prayer.image}" alt="${prayer.name}" loading="lazy">
+                            <div class="discover-card-info">
+                                <div class="discover-card-name">${prayer.name}</div>
+                                <div class="discover-card-cat">${prayer.category.charAt(0).toUpperCase() + prayer.category.slice(1)}</div>
+                            </div>
+                            <button class="discover-remove-btn"
+                                    onclick="removeFavorite(${idx}, event)"
+                                    title="Remove from favorites">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="3 6 5 6 21 6"/>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                    <line x1="10" y1="11" x2="10" y2="17"/>
+                                    <line x1="14" y1="11" x2="14" y2="17"/>
+                                </svg>
+                            </button>
+                        </div>
+                    `;
+                }).join('')}
+            `;
+        }
+
+        function openFavoritesPanel() {
+            renderFavoritesPanel();
+            document.getElementById('favoritesPanel').classList.add('open');
+            document.getElementById('favoritesOverlay').classList.add('visible');
+        }
+
+        function closeFavoritesPanel() {
+            document.getElementById('favoritesPanel').classList.remove('open');
+            document.getElementById('favoritesOverlay').classList.remove('visible');
+        }
+
+        function renderFavoritesPanel() {
+            const list = document.getElementById('favoritesPanelList');
+            const favs = getFavorites();
+            if (favs.length === 0) {
+                list.innerHTML = `
+                    <div class="favorites-empty">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                        <p>No favorite prayers yet.<br>Tap the heart icon next to any prayer to add it here.</p>
+                    </div>
+                `;
+                return;
+            }
+            list.innerHTML = favs.map(idx => {
+                const prayer = prayers[idx];
+                if (!prayer) return '';
+                return `
+                    <div class="fav-panel-item" onclick="closeFavoritesPanel(); selectPrayer(${idx})">
+                        <img class="fav-panel-item-art" src="${prayer.image}" alt="${prayer.name}" loading="lazy">
+                        <div class="fav-panel-item-info">
+                            <div class="fav-panel-item-name">${prayer.name}</div>
+                            <div class="fav-panel-item-meta">${getCategoryBadge(prayer.category)} ${prayer.duration}</div>
+                        </div>
+                        <button class="fav-panel-remove" onclick="removeFavorite(${idx}, event)" title="Remove from favorites">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateFavoritesCount() {
+            const countEl = document.getElementById('favCount');
+            if (countEl) {
+                const count = getFavorites().length;
+                countEl.style.display = count > 0 ? 'flex' : 'none';
+                countEl.textContent = count;
+            }
+        }
+
+        // ============================================
+        // TEXT-TO-SPEECH ENGINE
+        // ============================================
+
+        function estimateDuration(lines) {
+            const totalChars = lines.join(' ').length;
+            return (totalChars / 15) / speechRate;
+        }
+
+        function getSelectedVoice() {
+            const voices = window.speechSynthesis.getVoices();
+            const enVoices = voices.filter(v => v.lang.startsWith('en'));
+
+            if (selectedVoiceGender === 'female') {
+                return enVoices.find(v => /Zira/i.test(v.name)) ||
+                       enVoices.find(v => /Samantha/i.test(v.name)) ||
+                       enVoices.find(v => /Karen/i.test(v.name)) ||
+                       enVoices.find(v => /Female/i.test(v.name) && /Natural/i.test(v.name)) ||
+                       enVoices.find(v => /Female/i.test(v.name)) ||
+                       enVoices.find(v => /Google US English/i.test(v.name)) ||
+                       enVoices.find(v => /Natural/i.test(v.name)) ||
+                       enVoices.find(v => v.lang === 'en-US') || null;
+            } else {
+                return enVoices.find(v => /David/i.test(v.name)) ||
+                       enVoices.find(v => /Mark/i.test(v.name)) ||
+                       enVoices.find(v => /Daniel/i.test(v.name)) ||
+                       enVoices.find(v => /James/i.test(v.name)) ||
+                       enVoices.find(v => /Male/i.test(v.name) && /Natural/i.test(v.name)) ||
+                       enVoices.find(v => /Male/i.test(v.name)) ||
+                       enVoices.find(v => /Google UK English Male/i.test(v.name)) ||
+                       enVoices.find(v => v.lang === 'en-GB') || null;
+            }
+        }
+
+        function speakLines(prayer, fromLine, isResume, charOffset = 0) {
+            // Cancel any existing speech
+            window.speechSynthesis.cancel();
+            clearInterval(progressInterval);
+
+            const linesToSpeak = prayer.lines.slice(fromLine);
+            if (linesToSpeak.length === 0) return;
+            let text = linesToSpeak.join('\n');
+            if (charOffset > 0) text = text.substring(charOffset);
+
+            speechUtterance = new SpeechSynthesisUtterance(text);
+            speechUtterance.rate = speechRate;
+            speechUtterance.pitch = 1;
+            speechUtterance.volume = parseFloat(document.getElementById('volumeFill').style.width || '70') / 100;
+
+            const voice = getSelectedVoice();
+            if (voice) speechUtterance.voice = voice;
+
+            // Compute total duration for full prayer and remaining duration
+            totalDuration = estimateDuration(prayer.lines);
+            const remainingDuration = estimateDuration(linesToSpeak);
+
+            // Track absolute character position for accurate progress
+            totalPrayerChars = prayer.lines.join('\n').length;
+            let baseChars = 0;
+            for (let i = 0; i < fromLine; i++) baseChars += prayer.lines[i].length + 1;
+            charBaseOffset = baseChars + charOffset;
+            spokenAbsCharIdx = charBaseOffset;
+
+            if (isResume) {
+                // Keep elapsed time from before pause, start tracking the remaining portion
+                speechStartTime = Date.now();
+                speechDuration = remainingDuration;
+            } else {
+                elapsedBeforePause = 0;
+                speechStartTime = Date.now();
+                speechDuration = remainingDuration;
+            }
+
+            currentLineIdx = -1;
+            highlightLine(fromLine);
+
+            // Build line break map for the (potentially sliced) text
+            let charCount = 0;
+            const lineBreaks = [];
+            linesToSpeak.forEach((line, i) => {
+                const effectiveLen = (i === 0 && charOffset > 0) ? (line.length - charOffset) : line.length;
+                const lineCharBase = (i === 0 && charOffset > 0) ? charOffset : 0;
+                lineBreaks.push({ start: charCount, end: charCount + effectiveLen, lineIdx: fromLine + i, lineCharBase });
+                charCount += effectiveLen + 1;
+            });
+
+            speechUtterance.onboundary = (e) => {
+                if (e.name === 'word') {
+                    const charIdx = e.charIndex;
+                    spokenAbsCharIdx = charBaseOffset + charIdx;
+                    for (let i = lineBreaks.length - 1; i >= 0; i--) {
+                        if (charIdx >= lineBreaks[i].start) {
+                            highlightLine(lineBreaks[i].lineIdx);
+                            pausedAtLineIdx = lineBreaks[i].lineIdx;
+                            pausedCharWithinLine = lineBreaks[i].lineCharBase + (charIdx - lineBreaks[i].start);
+                            break;
+                        }
+                    }
+                }
+            };
+
+            speechUtterance.onend = () => {
+                // Only mark as finished if we weren't manually stopped
+                if (isPlaying) {
+                    isPlaying = false;
+                    isPaused = false;
+                    elapsedBeforePause = 0;
+                    pausedAtLineIdx = 0;
+                    pausedCharWithinLine = 0;
+                    updatePlayIcon();
+                    clearHighlights();
+                    clearInterval(progressInterval);
+                    document.getElementById('progressFill').style.width = '100%';
+                    const totalTime = formatTime(totalDuration);
+                    document.getElementById('currentTime').textContent = totalTime;
+                    document.getElementById('totalTime').textContent = totalTime;
+                }
+            };
+
+            window.speechSynthesis.speak(speechUtterance);
+
+            // Progress tracking
+            progressInterval = setInterval(updateProgress, 200);
+        }
+
+        function startPrayerPlayback(prayerIdx) {
+            stopPrayerPlayback();
+            const prayer = prayers[prayerIdx];
+            speakLines(prayer, 0, false);
+        }
+
+        function stopPrayerPlayback() {
+            window.speechSynthesis.cancel();
+            speechUtterance = null;
+            isPaused = false;
+            pausedAtLineIdx = 0;
+            pausedCharWithinLine = 0;
+            elapsedBeforePause = 0;
+            spokenAbsCharIdx = 0;
+            charBaseOffset = 0;
+            clearInterval(progressInterval);
+            currentLineIdx = -1;
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('currentTime').textContent = '0:00';
+        }
+
+        function pausePrayerPlayback() {
+            // Save how far we got
+            elapsedBeforePause = elapsedBeforePause + (Date.now() - speechStartTime) / 1000;
+            window.speechSynthesis.cancel();
+            isPaused = true;
+            clearInterval(progressInterval);
+        }
+
+        function resumePrayerPlayback() {
+            if (currentPrayerIdx < 0) return;
+            const prayer = prayers[currentPrayerIdx];
+            isPaused = false;
+            // Resume from the exact word where we paused
+            speakLines(prayer, pausedAtLineIdx, true, pausedCharWithinLine);
+        }
+
+        function updateProgress() {
+            if (!isPlaying || totalPrayerChars <= 0) return;
+            const pct = Math.min(100, (spokenAbsCharIdx / totalPrayerChars) * 100);
+            document.getElementById('progressFill').style.width = pct + '%';
+            const estimatedTime = (pct / 100) * totalDuration;
+            document.getElementById('currentTime').textContent = formatTime(estimatedTime);
+            document.getElementById('totalTime').textContent = formatTime(totalDuration);
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return m + ':' + (s < 10 ? '0' : '') + s;
+        }
+
+        function highlightLine(idx) {
+            if (idx === currentLineIdx) return;
+            currentLineIdx = idx;
+            document.querySelectorAll('.prayer-line').forEach((el, i) => {
+                el.classList.toggle('speaking', i === idx);
+            });
+            const speakingEl = document.querySelector('.prayer-line.speaking');
+            if (speakingEl) {
+                speakingEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        function clearHighlights() {
+            document.querySelectorAll('.prayer-line').forEach(el => el.classList.remove('speaking'));
+        }
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+
+        // Load voices (some browsers load async)
+        window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            window.speechSynthesis.getVoices(); // trigger voice loading
+            renderPrayerList();
+            renderDiscoverSidebar();
+            updateFavoritePrayersContent();
+
+            // Render mobile accordion
+            renderMobilePrayerList();
+            renderMobileFavorites();
+            renderMobilePopular();
+            renderMobileRecommended();
+
+            // Check for prayer query parameter
+            const params = new URLSearchParams(window.location.search);
+            const prayerParam = params.get('prayer');
+            if (prayerParam !== null) {
+                const idx = parseInt(prayerParam);
+                if (idx >= 0 && idx < prayers.length) {
+                    selectPrayer(idx);
+                } else {
+                    selectPrayer(0);
+                }
+            } else {
+                selectPrayer(0);
+            }
+
+            // Initialize favorites count badge
+            updateFavoritesCount();
+        });
+
+        // ============================================
+        // RENDER FUNCTIONS
+        // ============================================
+
+        function getCategoryLabel(cat) {
+            const labels = { morning: 'Morning', evening: 'Evening', healing: 'Healing', comfort: 'Comfort', gratitude: 'Gratitude', protection: 'Protection', guidance: 'Guidance', family: 'Family' };
+            return labels[cat] || cat;
+        }
+
+        function getCategoryBadge(cat) {
+            return `<span class="prayer-item-badge badge-${cat}">${getCategoryLabel(cat).toUpperCase()}</span>`;
+        }
+
+        function renderPrayerList() {
+            const list = document.getElementById('prayerList');
+            const filtered = currentFilter === 'all' ? prayers : prayers.filter(p => p.category === currentFilter);
+
+            const favs = getFavorites();
+            list.innerHTML = filtered.map((prayer, i) => {
+                const realIdx = prayers.indexOf(prayer);
+                const isFav = favs.includes(realIdx);
+                return `
+                    <div class="prayer-item ${realIdx === currentPrayerIdx ? 'active' : ''}" onclick="selectPrayer(${realIdx})" id="prayerItem${realIdx}">
+                        <button class="prayer-item-fav ${isFav ? 'favorited' : ''}" onclick="toggleFavorite(${realIdx}, event)" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="${isFav ? 'var(--accent-gold)' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                        </button>
+                        <img class="prayer-item-art" src="${prayer.image}" alt="${prayer.name}" loading="lazy">
+                        <div class="prayer-item-info">
+                            <div class="prayer-item-name">${prayer.name}</div>
+                            <div class="prayer-item-meta">${getCategoryBadge(prayer.category)} ${prayer.duration}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function filterPrayers(cat) {
+            currentFilter = cat;
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                const chipText = chip.textContent.trim().toLowerCase();
+                chip.classList.toggle('active', chipText === cat || (cat === 'all' && chipText === 'all'));
+            });
+            renderPrayerList();
+        }
+
+        function renderDiscoverSidebar() {
+            const sidebar = document.getElementById('discoverSidebar');
+            const popular = [17, 0, 4, 6]; // Lord's Prayer, Morning Offering, Healing, Comfort
+            const recommended = [11, 19, 8, 14]; // Armor of God, St. Francis, Thanksgiving, My Family
+
+            sidebar.innerHTML = `
+                <div class="library-section">
+                    <div class="library-header" onclick="toggleLibrary()">
+                        <div class="library-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                            </svg>
+                            Your Library
+                        </div>
+                        <svg class="library-toggle expanded" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                    <div class="library-content expanded" id="favoritePrayersContent">
+                        <div class="library-empty">
+                            <div class="library-empty-icon">♡</div>
+                            <div>No favorite prayers yet</div>
+                            <div style="font-size: 11px; margin-top: 4px;">Click the heart icon to save prayers</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="discover-divider"></div>
+                <div class="discover-title">Most Popular</div>
+                ${popular.map(idx => renderDiscoverCard(idx)).join('')}
+                <div class="discover-divider"></div>
+                <div class="discover-section-title">Recommended For You</div>
+                ${recommended.map(idx => renderDiscoverCard(idx)).join('')}
+            `;
+        }
+
+        function renderDiscoverCard(idx) {
+            const prayer = prayers[idx];
+            return `
+                <div class="discover-card" onclick="selectPrayer(${idx})">
+                    <img class="discover-card-art" src="${prayer.image}" alt="${prayer.name}" loading="lazy">
+                    <div class="discover-card-info">
+                        <div class="discover-card-name">${prayer.name}</div>
+                        <div class="discover-card-cat">${getCategoryLabel(prayer.category)}</div>
+                        <div class="discover-card-duration">${prayer.duration}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function selectPrayer(idx) {
+            // Close mobile sidebar when prayer is selected
+            if (window.innerWidth <= 768) {
+                closeMobileSidebar();
+            }
+
+            // If a different prayer is playing or paused, stop it
+            if (isPlaying || isPaused) {
+                stopPrayerPlayback();
+                isPlaying = false;
+                isPaused = false;
+                updatePlayIcon();
+            }
+
+            currentPrayerIdx = idx;
+            const prayer = prayers[idx];
+            const catClass = 'cat-' + prayer.category;
+
+            // Update sidebar active state
+            document.querySelectorAll('.prayer-item').forEach(el => el.classList.remove('active'));
+            const activeItem = document.getElementById('prayerItem' + idx);
+            if (activeItem) activeItem.classList.add('active');
+
+            // Render center content
+            const main = document.getElementById('mainContent');
+            main.innerHTML = `
+                <div class="prayer-banner ${catClass}">
+                    <img class="prayer-banner-art" src="${prayer.image}" alt="${prayer.name}">
+                    <div class="prayer-banner-info">
+                        <div class="prayer-banner-label">
+                            ${getCategoryBadge(prayer.category)} Prayer
+                        </div>
+                        <h1 class="prayer-banner-title">${prayer.name}</h1>
+                        <div class="prayer-banner-desc">${prayer.description}</div>
+                        <div class="prayer-banner-meta">
+                            <span>${prayer.author}</span>
+                            <span class="prayer-banner-dot"></span>
+                            <span>${prayer.duration} read</span>
+                            <span class="prayer-banner-dot"></span>
+                            <span>${prayer.lines.length} lines</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="prayer-actions">
+                    <button class="btn-play-large" id="bannerPlayBtn" onclick="toggleBannerPlay(${idx})" title="Play">
+                        <svg id="bannerPlayIcon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    </button>
+                    <div class="duration-badge">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                        ${prayer.duration}
+                    </div>
+                    <button class="btn-follow" onclick="toggleFollow(this)">Save</button>
+                    <div class="voice-selector">
+                        <span class="voice-selector-label">Choose Prayer Voice</span>
+                        <button class="voice-btn ${selectedVoiceGender === 'female' ? 'active' : ''}" onclick="setVoiceGender('female')" title="Female voice">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/><path d="M12 13v2"/></svg>
+                            Female
+                        </button>
+                        <button class="voice-btn ${selectedVoiceGender === 'male' ? 'active' : ''}" onclick="setVoiceGender('male')" title="Male voice">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
+                            Male
+                        </button>
+                    </div>
+                </div>
+
+                <div class="scripture-section">
+                    <div class="scripture-card">
+                        <div class="scripture-label">Scripture</div>
+                        <div class="scripture-text">${prayer.scripture.text}</div>
+                        <div class="scripture-ref">\u2014 ${prayer.scripture.ref}</div>
+                    </div>
+                </div>
+
+                <div class="prayer-text-section">
+                    <div class="prayer-text-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15z"/></svg>
+                        Prayer Text
+                    </div>
+                    <div class="prayer-text-body" id="prayerTextBody">
+                        ${prayer.lines.map((line, i) => `<div class="prayer-line" data-line="${i}">${line}</div>`).join('')}
+                    </div>
+                </div>
+            `;
+            main.scrollTop = 0;
+
+            // Update footer player info
+            document.getElementById('playerArt').src = prayer.image;
+            document.getElementById('playerPrayerName').textContent = prayer.name;
+            document.getElementById('playerCategory').textContent = getCategoryLabel(prayer.category) + ' Prayer';
+
+            // Update player like button state
+            updatePlayerLikeButton();
+        }
+
+        // ============================================
+        // PLAYBACK CONTROLS
+        // ============================================
+
+        function playPrayer(idx) {
+            currentPrayerIdx = idx;
+            isPlaying = true;
+            const prayer = prayers[idx];
+
+            // Update player info
+            document.getElementById('playerArt').src = prayer.image;
+            document.getElementById('playerPrayerName').textContent = prayer.name;
+            document.getElementById('playerCategory').textContent = getCategoryLabel(prayer.category) + ' Prayer';
+
+            updatePlayIcon();
+            renderPrayerList();
+
+            // Start TTS
+            startPrayerPlayback(idx);
+        }
+
+        function togglePlay() {
+            if (currentPrayerIdx === -1) {
+                if (prayers.length > 0) playPrayer(0);
+                return;
+            }
+
+            if (isPlaying) {
+                isPlaying = false;
+                pausePrayerPlayback();
+            } else {
+                if (isPaused) {
+                    isPlaying = true;
+                    resumePrayerPlayback();
+                } else {
+                    // Start fresh
+                    playPrayer(currentPrayerIdx);
+                    return;
+                }
+            }
+            updatePlayIcon();
+        }
+
+        function prevPrayer() {
+            if (currentPrayerIdx <= 0) return;
+            const newIdx = currentPrayerIdx - 1;
+            selectPrayer(newIdx);
+            playPrayer(newIdx);
+        }
+
+        function nextPrayer() {
+            if (currentPrayerIdx >= prayers.length - 1) return;
+            const newIdx = currentPrayerIdx + 1;
+            selectPrayer(newIdx);
+            playPrayer(newIdx);
+        }
+
+        function updatePlayIcon() {
+            const playSvg = '<polygon points="5 3 19 12 5 21 5 3"/>';
+            const pauseSvg = '<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>';
+
+            // Footer player icon
+            const icon = document.getElementById('playIcon');
+            icon.innerHTML = isPlaying ? pauseSvg : playSvg;
+
+            // Banner large play button icon
+            const bannerIcon = document.getElementById('bannerPlayIcon');
+            if (bannerIcon) {
+                bannerIcon.innerHTML = isPlaying ? pauseSvg : playSvg;
+            }
+        }
+
+        function toggleBannerPlay(idx) {
+            if (isPlaying && currentPrayerIdx === idx) {
+                // Currently playing this prayer — pause it
+                togglePlay();
+            } else if (isPaused && currentPrayerIdx === idx) {
+                // Paused on this prayer — resume from where we left off
+                togglePlay();
+            } else {
+                // Not playing or different prayer — start playing
+                playPrayer(idx);
+            }
+        }
+
+        function setVoiceGender(gender) {
+            selectedVoiceGender = gender;
+            // Update button states
+            document.querySelectorAll('.voice-btn').forEach(btn => {
+                const btnGender = btn.getAttribute('title').toLowerCase().includes('female') ? 'female' : 'male';
+                btn.classList.toggle('active', btnGender === gender);
+            });
+            // If currently playing, restart with the new voice
+            if (isPlaying && currentPrayerIdx >= 0) {
+                playPrayer(currentPrayerIdx);
+            }
+        }
+
+        function toggleFollow(btn) {
+            btn.classList.toggle('following');
+            btn.textContent = btn.classList.contains('following') ? 'Saved' : 'Save';
+        }
+
+        function toggleLike() {
+            // Toggle favorite for the current prayer
+            toggleFavorite(currentPrayerIdx, null);
+
+            // Update player button appearance
+            updatePlayerLikeButton();
+        }
+
+        function updatePlayerLikeButton() {
+            const btn = document.querySelector('.player-like-btn');
+            if (!btn) return;
+
+            const svg = btn.querySelector('svg');
+            const favs = getFavorites();
+            const isLiked = favs.includes(currentPrayerIdx);
+
+            svg.setAttribute('fill', isLiked ? 'var(--accent-gold)' : 'none');
+            svg.setAttribute('stroke', isLiked ? 'var(--accent-gold)' : 'currentColor');
+            btn.style.color = isLiked ? 'var(--accent-gold)' : '';
+            btn.title = isLiked ? 'Remove from favorites' : 'Add to favorites';
+        }
+
+        // Speed control
+        function cycleSpeed() {
+            currentSpeedIdx = (currentSpeedIdx + 1) % speedOptions.length;
+            speechRate = speedOptions[currentSpeedIdx];
+            document.getElementById('speedBtn').textContent = speechRate + 'x';
+            // If currently playing, restart with new speed
+            if (isPlaying && currentPrayerIdx >= 0) {
+                playPrayer(currentPrayerIdx);
+            }
+        }
+
+        // Progress bar click — seek to the corresponding line
+        function handleProgressClick(e) {
+            if (currentPrayerIdx < 0) return;
+            const prayer = prayers[currentPrayerIdx];
+            const bar = document.getElementById('progressBar');
+            const rect = bar.getBoundingClientRect();
+            const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+
+            // Map click percentage to a line index
+            const targetLine = Math.floor(pct * prayer.lines.length);
+            const clampedLine = Math.min(targetLine, prayer.lines.length - 1);
+
+            // Compute elapsed time up to that line for progress display
+            const linesBeforeTarget = prayer.lines.slice(0, clampedLine);
+            elapsedBeforePause = estimateDuration(linesBeforeTarget);
+            pausedAtLineIdx = clampedLine;
+            pausedCharWithinLine = 0;
+
+            if (isPlaying) {
+                // Re-speak from the target line
+                speakLines(prayer, clampedLine, true);
+            } else {
+                // If paused or stopped, set position and start playing
+                isPlaying = true;
+                isPaused = false;
+                speakLines(prayer, clampedLine, true);
+                updatePlayIcon();
+            }
+        }
+
+        // Add drag support on the progress bar
+        (function() {
+            const bar = document.getElementById('progressBar');
+            let dragging = false;
+            bar.addEventListener('mousedown', (e) => { dragging = true; handleProgressClick(e); });
+            document.addEventListener('mousemove', (e) => { if (dragging) handleProgressClick(e); });
+            document.addEventListener('mouseup', () => { dragging = false; });
+        })();
+
+        // Volume controls
+        function handleVolumeClick(e) {
+            const bar = document.getElementById('volumeBar');
+            const rect = bar.getBoundingClientRect();
+            const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            document.getElementById('volumeFill').style.width = (pct * 100) + '%';
+            updateVolumeIcon();
+            // Apply volume immediately if speech is active
+            if (isPlaying && speechUtterance) {
+                // Cancel and re-speak from current position to apply new volume
+                elapsedBeforePause = elapsedBeforePause + (Date.now() - speechStartTime) / 1000;
+                const prayer = prayers[currentPrayerIdx];
+                speakLines(prayer, pausedAtLineIdx, true, pausedCharWithinLine);
+            }
+        }
+
+        // Add drag support on the volume bar
+        (function() {
+            const bar = document.getElementById('volumeBar');
+            let dragging = false;
+            bar.addEventListener('mousedown', (e) => { dragging = true; handleVolumeClick(e); });
+            document.addEventListener('mousemove', (e) => { if (dragging) handleVolumeClick(e); });
+            document.addEventListener('mouseup', () => { dragging = false; });
+        })();
+
+        const volumeSvgHigh = '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>';
+        const volumeSvgLow = '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>';
+        const volumeSvgMute = '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>';
+
+        function updateVolumeIcon() {
+            const fill = document.getElementById('volumeFill');
+            const vol = parseFloat(fill.style.width) || 0;
+            const btn = document.getElementById('volumeBtn');
+            const svg = btn.querySelector('svg');
+            if (vol <= 0) {
+                svg.innerHTML = volumeSvgMute;
+            } else if (vol < 40) {
+                svg.innerHTML = volumeSvgLow;
+            } else {
+                svg.innerHTML = volumeSvgHigh;
+            }
+        }
+
+        let preMuteVolume = 70;
+        function toggleMute() {
+            const fill = document.getElementById('volumeFill');
+            const currentWidth = parseFloat(fill.style.width) || 0;
+            if (currentWidth > 0) {
+                preMuteVolume = currentWidth;
+                fill.style.width = '0%';
+            } else {
+                fill.style.width = preMuteVolume + '%';
+            }
+            updateVolumeIcon();
+            // Apply mute/unmute immediately
+            if (isPlaying && speechUtterance) {
+                elapsedBeforePause = elapsedBeforePause + (Date.now() - speechStartTime) / 1000;
+                const prayer = prayers[currentPrayerIdx];
+                speakLines(prayer, pausedAtLineIdx, true, pausedCharWithinLine);
+            }
+        }
+    </script>
+    <script src="/js/site-translate.js"></script>
+</body>
+</html>

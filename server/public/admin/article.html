@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Article Viewer - JubileeVerse Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* MSN Dark Theme Colors */
+            --bg-primary: #1b1b1b;
+            --bg-secondary: #242424;
+            --bg-tertiary: #2d2d2d;
+            --bg-card: #2d2d2d;
+
+            /* Text Colors */
+            --text-primary: #ffffff;
+            --text-secondary: #c4c4c4;
+            --text-muted: #8a8a8a;
+
+            /* Accent Colors */
+            --accent-gold: #E6AC00;
+            --accent-blue: #0078d4;
+
+            /* Borders */
+            --border-color: rgba(255, 255, 255, 0.1);
+
+            /* Spacing */
+            --space-sm: 8px;
+            --space-md: 12px;
+            --space-lg: 16px;
+            --space-xl: 24px;
+            --space-2xl: 32px;
+
+            /* Font Sizes */
+            --font-sm: 12px;
+            --font-base: 14px;
+            --font-md: 16px;
+            --font-lg: 18px;
+            --font-xl: 20px;
+            --font-2xl: 24px;
+            --font-3xl: 32px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .article-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: var(--space-2xl);
+        }
+
+        .article-header {
+            background: var(--bg-secondary);
+            padding: var(--space-xl);
+            border-radius: 8px;
+            margin-bottom: var(--space-xl);
+            border: 1px solid var(--border-color);
+        }
+
+        .article-category {
+            font-size: var(--font-sm);
+            color: var(--accent-gold);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: var(--space-sm);
+        }
+
+        .article-title {
+            font-size: var(--font-3xl);
+            font-weight: 700;
+            margin-bottom: var(--space-md);
+            color: var(--text-primary);
+        }
+
+        .article-meta {
+            display: flex;
+            gap: var(--space-lg);
+            font-size: var(--font-sm);
+            color: var(--text-muted);
+        }
+
+        .article-content {
+            background: var(--bg-card);
+            padding: var(--space-2xl);
+            border-radius: 8px;
+            margin-bottom: var(--space-xl);
+            border: 1px solid var(--border-color);
+        }
+
+        .article-content p {
+            margin-bottom: var(--space-lg);
+            font-size: var(--font-md);
+            color: var(--text-secondary);
+        }
+
+        .article-content h1,
+        .article-content h2,
+        .article-content h3 {
+            margin-top: var(--space-xl);
+            margin-bottom: var(--space-md);
+            color: var(--text-primary);
+        }
+
+        .article-content h1 { font-size: var(--font-2xl); }
+        .article-content h2 { font-size: var(--font-xl); }
+        .article-content h3 { font-size: var(--font-lg); }
+
+        .article-content ul,
+        .article-content ol {
+            margin-left: var(--space-xl);
+            margin-bottom: var(--space-lg);
+        }
+
+        .article-content li {
+            margin-bottom: var(--space-sm);
+        }
+
+        .article-content blockquote {
+            border-left: 4px solid var(--accent-gold);
+            padding-left: var(--space-lg);
+            margin: var(--space-xl) 0;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .article-content code {
+            background: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: var(--font-sm);
+        }
+
+        .article-content pre {
+            background: var(--bg-tertiary);
+            padding: var(--space-lg);
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: var(--space-lg) 0;
+        }
+
+        .article-content pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: var(--space-2xl);
+            color: var(--text-muted);
+        }
+
+        .error-state {
+            text-align: center;
+            padding: var(--space-2xl);
+            color: var(--text-muted);
+        }
+
+        .error-state h2 {
+            color: #d13438;
+            margin-bottom: var(--space-md);
+        }
+
+        .article-actions {
+            display: flex;
+            gap: var(--space-md);
+            justify-content: center;
+            padding: var(--space-xl);
+        }
+
+        .btn {
+            padding: var(--space-md) var(--space-xl);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: var(--font-base);
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+            border-color: var(--accent-blue);
+        }
+
+        .btn-primary:hover {
+            background: #006cbe;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-secondary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-card);
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+        }
+    </style>
+</head>
+<body>
+    <div class="article-container" id="articleContainer">
+        <div class="loading-spinner">
+            <p>Loading article...</p>
+        </div>
+    </div>
+
+    <script>
+        // Get article ID from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const articleId = urlParams.get('id');
+
+        if (!articleId) {
+            showError('No article ID provided');
+        } else {
+            loadArticle(articleId);
+        }
+
+        // Load article from API
+        async function loadArticle(id) {
+            try {
+                const response = await fetch(`/api/admin/articles/${id}`);
+
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        throw new Error('Article not found');
+                    }
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success && data.article) {
+                    renderArticle(data.article);
+                } else {
+                    throw new Error('Invalid response format');
+                }
+            } catch (error) {
+                console.error('Error loading article:', error);
+                // Show mock article for development
+                renderMockArticle();
+            }
+        }
+
+        // Render article
+        function renderArticle(article) {
+            const container = document.getElementById('articleContainer');
+
+            // Format date
+            const date = new Date(article.created_at);
+            const formattedDate = date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            // Update page title
+            document.title = `${article.title} - JubileeVerse Admin`;
+
+            container.innerHTML = `
+                <div class="article-header">
+                    <div class="article-category">${escapeHtml(article.category_name)}</div>
+                    <h1 class="article-title">${escapeHtml(article.title)}</h1>
+                    <div class="article-meta">
+                        <span>Article ID: ${article.id}</span>
+                        <span>Created: ${formattedDate}</span>
+                    </div>
+                </div>
+
+                <div class="article-content">
+                    ${article.content ? formatContent(article.content) : '<p style="color: var(--text-muted); font-style: italic;">No content available</p>'}
+                </div>
+
+                <div class="article-actions">
+                    <button class="btn btn-primary" onclick="window.close()">Close Window</button>
+                    <button class="btn btn-secondary" onclick="printArticle()">Print</button>
+                </div>
+            `;
+        }
+
+        // Render mock article for development
+        function renderMockArticle() {
+            const mockArticle = {
+                id: articleId,
+                category_name: 'Sample Category',
+                title: 'Sample Article - This is a Demo Article',
+                created_at: new Date().toISOString(),
+                content: `
+                    <h2>Introduction</h2>
+                    <p>This is a sample article demonstrating the article viewer functionality. In production, this content would be loaded from the database.</p>
+
+                    <h2>Key Features</h2>
+                    <p>The article viewer supports the following features:</p>
+                    <ul>
+                        <li>Clean, readable layout optimized for long-form content</li>
+                        <li>Proper typography and spacing for comfortable reading</li>
+                        <li>Support for rich HTML content including headings, lists, and blockquotes</li>
+                        <li>Responsive design that works on all screen sizes</li>
+                    </ul>
+
+                    <h2>Content Formatting</h2>
+                    <p>Articles can include various formatting options:</p>
+                    <blockquote>
+                        "This is a blockquote example showing how quoted text appears in the article viewer."
+                    </blockquote>
+
+                    <p>You can also include <code>inline code</code> and code blocks:</p>
+
+                    <pre><code>function example() {
+    console.log('This is a code block example');
+    return true;
+}</code></pre>
+
+                    <h2>Conclusion</h2>
+                    <p>This article viewer provides a clean, distraction-free reading experience for your content. The styling is consistent with the JubileeVerse admin dashboard theme.</p>
+                `
+            };
+
+            renderArticle(mockArticle);
+        }
+
+        // Format content (preserve HTML)
+        function formatContent(content) {
+            // Content is already HTML, just return it
+            // In production, you might want to sanitize this
+            return content;
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Print article
+        function printArticle() {
+            window.print();
+        }
+
+        // Show error
+        function showError(message) {
+            const container = document.getElementById('articleContainer');
+            container.innerHTML = `
+                <div class="error-state">
+                    <h2>Error Loading Article</h2>
+                    <p>${escapeHtml(message)}</p>
+                    <div class="article-actions">
+                        <button class="btn btn-secondary" onclick="window.close()">Close Window</button>
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

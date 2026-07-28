@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="JubileeVerse Finance - Market data, stock quotes, and financial news">
+    <title>Finance - JubileeVerse</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1b1b1b;
+            --bg-secondary: #242424;
+            --bg-tertiary: #2d2d2d;
+            --bg-card: #2d2d2d;
+            --text-primary: #ffffff;
+            --text-secondary: #c4c4c4;
+            --text-muted: #8a8a8a;
+            --accent-gold: #E6AC00;
+            --accent-gold-hover: #F5C518;
+            --accent-blue: #0078d4;
+            --accent-green: #0a8043;
+            --accent-red: #d93025;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --header-height: 48px;
+            --card-radius: 8px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            height: var(--header-height);
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 10px;
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+        }
+        .logo-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: #ffffff;
+        }
+        .logo-text span { color: var(--accent-gold); font-weight: 400; }
+        .logo-text .logo-verse { color: var(--accent-gold); }
+        .logo-text .logo-dotcom { color: #ffffff; }
+        .back-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--accent-gold); }
+        .back-link svg { width: 16px; height: 16px; }
+
+        /* Finance page layout */
+        .finance-page {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 16px;
+        }
+
+        /* Loading */
+        .finance-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+            gap: 16px;
+        }
+        .finance-loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: var(--accent-gold);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Market tabs */
+        .market-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            padding-bottom: 4px;
+        }
+        .market-tabs::-webkit-scrollbar { display: none; }
+        .market-tab {
+            flex-shrink: 0;
+            padding: 8px 20px;
+            border-radius: 24px;
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .market-tab:hover {
+            border-color: var(--accent-gold);
+            color: var(--text-primary);
+        }
+        .market-tab.active {
+            background: var(--accent-gold);
+            color: #000;
+            border-color: var(--accent-gold);
+            font-weight: 600;
+        }
+
+        /* Market indices banner */
+        .indices-banner {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            margin-bottom: 24px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.2) transparent;
+        }
+        .indices-banner::-webkit-scrollbar { height: 4px; }
+        .indices-banner::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+        .index-card {
+            flex: 0 0 200px;
+            background: var(--bg-card);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            transition: border-color 0.2s;
+        }
+        .index-card:hover { border-color: rgba(255,255,255,0.2); }
+        .index-card-name {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+        .index-card-value {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .index-card-change {
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .index-card-change.positive { color: var(--accent-green); }
+        .index-card-change.negative { color: var(--accent-red); }
+        .index-card-change svg { width: 14px; height: 14px; }
+
+        /* Section title */
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-title-icon { font-size: 20px; }
+
+        /* Watchlist / Stock table */
+        .stock-table {
+            background: var(--bg-card);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .stock-table-header {
+            display: grid;
+            grid-template-columns: 2fr 1fr 100px 1fr;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+        .stock-table-header span:nth-child(2),
+        .stock-table-header span:nth-child(3),
+        .stock-table-header span:nth-child(4) { text-align: right; }
+        .stock-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 100px 1fr;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-color);
+            align-items: center;
+            transition: background 0.15s;
+            cursor: pointer;
+        }
+        .stock-row:last-child { border-bottom: none; }
+        .stock-row:hover { background: rgba(255,255,255,0.03); }
+        .stock-info {
+            display: flex;
+            flex-direction: column;
+        }
+        .stock-name {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .stock-ticker {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .stock-chart {
+            display: flex;
+            justify-content: flex-end;
+        }
+        .stock-price {
+            text-align: right;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .stock-change {
+            text-align: right;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .stock-change.positive { color: var(--accent-green); }
+        .stock-change.negative { color: var(--accent-red); }
+
+        /* News cards grid */
+        .news-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .news-card {
+            background: var(--bg-card);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .news-card:hover {
+            border-color: var(--accent-gold);
+            transform: translateY(-2px);
+        }
+        .news-card-image {
+            width: 100%;
+            height: 140px;
+            object-fit: cover;
+            background: var(--bg-tertiary);
+        }
+        .news-card-body {
+            padding: 14px;
+        }
+        .news-card-category {
+            font-size: 10px;
+            color: var(--accent-gold);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .news-card-title {
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.4;
+            margin-bottom: 8px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .news-card-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Quick stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+        .stat-card {
+            background: var(--bg-card);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            text-align: center;
+        }
+        .stat-card-value {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .stat-card-label {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .stock-table-header { grid-template-columns: 2fr 1fr 1fr; }
+            .stock-table-header span:nth-child(3) { display: none; }
+            .stock-row { grid-template-columns: 2fr 1fr 1fr; }
+            .stock-chart { display: none; }
+            .index-card { flex: 0 0 160px; padding: 12px; }
+            .index-card-value { font-size: 18px; }
+        }
+        @media (max-width: 480px) {
+            .finance-page { padding: 16px 10px; }
+            .news-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-inner">
+            <a href="/" class="logo">
+                <img src="/images/JubileeLogo.png" alt="Jubilee" class="logo-icon">
+                <div class="logo-text">Jubilee<span class="logo-verse">Verse</span><span class="logo-dotcom">.com</span></div>
+            </a>
+            <a href="/" class="back-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5"></path><path d="M12 19l-7-7 7-7"></path></svg>
+                Back to Home
+            </a>
+        </div>
+    </header>
+
+    <div class="finance-page" id="financePage">
+        <div class="finance-loading" id="financeLoading">
+            <div class="finance-loading-spinner"></div>
+            <div style="color:var(--text-secondary);font-size:14px;">Loading market data...</div>
+        </div>
+    </div>
+
+    <script>
+        const financeDataSets = {
+            US: {
+                region: 'United States',
+                currency: 'USD',
+                tabs: [
+                    { id: 'indices', label: 'Indices' },
+                    { id: 'stocks', label: 'Stocks' },
+                    { id: 'crypto', label: 'Crypto' }
+                ],
+                indices: [
+                    { name: 'Dow Jones', ticker: 'DJI', value: '44,156.73', change: '+0.42%', changeVal: '+183.51', positive: true },
+                    { name: 'S&P 500', ticker: 'SPX', value: '6,012.28', change: '+0.58%', changeVal: '+34.67', positive: true },
+                    { name: 'NASDAQ', ticker: 'IXIC', value: '19,654.02', change: '+0.83%', changeVal: '+162.03', positive: true },
+                    { name: 'Russell 2000', ticker: 'RUT', value: '2,287.49', change: '-0.81%', changeVal: '-18.64', positive: false },
+                    { name: 'VIX', ticker: 'VIX', value: '14.85', change: '-3.24%', changeVal: '-0.50', positive: false }
+                ],
+                stocks: [
+                    { name: 'Apple Inc.', ticker: 'AAPL', price: '227.63', change: '+1.24%', positive: true },
+                    { name: 'Microsoft Corp.', ticker: 'MSFT', price: '415.50', change: '+0.89%', positive: true },
+                    { name: 'NVIDIA Corp.', ticker: 'NVDA', price: '875.28', change: '+2.15%', positive: true },
+                    { name: 'Amazon.com Inc.', ticker: 'AMZN', price: '186.40', change: '+0.67%', positive: true },
+                    { name: 'Alphabet Inc.', ticker: 'GOOGL', price: '198.41', change: '+1.12%', positive: true },
+                    { name: 'Meta Platforms', ticker: 'META', price: '638.40', change: '+0.89%', positive: true },
+                    { name: 'Tesla Inc.', ticker: 'TSLA', price: '248.50', change: '-1.23%', positive: false },
+                    { name: 'Berkshire Hathaway', ticker: 'BRK.B', price: '456.78', change: '+0.34%', positive: true }
+                ],
+                crypto: [
+                    { name: 'Bitcoin', ticker: 'BTC-USD', price: '101,350.00', change: '+2.41%', positive: true },
+                    { name: 'Ethereum', ticker: 'ETH-USD', price: '3,245.80', change: '+1.87%', positive: true },
+                    { name: 'Solana', ticker: 'SOL-USD', price: '198.45', change: '+4.23%', positive: true },
+                    { name: 'XRP', ticker: 'XRP-USD', price: '2.34', change: '-0.85%', positive: false },
+                    { name: 'Cardano', ticker: 'ADA-USD', price: '0.89', change: '+1.12%', positive: true }
+                ],
+                news: [
+                    { title: 'Fed Signals Potential Rate Cuts in Second Half of 2026', category: 'Economy', image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop', time: '2 hours ago' },
+                    { title: 'Tech Giants Report Record Earnings Amid AI Boom', category: 'Technology', image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=200&fit=crop', time: '3 hours ago' },
+                    { title: 'Oil Prices Surge on Middle East Supply Concerns', category: 'Commodities', image: 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=400&h=200&fit=crop', time: '5 hours ago' },
+                    { title: 'Housing Market Shows Signs of Recovery', category: 'Real Estate', image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400&h=200&fit=crop', time: '6 hours ago' }
+                ]
+            },
+            IN: {
+                region: 'India',
+                currency: 'INR',
+                tabs: [
+                    { id: 'indices', label: 'Indices' },
+                    { id: 'stocks', label: 'Stocks' },
+                    { id: 'mutualfunds', label: 'Mutual Funds' }
+                ],
+                indices: [
+                    { name: 'SENSEX', ticker: 'BSE', value: '76,190.46', change: '-0.42%', changeVal: '-320.72', positive: false },
+                    { name: 'NIFTY 50', ticker: 'NSE', value: '23,092.20', change: '-0.38%', changeVal: '-88.55', positive: false },
+                    { name: 'BANK NIFTY', ticker: 'BANKNIFTY', value: '48,345.10', change: '+0.52%', changeVal: '+249.80', positive: true },
+                    { name: 'NIFTY IT', ticker: 'NIFTYIT', value: '38,567.85', change: '+0.78%', changeVal: '+298.42', positive: true },
+                    { name: 'NIFTY MIDCAP', ticker: 'NIFTYMID', value: '52,143.70', change: '-0.15%', changeVal: '-78.22', positive: false }
+                ],
+                stocks: [
+                    { name: 'Reliance Industries', ticker: 'RELIANCE', price: '1,263.75', change: '+1.12%', positive: true },
+                    { name: 'Tata Consultancy', ticker: 'TCS', price: '3,842.50', change: '-0.67%', positive: false },
+                    { name: 'HDFC Bank', ticker: 'HDFCBANK', price: '1,642.20', change: '+0.78%', positive: true },
+                    { name: 'Infosys Ltd', ticker: 'INFY', price: '1,578.30', change: '+0.85%', positive: true },
+                    { name: 'ICICI Bank', ticker: 'ICICIBANK', price: '1,087.45', change: '+0.44%', positive: true },
+                    { name: 'Bharti Airtel', ticker: 'BHARTIARTL', price: '1,172.60', change: '-0.31%', positive: false },
+                    { name: 'Wipro Ltd', ticker: 'WIPRO', price: '287.35', change: '+1.53%', positive: true },
+                    { name: 'State Bank of India', ticker: 'SBIN', price: '762.40', change: '+0.92%', positive: true }
+                ],
+                mutualfunds: [
+                    { name: 'SBI Bluechip Fund', ticker: 'SBIBLU', price: '78.45', change: '+0.56%', positive: true },
+                    { name: 'HDFC Flexi Cap Fund', ticker: 'HDFCFLEX', price: '1,523.80', change: '+0.89%', positive: true },
+                    { name: 'ICICI Pru Value Discovery', ticker: 'ICICIVAL', price: '412.35', change: '-0.23%', positive: false },
+                    { name: 'Axis Small Cap Fund', ticker: 'AXISSM', price: '92.67', change: '+1.45%', positive: true }
+                ],
+                news: [
+                    { title: 'RBI Keeps Repo Rate Unchanged at 6.5%', category: 'Economy', image: 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=400&h=200&fit=crop', time: '1 hour ago' },
+                    { title: 'IT Sector Rallies on Strong Q3 Earnings', category: 'Technology', image: 'https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=400&h=200&fit=crop', time: '3 hours ago' },
+                    { title: 'Auto Sales Hit Record High in January', category: 'Automobile', image: 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=400&h=200&fit=crop', time: '4 hours ago' },
+                    { title: 'Rupee Strengthens Against Dollar on FII Inflows', category: 'Currency', image: 'https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=400&h=200&fit=crop', time: '5 hours ago' }
+                ]
+            },
+            GB: {
+                region: 'United Kingdom',
+                currency: 'GBP',
+                tabs: [
+                    { id: 'indices', label: 'Indices' },
+                    { id: 'stocks', label: 'Stocks' }
+                ],
+                indices: [
+                    { name: 'FTSE 100', ticker: 'UKX', value: '8,532.28', change: '+0.34%', changeVal: '+28.85', positive: true },
+                    { name: 'FTSE 250', ticker: 'MCX', value: '20,845.12', change: '-0.18%', changeVal: '-37.52', positive: false },
+                    { name: 'FTSE All-Share', ticker: 'ASX', value: '4,652.40', change: '+0.22%', changeVal: '+10.23', positive: true }
+                ],
+                stocks: [
+                    { name: 'AstraZeneca', ticker: 'AZN', price: '10,942.00', change: '+1.21%', positive: true },
+                    { name: 'Shell PLC', ticker: 'SHEL', price: '2,678.50', change: '-0.56%', positive: false },
+                    { name: 'HSBC Holdings', ticker: 'HSBA', price: '718.40', change: '+0.72%', positive: true },
+                    { name: 'Unilever PLC', ticker: 'ULVR', price: '4,285.00', change: '+0.45%', positive: true },
+                    { name: 'BP PLC', ticker: 'BP', price: '485.35', change: '-0.38%', positive: false },
+                    { name: 'GlaxoSmithKline', ticker: 'GSK', price: '1,542.80', change: '+0.67%', positive: true }
+                ],
+                news: [
+                    { title: 'Bank of England Holds Interest Rates Steady', category: 'Economy', image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400&h=200&fit=crop', time: '2 hours ago' },
+                    { title: 'UK Housing Prices Rise for Third Consecutive Month', category: 'Real Estate', image: 'https://images.unsplash.com/photo-1558036117-15d82a90b9b1?w=400&h=200&fit=crop', time: '4 hours ago' },
+                    { title: 'London Stock Exchange Sees Record IPO Activity', category: 'Markets', image: 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=400&h=200&fit=crop', time: '6 hours ago' }
+                ]
+            }
+        };
+        financeDataSets.DEFAULT = financeDataSets.US;
+
+        let currentCountry = 'US';
+        let currentTab = 'indices';
+
+        async function getCountry() {
+            try {
+                const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(5000) });
+                if (res.ok) { const g = await res.json(); return g.country_code || 'US'; }
+            } catch (e) {}
+            try {
+                const res = await fetch('https://ip-api.com/json/?fields=countryCode', { signal: AbortSignal.timeout(5000) });
+                if (res.ok) { const g = await res.json(); return g.countryCode || 'US'; }
+            } catch (e) {}
+            return 'US';
+        }
+
+        function generateMiniChart(positive) {
+            const points = [];
+            let y = 12;
+            for (let x = 0; x <= 50; x += 5) {
+                y += (Math.random() - (positive ? 0.35 : 0.65)) * 4;
+                y = Math.max(2, Math.min(22, y));
+                points.push(`${x},${y}`);
+            }
+            const color = positive ? '#0a8043' : '#d93025';
+            return `<svg width="50" height="24" viewBox="0 0 50 24"><polyline points="${points.join(' ')}" fill="none" stroke="${color}" stroke-width="1.5"/></svg>`;
+        }
+
+        function renderPage() {
+            const page = document.getElementById('financePage');
+            const data = financeDataSets[currentCountry] || financeDataSets.DEFAULT;
+
+            // Tabs
+            const tabsHTML = data.tabs.map(t =>
+                `<button class="market-tab${t.id === currentTab ? ' active' : ''}" onclick="switchTab('${t.id}')">${t.label}</button>`
+            ).join('');
+
+            // Indices banner
+            const indicesHTML = data.indices.map(idx => `
+                <div class="index-card">
+                    <div class="index-card-name">${idx.name} (${idx.ticker})</div>
+                    <div class="index-card-value">${idx.value}</div>
+                    <div class="index-card-change ${idx.positive ? 'positive' : 'negative'}">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            ${idx.positive
+                                ? '<path d="M7 14l5-5 5 5z"/>'
+                                : '<path d="M7 10l5 5 5-5z"/>'}
+                        </svg>
+                        ${idx.change} (${idx.changeVal})
+                    </div>
+                </div>
+            `).join('');
+
+            // Stock table based on current tab
+            let stocksData = [];
+            let tableTitle = 'Watchlist';
+            if (currentTab === 'indices') {
+                stocksData = data.stocks;
+                tableTitle = 'Top Stocks';
+            } else if (currentTab === 'stocks') {
+                stocksData = data.stocks;
+                tableTitle = 'Popular Stocks';
+            } else if (currentTab === 'crypto') {
+                stocksData = data.crypto || [];
+                tableTitle = 'Cryptocurrencies';
+            } else if (currentTab === 'mutualfunds') {
+                stocksData = data.mutualfunds || [];
+                tableTitle = 'Mutual Funds';
+            }
+
+            const stockRowsHTML = stocksData.map(s => `
+                <div class="stock-row">
+                    <div class="stock-info">
+                        <span class="stock-name">${s.name}</span>
+                        <span class="stock-ticker">${s.ticker}</span>
+                    </div>
+                    <div class="stock-price">${data.currency === 'USD' ? '$' : (data.currency === 'GBP' ? '£' : '₹')}${s.price}</div>
+                    <div class="stock-chart">${generateMiniChart(s.positive)}</div>
+                    <div class="stock-change ${s.positive ? 'positive' : 'negative'}">${s.change}</div>
+                </div>
+            `).join('');
+
+            // News
+            const newsHTML = data.news.map(n => `
+                <div class="news-card">
+                    <img class="news-card-image" src="${n.image}" alt="${n.title}" loading="lazy">
+                    <div class="news-card-body">
+                        <div class="news-card-category">${n.category}</div>
+                        <div class="news-card-title">${n.title}</div>
+                        <div class="news-card-meta">${n.time}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Stats
+            const marketStatus = new Date().getHours() >= 9 && new Date().getHours() < 16 ? 'Open' : 'Closed';
+            const statsHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-value" style="color:${marketStatus === 'Open' ? 'var(--accent-green)' : 'var(--accent-red)'}">${marketStatus}</div>
+                        <div class="stat-card-label">Market Status</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-value">${data.indices.length}</div>
+                        <div class="stat-card-label">Indices Tracked</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-value">${stocksData.length}</div>
+                        <div class="stat-card-label">Securities</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-value">${data.region}</div>
+                        <div class="stat-card-label">Region</div>
+                    </div>
+                </div>
+            `;
+
+            page.innerHTML = `
+                <div class="market-tabs">${tabsHTML}</div>
+
+                <div class="section-title"><span class="section-title-icon">📈</span> Market Overview</div>
+                <div class="indices-banner">${indicesHTML}</div>
+
+                ${statsHTML}
+
+                <div class="section-title"><span class="section-title-icon">📋</span> ${tableTitle}</div>
+                <div class="stock-table">
+                    <div class="stock-table-header">
+                        <span>Name</span>
+                        <span>Price</span>
+                        <span>Chart</span>
+                        <span>Change</span>
+                    </div>
+                    ${stockRowsHTML}
+                </div>
+
+                <div class="section-title"><span class="section-title-icon">📰</span> Financial News</div>
+                <div class="news-grid">${newsHTML}</div>
+            `;
+        }
+
+        function switchTab(id) {
+            currentTab = id;
+            renderPage();
+        }
+
+        async function init() {
+            currentCountry = await getCountry();
+            if (!financeDataSets[currentCountry]) currentCountry = 'US';
+            currentTab = financeDataSets[currentCountry].tabs[0].id;
+            renderPage();
+        }
+
+        init();
+    </script>
+    <script src="/js/site-translate.js"></script>
+</body>
+</html>

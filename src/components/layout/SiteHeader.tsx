@@ -1,0 +1,39 @@
+'use client';
+
+import Link from 'next/link';
+import ProfileMenu from './ProfileMenu';
+import SearchBox from './SearchBox';
+
+/** Sticky top header: branding, quick media links, search, and the auth area. */
+export default function SiteHeader() {
+  return (
+    <header className="header">
+      <div className="header-inner">
+        <Link href="/" className="logo">
+          <img src="/images/JubileeLogo.png" alt="Jubilee" className="logo-icon" />
+          <div className="logo-text">
+            Jubilee<span className="logo-verse">Verse</span>
+            <span className="logo-dotcom">.com</span>
+          </div>
+        </Link>
+
+        <div className="header-actions">
+          <div className="header-media-links">
+            <Link href="/prayer">Prayer</Link>
+            <span className="divider">|</span>
+            <Link href="/music">Music</Link>
+            <span className="divider">|</span>
+            <Link href="/radio">Radio</Link>
+            <span className="divider">|</span>
+            <a href="https://www.jubileeinspire.com" target="_blank" rel="noopener noreferrer">
+              AI Bible Chat
+            </a>
+          </div>
+
+          <SearchBox />
+          <ProfileMenu />
+        </div>
+      </div>
+    </header>
+  );
+}

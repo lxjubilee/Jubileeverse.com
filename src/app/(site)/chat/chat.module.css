@@ -1,0 +1,437 @@
+/* ============================================================================
+   Chat — JubileeVerse AI Assistant
+   Ported from the original static /chat/index.html inline styles. The (site)
+   layout supplies the global header/nav/footer, so the original full-screen
+   chat header is reproduced here as a compact in-page bar instead.
+   ============================================================================ */
+
+.chatPage {
+  display: flex;
+  flex-direction: column;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-lg);
+  /* Fit within the (site) shell: full viewport minus header (48) + nav (50). */
+  height: calc(100vh - 98px);
+  min-height: 480px;
+  overflow: hidden;
+}
+
+/* Compact in-page header (status + actions) */
+.chatBar {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--card-radius) var(--card-radius) 0 0;
+  padding: 14px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.barLeft {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.barTitle {
+  font-family: var(--font-orbitron), 'Orbitron', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.barTitle img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.barTitle .verse {
+  color: var(--accent-gold);
+}
+
+.statusIndicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--bg-tertiary);
+  border-radius: 20px;
+  font-size: var(--font-base);
+  color: var(--text-secondary);
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  animation: chatPulse 2s infinite;
+}
+
+.statusDot.busy {
+  background: var(--accent-gold);
+}
+
+@keyframes chatPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.barRight {
+  display: flex;
+  gap: 10px;
+}
+
+.barButton {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 9px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: var(--font-base);
+  font-family: inherit;
+}
+
+.barButton:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+/* Error toast */
+.errorMessage {
+  background: #dc2626;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin: 10px 0;
+}
+
+/* Body wraps messages + input so they share the rounded card frame */
+.chatBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-top: none;
+  border-radius: 0 0 var(--card-radius) var(--card-radius);
+  overflow: hidden;
+}
+
+/* Messages Area */
+.messagesArea {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.messagesArea::-webkit-scrollbar {
+  width: 10px;
+}
+
+.messagesArea::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+.messagesArea::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--accent-gold) 0%, #b8860b 100%);
+  border-radius: 5px;
+}
+
+.message {
+  display: flex;
+  gap: 15px;
+  animation: chatMessageSlide 0.3s ease-out;
+}
+
+@keyframes chatMessageSlide {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message.user {
+  flex-direction: row-reverse;
+}
+
+.messageAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: var(--font-sm);
+  flex-shrink: 0;
+}
+
+.message.user .messageAvatar {
+  background: var(--accent-blue);
+  color: white;
+}
+
+.message.assistant .messageAvatar {
+  background: var(--accent-gold);
+  color: var(--bg-primary);
+}
+
+.messageContent {
+  max-width: 70%;
+  padding: 15px 20px;
+  border-radius: 12px;
+  line-height: 1.6;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.message.user .messageContent {
+  background: var(--accent-blue);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.message.assistant .messageContent {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-bottom-left-radius: 4px;
+}
+
+/* Markdown spacing inside an assistant bubble */
+.messageContent p {
+  margin-bottom: 10px;
+}
+
+.messageContent p:last-child {
+  margin-bottom: 0;
+}
+
+.messageContent ul,
+.messageContent ol {
+  margin: 0 0 10px 20px;
+}
+
+.messageContent ul:last-child,
+.messageContent ol:last-child {
+  margin-bottom: 0;
+}
+
+.messageContent a {
+  color: var(--accent-gold);
+  text-decoration: underline;
+}
+
+.messageContent code {
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.9em;
+}
+
+.messageContent pre {
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  margin-bottom: 10px;
+}
+
+.messageContent pre code {
+  background: none;
+  padding: 0;
+}
+
+/* Typing indicator */
+.typingIndicator {
+  display: flex;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.typingDot {
+  width: 8px;
+  height: 8px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  animation: chatTyping 1.4s infinite;
+}
+
+.typingDot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typingDot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes chatTyping {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Welcome / empty state */
+.welcomeMessage {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+  margin: auto 0;
+}
+
+.welcomeMessage h2 {
+  color: var(--accent-gold);
+  margin-bottom: 15px;
+  font-size: 28px;
+}
+
+.welcomeMessage p {
+  font-size: var(--font-md);
+  line-height: 1.6;
+}
+
+.suggestions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  margin-top: 30px;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.suggestionCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  padding: 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+}
+
+.suggestionCard:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-gold);
+  transform: translateY(-2px);
+}
+
+.suggestionCard h3 {
+  color: var(--accent-gold);
+  font-size: var(--font-md);
+  margin-bottom: 8px;
+}
+
+.suggestionCard p {
+  font-size: var(--font-base);
+  color: var(--text-muted);
+}
+
+/* Input Area */
+.inputArea {
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  padding: 20px;
+  display: flex;
+  gap: 15px;
+  align-items: flex-end;
+}
+
+.inputWrapper {
+  flex: 1;
+  position: relative;
+}
+
+.messageInput {
+  width: 100%;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 15px 20px;
+  border-radius: 8px;
+  font-size: var(--font-md);
+  font-family: inherit;
+  resize: none;
+  max-height: 120px;
+  min-height: 54px;
+  transition: border-color 0.2s;
+  display: block;
+}
+
+.messageInput:focus {
+  outline: none;
+  border-color: var(--accent-gold);
+}
+
+.messageInput::placeholder {
+  color: var(--text-muted);
+}
+
+.sendButton {
+  background: var(--accent-gold);
+  color: var(--bg-primary);
+  border: none;
+  padding: 15px 30px;
+  border-radius: 8px;
+  font-size: var(--font-md);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.sendButton:hover:not(:disabled) {
+  background: var(--accent-gold-hover);
+  transform: translateY(-2px);
+}
+
+.sendButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .chatPage {
+    padding: var(--space-sm);
+    height: calc(100vh - 98px);
+  }
+
+  .messageContent {
+    max-width: 85%;
+  }
+
+  .barTitle {
+    font-size: 18px;
+  }
+}

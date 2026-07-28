@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120" fill="currentColor">
+  <!-- Head (no circle symbol) -->
+  <circle cx="50" cy="14" r="10"/>
+  <!-- Torso -->
+  <path d="M36 28 L36 68 L64 68 L64 28 Z"/>
+  <!-- Arms -->
+  <path d="M36 32 L20 54 L26 58 L40 40"/>
+  <path d="M64 32 L80 54 L74 58 L60 40"/>
+  <!-- Left leg -->
+  <path d="M36 68 L34 110 L46 110 L48 68 Z"/>
+  <!-- Right leg -->
+  <path d="M52 68 L54 110 L66 110 L64 68 Z"/>
+</svg>

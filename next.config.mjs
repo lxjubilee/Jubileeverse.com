@@ -1,0 +1,38 @@
+/** @type {import('next').NextConfig} */
+
+// The Express API (server/server.js) is kept UNCHANGED and runs on its own port.
+// In development we proxy API + backend-served asset paths to it so the browser
+// only ever talks to the Next.js origin. In production, put a reverse proxy in
+// front that routes the same paths to the Express process.
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3107';
+
+const nextConfig = {
+  reactStrictMode: true,
+
+  // Content images (cached_image_path, image_url, etc.) are produced and served
+  // by the Express backend under /images. We render them with plain <img>, so no
+  // optimizer round-trip is needed.
+  images: {
+    unoptimized: true,
+  },
+
+  async rewrites() {
+    return [
+      // Express REST API — the single source of truth for all data.
+      { source: '/api/:path*', destination: `${BACKEND_URL}/api/:path*` },
+      // OIDC / local auth flow handled by the backend (/auth/login, /auth/callback, /auth/logout).
+      { source: '/auth/:path*', destination: `${BACKEND_URL}/auth/:path*` },
+      // Backend-generated + content images live under /images on the Express public dir.
+      { source: '/images/:path*', destination: `${BACKEND_URL}/images/:path*` },
+      // Existing back-office SPA (cockpit/dist) served by Express at /backoffice.
+      { source: '/backoffice/:path*', destination: `${BACKEND_URL}/backoffice/:path*` },
+      // Health / connection status endpoints.
+      { source: '/health', destination: `${BACKEND_URL}/health` },
+      { source: '/status/:path*', destination: `${BACKEND_URL}/status/:path*` },
+      // Onboarding video lives in the backend public dir.
+      { source: '/welcome.mp4', destination: `${BACKEND_URL}/welcome.mp4` },
+    ];
+  },
+};
+
+export default nextConfig;

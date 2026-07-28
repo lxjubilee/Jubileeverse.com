@@ -1,0 +1,51 @@
+config:
+  target: 'http://localhost:3107'
+  phases:
+    - duration: 30
+      arrivalRate: 3
+      rampTo: 10
+      name: "Warm up"
+    - duration: 60
+      arrivalRate: 10
+      name: "Sustained load"
+  plugins:
+    expect: {}
+  defaults:
+    headers:
+      X-Api-Key: "{{ $env.JUBILEE_TEST_API_KEY }}"
+  ensure:
+    p95: 500
+    maxErrorRate: 1
+
+scenarios:
+  - name: "Public content API"
+    weight: 60
+    flow:
+      - get:
+          url: "/api/v1/content"
+          expect:
+            - statusCode: 200
+      - get:
+          url: "/api/v1/sites/jubileeverse.com/feed"
+          expect:
+            - statusCode:
+                - 200
+                - 404
+
+  - name: "Full-text search"
+    weight: 25
+    flow:
+      - get:
+          url: "/api/v1/search?q=faith"
+          expect:
+            - statusCode: 200
+
+  - name: "Health check"
+    weight: 15
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode:
+                - 200
+                - 503

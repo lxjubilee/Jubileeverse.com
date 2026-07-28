@@ -1,0 +1,13 @@
+Before any current news article is approved for publication, it must be carefully reviewed to ensure it aligns with family values and is appropriate for a faith-based audience. Both the written content and any accompanying images must be evaluated to confirm they are not offensive, suggestive, or inconsistent with the site’s Christian standards. No current events article should be published until the system has reviewed and approved all text and visuals for suitability on the website.
+
+Inappropriate images typically depicts romantic or intimate physical closeness between individuals, often emphasizing emotional or physical connection through body positioning, facial proximity, closed eyes, or suggestive lighting. While such imagery may be common in entertainment, fashion, or lifestyle media, it can carry undertones of sensuality or romantic intimacy that extend beyond neutral reporting.
+
+For a faith-based, family-values-oriented publication, images that center on romantic or sensual physical closeness may be considered misaligned with the site’s tone and mission. Even if the image is not explicitly sexual, suggestive framing—such as intimate poses, bedroom settings, provocative body language, partial nudity, or emotionally charged physical contact—can shift the focus from informative content to personal or sensual expression. This may distract from the publication’s spiritual, educational, or church-centered objectives.
+
+Sexualized imagery includes, but is not limited to, photographs that emphasize physical attraction through revealing clothing, exposed skin intended to draw attention to the body, seductive facial expressions, suggestive touching, or poses commonly associated with romantic or sexual relationships. For faith-based readers—particularly those who prioritize modesty, family standards, and biblical values—such images may feel inappropriate, unnecessary, or inconsistent with the publication’s purpose.
+
+Additionally, family-oriented audiences often expect content that is suitable for readers of all ages. Imagery that implies sexual intimacy, glamorizes sensuality, or mirrors entertainment-industry aesthetics may create discomfort for parents, church leaders, or educators who rely on the platform for spiritually grounded material.
+
+In this context, filtering such images is not a judgment of the individuals depicted but a content-alignment decision. The goal is to maintain visual consistency with Christian values, modesty standards, and a tone that supports faith formation rather than romantic or sensual expression. 
+
+In addition, the content must be at least 400 words in length in order for it to be approved for publication. 

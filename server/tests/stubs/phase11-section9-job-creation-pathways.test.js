@@ -1,0 +1,70 @@
+/**
+ * Phase 11, Section 9 — Job Creation Pathways
+ * Acceptance-criteria stubs (all .todo)
+ */
+
+describe('AC-S9-1: Pathway 1 — Direct Creation (Automation Workspace)', () => {
+  test.todo('"+ New Job" button opens right panel with empty editable form')
+  test.todo('New job form pre-selects the currently selected automation tree node')
+  test.todo('New job form requires job name before save')
+  test.todo('Prompt Recipe dropdown shows only published prompt_recipe objects')
+  test.todo('Saving new job calls POST /api/v1/automation-jobs with status=queued')
+  test.todo('Created job appears in Pending Jobs tab immediately after save')
+  test.todo('New job has requested_by set to the actor email from JWT')
+})
+
+describe('AC-S9-2: Pathway 2 — From Content Workspace', () => {
+  test.todo('CalendarClock button appears in InlineEditorPanel header for automatable content types')
+  test.todo('CalendarClock button is hidden for non-automatable content types (e.g. site, persona)')
+  test.todo('Clicking CalendarClock opens floating panel with job creation form')
+  test.todo('Floating panel pre-fills target_taxonomy_node_id from Zustand selectedNodeId')
+  test.todo('Floating panel pre-fills target_content_type from content object object_type')
+  test.todo('Floating panel has Prompt Recipe dropdown (published recipes only)')
+  test.todo('Floating panel has quantity input (min 1, max 100, default 1)')
+  test.todo('Floating panel has priority select (1-5, default 3)')
+  test.todo('Schedule Job calls POST /api/v1/automation-jobs')
+  test.todo('Success feedback shown after job is created')
+  test.todo('Panel closes on outside click')
+})
+
+describe('AC-S9-3: Pathway 3 — Job Templates', () => {
+  test.todo('Templates tab appears in AutomationJobsPanel center panel')
+  test.todo('Templates list shows Name, Type, Prompt, Qty, Priority, Status columns')
+  test.todo('Non-admin users see templates list but no New/Edit/Delete buttons')
+  test.todo('Admin users see New Template, Edit, and Delete buttons')
+  test.todo('New Template button opens create modal with fields: Name, Content Type, Prompt, Qty, Priority, Description, Active')
+  test.todo('Create template calls POST /api/v1/automation-job-templates')
+  test.todo('POST /api/v1/automation-job-templates returns 403 for non-admin users')
+  test.todo('Edit template opens pre-filled modal and calls PUT /api/v1/automation-job-templates/:id')
+  test.todo('Delete template shows confirmation and calls DELETE /api/v1/automation-job-templates/:id')
+  test.todo('DELETE returns 403 for non-admin users')
+  test.todo('Inactive templates shown only when "Show inactive" checkbox is checked')
+})
+
+describe('AC-S9-4: Template Application (Bulk Mode)', () => {
+  test.todo('Apply button (play icon) opens Apply modal for non-inactive templates')
+  test.todo('Apply modal shows Job Name, Taxonomy Node IDs, Quantity, Priority fields')
+  test.todo('Submitting Apply modal calls POST /api/v1/automation-job-templates/:id/apply')
+  test.todo('apply endpoint creates one job per taxonomy_node_id in the list')
+  test.todo('Bulk apply with 3 node IDs creates 3 jobs')
+  test.todo('apply endpoint with no node_ids creates one job with no taxonomy node filter')
+  test.todo('apply endpoint returns 400 for inactive templates')
+  test.todo('Each created job has prompt_recipe_id from template.prompt_id')
+  test.todo('Each created job has status=queued after creation')
+  test.todo('Success message shows count of jobs created')
+  test.todo('After apply, Pending Jobs tab refreshes to show new jobs')
+})
+
+describe('AC-S9-5: Template API & Schema', () => {
+  test.todo('jv_automation_job_templates has required columns: id, template_name, target_content_type, is_active')
+  test.todo('jv_automation_job_templates has default_quantity CHECK (BETWEEN 1 AND 100)')
+  test.todo('jv_automation_job_templates has default_priority CHECK (BETWEEN 1 AND 5)')
+  test.todo('jv_automation_job_templates has FK to automation_nav_nodes (ON DELETE SET NULL)')
+  test.todo('jv_automation_job_templates has FK to jv_content_objects for prompt_id (ON DELETE SET NULL)')
+  test.todo('GET /api/v1/automation-job-templates returns 401 for unauthenticated requests')
+  test.todo('GET /api/v1/automation-job-templates returns templates for all privileged roles')
+  test.todo('GET supports filtering by node_id and active_only')
+  test.todo('GET response includes node_title and prompt_name from joins')
+  test.todo('automation_template.created audit event is logged on POST')
+  test.todo('automation_template.applied audit event is logged on apply')
+})

@@ -1,0 +1,3907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="JubileeVerse - Uplifting Christian news article">
+    <title>Article - JubileeVerse</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <!-- Markdown parser for Claude-generated full_article content -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+    <style>
+        /* ============================================
+           JUBILEE GOOD NEWS - MSN-STYLE ARTICLE PAGE
+           ============================================ */
+
+        :root {
+            /* MSN Dark Theme Colors */
+            --bg-primary: #1b1b1b;
+            --bg-secondary: #242424;
+            --bg-tertiary: #2d2d2d;
+            --bg-card: #2d2d2d;
+            --bg-card-hover: #3a3a3a;
+
+            /* Text Colors */
+            --text-primary: #ffffff;
+            --text-secondary: #c4c4c4;
+            --text-muted: #8a8a8a;
+            --text-body: #e0e0e0;
+
+            /* Accent Colors */
+            --accent-gold: #E6AC00;
+            --accent-gold-hover: #F5C518;
+            --accent-blue: #0078d4;
+            --accent-red: #d13438;
+            --accent-green: #107c10;
+
+            /* Borders */
+            --border-color: rgba(255, 255, 255, 0.1);
+            --border-hover: rgba(255, 255, 255, 0.2);
+
+            /* Spacing */
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 12px;
+            --space-lg: 16px;
+            --space-xl: 24px;
+            --space-2xl: 32px;
+            --space-3xl: 48px;
+
+            /* Font Sizes */
+            --font-xs: 11px;
+            --font-sm: 12px;
+            --font-base: 14px;
+            --font-md: 16px;
+            --font-lg: 18px;
+            --font-xl: 22px;
+            --font-2xl: 28px;
+            --font-3xl: 36px;
+            --font-4xl: 42px;
+
+            /* Article Typography */
+            --article-line-height: 1.75;
+            --article-max-width: 720px;
+
+            /* Layout */
+            --max-width: 1548px;
+            --header-height: 48px;
+            --card-radius: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            font-size: 16px;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #articleContent {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        a:hover {
+            color: var(--accent-gold);
+        }
+
+        /* ============================================
+           HEADER - STICKY NAVIGATION
+           ============================================ */
+
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-inner {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 0 var(--space-lg);
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+        }
+
+        .back-btn-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: rgba(0, 0, 0, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+
+        .back-btn-overlay:hover {
+            background: rgba(0, 0, 0, 0.65);
+            border-color: rgba(255, 255, 255, 0.45);
+        }
+
+        .back-btn-overlay svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .logo-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .logo-text span {
+            color: var(--accent-gold);
+        }
+        .logo-text .logo-verse { color: var(--accent-gold); }
+        .logo-text .logo-dotcom { color: #ffffff; }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+        }
+
+        .header-media-links {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: var(--font-sm);
+        }
+
+        .header-media-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .header-media-links a:hover {
+            color: var(--text-primary);
+        }
+
+        .header-media-links .divider {
+            color: var(--text-muted);
+        }
+
+        .btn-sign-in {
+            background: transparent;
+            color: var(--text-secondary);
+            padding: var(--space-sm) var(--space-md);
+            border-radius: 4px;
+            font-size: var(--font-sm);
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border: 1px solid var(--border-color);
+            text-decoration: none;
+        }
+
+        .btn-sign-in:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .profile-btn-container {
+            position: relative;
+            display: inline-flex;
+        }
+
+        .profile-btn {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+            background-color: #ffbd59;
+            color: #000;
+            font-weight: bold;
+            font-size: 13px;
+            transition: all 0.15s ease;
+        }
+
+        .profile-btn:hover {
+            background-color: #ffd280;
+            transform: scale(1.05);
+        }
+
+        .profile-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            min-width: 200px;
+            display: none;
+            flex-direction: column;
+            z-index: 1000;
+            overflow: hidden;
+        }
+
+        .profile-dropdown.open {
+            display: flex;
+        }
+
+        .profile-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: var(--font-sm);
+            transition: background 0.15s;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .profile-dropdown-item:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .profile-dropdown-item svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        .profile-dropdown-divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 4px 0;
+        }
+
+        .share-btn {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+            padding: var(--space-sm) var(--space-md);
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-size: var(--font-sm);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .share-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .share-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* ============================================
+           ARTICLE HERO SECTION
+           ============================================ */
+
+        .article-hero {
+            position: relative;
+            width: 100%;
+            max-height: 750px;
+            overflow: hidden;
+            background: var(--bg-tertiary);
+        }
+
+        .article-hero-image {
+            width: 100%;
+            height: 750px;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* Reviewer inline editing — title */
+        .reviewer-title-edit-wrap {
+            position: relative;
+            width: 100%;
+        }
+        .reviewer-title-input {
+            width: 100%;
+            background: rgba(0,0,0,0.6);
+            border: 2px solid var(--accent-gold);
+            border-radius: 4px;
+            color: #fff;
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: clamp(22px, 4vw, 36px);
+            font-weight: 700;
+            line-height: 1.2;
+            padding: 8px 12px;
+            resize: none;
+            outline: none;
+            box-sizing: border-box;
+        }
+        .reviewer-edit-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .reviewer-save-btn {
+            background: #2e7d32;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .reviewer-save-btn:hover { background: #1b5e20; }
+        .reviewer-cancel-btn {
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            padding: 6px 14px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .reviewer-cancel-btn:hover { background: rgba(255,255,255,0.25); }
+
+        /* Reviewer inline editing — body */
+        .reviewer-body-edit-wrap {
+            position: relative;
+            width: 100%;
+        }
+        .reviewer-body-textarea {
+            width: 100%;
+            min-height: 480px;
+            background: #1a1a1a;
+            border: 2px solid var(--accent-gold);
+            border-radius: 6px;
+            color: #e8e8e8;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            padding: 16px;
+            resize: vertical;
+            outline: none;
+            box-sizing: border-box;
+        }
+        .reviewer-body-hint {
+            font-size: 12px;
+            color: var(--accent-gold);
+            margin-bottom: 8px;
+            opacity: 0.8;
+        }
+        [title~="Double-click"] {
+            cursor: text;
+        }
+        .reviewer-editable-hint {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            font-size: 10px;
+            background: var(--accent-gold);
+            color: #000;
+            padding: 2px 6px;
+            border-radius: 3px;
+            opacity: 0.8;
+            pointer-events: none;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        /* Reviewer-only delete button — top-right corner of hero image */
+        .reviewer-delete-btn {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            z-index: 20;
+            width: 38px;
+            height: 38px;
+            background: #c62828;
+            border: 2px solid #b71c1c;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 20px;
+            font-weight: 700;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0.9;
+            transition: opacity 0.15s, background 0.15s;
+        }
+        .reviewer-delete-btn:hover {
+            opacity: 1;
+            background: #b71c1c;
+        }
+
+        /* Reviewer image-regeneration button — sits left of the delete button */
+        .reviewer-regen-btn {
+            position: absolute;
+            top: 14px;
+            right: 62px;
+            z-index: 20;
+            width: 38px;
+            height: 38px;
+            background: #c62828;
+            border: 2px solid #b71c1c;
+            border-radius: 4px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0.9;
+            transition: opacity 0.15s, background 0.15s, transform 0.3s ease;
+        }
+        .reviewer-regen-btn:hover {
+            opacity: 1;
+            background: #b71c1c;
+            transform: rotate(180deg);
+        }
+        .reviewer-regen-btn svg {
+            width: 18px;
+            height: 18px;
+            pointer-events: none;
+        }
+        .reviewer-regen-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Reviewer article-rewrite button — sits left of the image-regen button */
+        .reviewer-rewrite-btn {
+            position: absolute;
+            top: 14px;
+            right: 110px;
+            z-index: 20;
+            width: 38px;
+            height: 38px;
+            background: #c62828;
+            border: 2px solid #b71c1c;
+            border-radius: 4px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0.9;
+            transition: opacity 0.15s, background 0.15s;
+        }
+        .reviewer-rewrite-btn:hover {
+            opacity: 1;
+            background: #b71c1c;
+        }
+        .reviewer-rewrite-btn svg {
+            width: 18px;
+            height: 18px;
+            pointer-events: none;
+        }
+        .reviewer-rewrite-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Confirm-delete modal */
+        .confirm-modal-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 9000;
+            align-items: center;
+            justify-content: center;
+        }
+        .confirm-modal-backdrop.open {
+            display: flex;
+        }
+        .confirm-modal {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 32px 28px 24px;
+            max-width: 380px;
+            width: 90%;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+            text-align: center;
+        }
+        .confirm-modal p {
+            color: #f0f0f0;
+            font-size: 1rem;
+            line-height: 1.55;
+            margin: 0 0 28px;
+        }
+        .confirm-modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .confirm-modal-ok {
+            background: #c62828;
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            padding: 10px 28px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .confirm-modal-ok:hover { background: #b71c1c; }
+        .confirm-modal-cancel {
+            background: transparent;
+            border: 1px solid #555;
+            border-radius: 5px;
+            color: #ccc;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 10px 28px;
+            cursor: pointer;
+            transition: border-color 0.15s, color 0.15s;
+        }
+        .confirm-modal-cancel:hover { border-color: #aaa; color: #fff; }
+
+        .article-hero-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: var(--space-3xl) var(--space-xl);
+            background: linear-gradient(transparent, rgba(0,0,0,0.85), rgba(0,0,0,0.95));
+        }
+
+        .article-hero-content {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 0 var(--space-lg);
+        }
+
+        .article-meta-top {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            margin-bottom: var(--space-md);
+            flex-wrap: wrap;
+        }
+
+        .article-source-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-xs);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .article-source-badge.cnn { background: #cc0000; color: white; }
+        .article-source-badge.foxnews { background: #003366; color: white; }
+        .article-source-badge.yahoo { background: #6001d2; color: white; }
+        .article-source-badge.nytimes { background: #f5f5f5; color: #1a1a1a; }
+        .article-source-badge.msn { background: #0078d4; color: white; }
+        .article-source-badge.default { background: var(--accent-gold); color: var(--bg-primary); }
+
+        .article-rank-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .article-rank-badge.rank-1 { background: var(--accent-gold); color: var(--bg-primary); }
+        .article-rank-badge.rank-2 { background: #c0c0c0; color: var(--bg-primary); }
+        .article-rank-badge.rank-3 { background: #cd7f32; color: white; }
+
+        .article-rank-badge svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        .article-category {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent-gold);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .article-hero-title {
+            font-family: 'Playfair Display', serif;
+            font-size: var(--font-3xl);
+            font-weight: 700;
+            line-height: 1.2;
+            color: var(--text-primary);
+            margin-bottom: var(--space-lg);
+        }
+
+        .article-meta-bottom {
+            display: flex;
+            align-items: center;
+            gap: var(--space-lg);
+            color: var(--text-muted);
+            font-size: var(--font-sm);
+        }
+
+        .article-meta-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+
+        .article-meta-item svg {
+            width: 14px;
+            height: 14px;
+            opacity: 0.7;
+        }
+
+        .prominence-score {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .score-circle-small {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--font-sm);
+            font-weight: 700;
+            background: rgba(16, 124, 16, 0.2);
+            color: var(--accent-green);
+            border: 2px solid var(--accent-green);
+        }
+
+        /* ============================================
+           ARTICLE CONTENT
+           ============================================ */
+
+        .article-container {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: var(--space-2xl) var(--space-lg);
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: var(--space-3xl);
+        }
+
+        .article-main {
+            /* Full width - content extends to the right */
+        }
+
+        .article-body {
+            font-size: var(--font-lg);
+            line-height: var(--article-line-height);
+            color: var(--text-body);
+            text-align: justify;
+        }
+
+        .article-body p {
+            margin-bottom: var(--space-xl);
+            text-align: justify;
+        }
+
+        .article-body p:first-child::first-letter {
+            float: left;
+            font-family: 'Playfair Display', serif;
+            font-size: 4rem;
+            line-height: 0.8;
+            padding-right: var(--space-md);
+            padding-top: var(--space-xs);
+            color: var(--accent-gold);
+        }
+
+        .article-body h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: var(--font-2xl);
+            font-weight: 700;
+            margin-top: var(--space-2xl);
+            margin-bottom: var(--space-lg);
+            color: var(--text-primary);
+            line-height: 1.25;
+        }
+
+        .article-body h2 {
+            font-size: var(--font-xl);
+            font-weight: 600;
+            margin-top: var(--space-2xl);
+            margin-bottom: var(--space-lg);
+            color: var(--text-primary);
+        }
+
+        .article-body h3 {
+            font-size: var(--font-lg);
+            font-weight: 600;
+            margin-top: var(--space-xl);
+            margin-bottom: var(--space-md);
+            color: var(--text-primary);
+        }
+
+        .article-body h4, .article-body h5, .article-body h6 {
+            font-size: var(--font-md);
+            font-weight: 600;
+            margin-top: var(--space-lg);
+            margin-bottom: var(--space-sm);
+            color: var(--text-secondary);
+        }
+
+        .article-body hr {
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin: var(--space-2xl) 0;
+        }
+
+        .article-body strong {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .article-body em {
+            font-style: italic;
+            color: var(--text-secondary);
+        }
+
+        .article-body a {
+            color: var(--accent-gold);
+            text-decoration: underline;
+        }
+
+        .article-body a:hover {
+            color: var(--accent-gold-hover);
+        }
+
+        .article-body code {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 1px 6px;
+            color: var(--accent-gold);
+        }
+
+        .article-body pre {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--card-radius);
+            padding: var(--space-lg);
+            overflow-x: auto;
+            margin: var(--space-xl) 0;
+        }
+
+        .article-body pre code {
+            background: none;
+            border: none;
+            padding: 0;
+            color: var(--text-secondary);
+        }
+
+        .article-body blockquote {
+            margin: var(--space-2xl) 0;
+            padding: var(--space-lg) var(--space-xl);
+            border-left: 3px solid var(--accent-gold);
+            background: var(--bg-card);
+            border-radius: 0 var(--card-radius) var(--card-radius) 0;
+            font-style: italic;
+            color: var(--text-secondary);
+            text-align: justify;
+        }
+
+        .article-body ul, .article-body ol {
+            margin: var(--space-lg) 0;
+            padding-left: var(--space-xl);
+        }
+
+        .article-body li {
+            margin-bottom: var(--space-sm);
+        }
+
+        /* Author Byline */
+        .article-byline {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-md);
+            margin: var(--space-xl) 0;
+            padding: var(--space-lg);
+            background: var(--bg-secondary);
+            border-radius: var(--card-radius);
+            border-left: 3px solid var(--accent-gold);
+        }
+
+        .article-byline-avatars {
+            display: flex;
+            gap: calc(var(--space-xs) * -1);
+            flex-shrink: 0;
+        }
+
+        .article-byline-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid var(--bg-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: white;
+            margin-right: -8px;
+        }
+
+        .article-byline-avatar img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .article-byline-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .article-byline-credit {
+            font-size: var(--font-sm);
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+        }
+
+        .article-byline-names {
+            font-size: var(--font-base);
+            font-weight: 600;
+            color: var(--text-primary);
+            line-height: 1.4;
+        }
+
+        .article-byline-names a {
+            color: var(--accent-gold);
+            text-decoration: none;
+        }
+
+        .article-byline-names a:hover {
+            text-decoration: underline;
+        }
+
+        .article-byline-roles {
+            font-size: var(--font-sm);
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .author-bio-excerpt {
+            font-size: var(--font-sm);
+            color: var(--text-secondary);
+            margin-top: var(--space-xs);
+            font-style: italic;
+            line-height: 1.5;
+        }
+
+        /* Hopeful Call-to-Action Box */
+        .hope-callout {
+            margin: var(--space-2xl) 0;
+            padding: var(--space-xl);
+            background: linear-gradient(135deg, rgba(230, 172, 0, 0.1), rgba(230, 172, 0, 0.05));
+            border: 1px solid rgba(230, 172, 0, 0.3);
+            border-radius: var(--card-radius);
+        }
+
+        .hope-callout-title {
+            font-size: var(--font-md);
+            font-weight: 600;
+            color: var(--accent-gold);
+            margin-bottom: var(--space-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .hope-callout-title svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .hope-callout-text {
+            font-size: var(--font-base);
+            color: var(--text-secondary);
+            line-height: 1.6;
+            text-align: justify;
+        }
+
+        /* Original Source Link */
+        .original-source {
+            margin-top: var(--space-2xl);
+            padding: var(--space-lg);
+            background: var(--bg-card);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-color);
+        }
+
+        .original-source-label {
+            font-size: var(--font-xs);
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: var(--space-sm);
+        }
+
+        .original-source-title {
+            font-size: var(--font-base);
+            color: var(--text-secondary);
+            margin-bottom: var(--space-sm);
+        }
+
+        .original-source-link {
+            font-size: var(--font-sm);
+            color: var(--accent-blue);
+            word-break: break-all;
+        }
+
+        .original-source-link:hover {
+            text-decoration: underline;
+        }
+
+        /* ============================================
+           ARTICLE SIDEBAR
+           ============================================ */
+
+        .article-sidebar {
+            position: sticky;
+            top: calc(var(--header-height) + var(--space-xl));
+            height: fit-content;
+        }
+
+        .sidebar-widget {
+            background: var(--bg-card);
+            border-radius: var(--card-radius);
+            padding: var(--space-lg);
+            margin-bottom: var(--space-lg);
+        }
+
+        .widget-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: var(--space-md);
+            padding-bottom: var(--space-sm);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .widget-title svg {
+            width: 18px; height: 18px;
+            flex-shrink: 0;
+            opacity: 0.65;
+        }
+
+        /* ============================================
+           TTS - READ ALOUD WIDGET
+           ============================================ */
+
+        .tts-controls {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            margin-bottom: var(--space-md);
+        }
+
+        .tts-play-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--accent-gold);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s, background 0.2s;
+            flex-shrink: 0;
+        }
+
+        .tts-play-btn:hover { background: var(--accent-gold-hover); transform: scale(1.06); }
+
+        .tts-play-btn svg { width: 18px; height: 18px; fill: #000; color: #000; }
+
+        .tts-stop-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .tts-stop-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+        .tts-stop-btn svg { width: 14px; height: 14px; }
+
+        .tts-speed-btn {
+            background: rgba(255,255,255,0.08);
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+
+        .tts-speed-btn:hover { background: rgba(255,255,255,0.15); color: var(--text-primary); }
+
+        .tts-gender-toggle {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            margin-left: auto;
+        }
+
+        .tts-gender-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+            padding: 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .tts-gender-btn:active { transform: scale(0.85); }
+
+        .tts-gender-btn svg {
+            width: 36px;
+            height: 36px;
+            transition: filter 0.3s ease, transform 0.3s ease, color 0.3s ease;
+            pointer-events: none;
+        }
+
+        .tts-gender-btn { color: #ffffff; }
+
+        .tts-gender-btn:not(.active) { opacity: 0.25; }
+        .tts-gender-btn:not(.active):hover { opacity: 0.5; }
+        .tts-gender-btn:not(.active):hover svg { transform: scale(1.1); }
+
+        .tts-gender-btn.active { opacity: 1; color: #E6AC00; }
+        .tts-gender-btn.active svg {
+            filter: drop-shadow(0 0 5px rgba(230,172,0,0.5));
+            transform: scale(1.05);
+        }
+
+        .tts-progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            cursor: pointer;
+            position: relative;
+            margin-bottom: 6px;
+            transition: height 0.15s;
+        }
+
+        .tts-progress-bar:hover { height: 6px; }
+
+        .tts-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--accent-gold);
+            border-radius: 2px;
+            transition: width 0.2s linear;
+        }
+
+        .tts-time-display {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 3px;
+            font-size: 11px;
+            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            margin-bottom: var(--space-sm);
+        }
+
+        .tts-time-sep { opacity: 0.4; }
+
+        #ttsElapsed { color: var(--accent-gold); }
+        #ttsDuration { color: var(--text-muted); }
+
+        /* Translate Widget */
+        .translate-dropdown { position: relative; margin-top: 8px; }
+        .translate-dropdown-trigger {
+            width: 100%;
+            padding: 8px 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            user-select: none;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .translate-dropdown-trigger:hover { border-color: var(--border-hover); color: var(--text-primary); }
+        .translate-dropdown.open .translate-dropdown-trigger { border-color: var(--accent-gold); color: var(--text-primary); }
+        .translate-dropdown-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .translate-dropdown-arrow {
+            width: 13px; height: 13px;
+            flex-shrink: 0;
+            opacity: 0.5;
+            transition: transform 0.2s, opacity 0.2s;
+        }
+        .translate-dropdown.open .translate-dropdown-arrow { transform: rotate(180deg); opacity: 1; }
+        .translate-dropdown-panel {
+            display: none;
+            position: absolute;
+            top: calc(100% + 3px);
+            left: 0; right: 0;
+            background: var(--bg-tertiary);
+            border: 1px solid rgba(230,172,0,0.5);
+            border-radius: 6px;
+            max-height: 372px;
+            overflow-y: scroll;
+            z-index: 1000;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            scrollbar-width: thin;
+            scrollbar-color: rgba(230,172,0,0.6) transparent;
+        }
+        .translate-dropdown-panel.panel-above {
+            top: auto;
+            bottom: calc(100% + 3px);
+        }
+        .translate-dropdown-panel::-webkit-scrollbar { width: 4px; }
+        .translate-dropdown-panel::-webkit-scrollbar-track { background: transparent; }
+        .translate-dropdown-panel::-webkit-scrollbar-thumb { background: rgba(230,172,0,0.6); border-radius: 4px; }
+        .translate-dropdown-panel::-webkit-scrollbar-thumb:hover { background: var(--accent-gold); }
+        .translate-dropdown.open .translate-dropdown-panel { display: block; }
+        .translate-search-input {
+            width: 100%;
+            padding: 7px 10px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            color: var(--text-primary);
+            font-size: 12px;
+            outline: none;
+            font-family: inherit;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .translate-search-input:focus { border-color: var(--accent-gold); }
+        .translate-search-input::placeholder { color: var(--text-muted); }
+        .translate-no-results {
+            padding: 12px 10px;
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+        .translate-prev-lang-section { margin-top: 8px; font-size: 11px; line-height: 1.7; }
+        .translate-prev-lang-section a { color: var(--accent-gold); text-decoration: none; opacity: 0.85; cursor: pointer; display: block; padding: 1px 0; }
+        .translate-prev-lang-section a:hover { opacity: 1; text-decoration: underline; }
+        .tts-play-btn.tts-inactive { opacity: 0.3; pointer-events: none; cursor: not-allowed; }
+        .translate-dropdown-option {
+            padding: 7px 10px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: background 0.1s, color 0.1s;
+        }
+        .translate-dropdown-option:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+        .translate-dropdown-option.active { color: var(--accent-gold); background: rgba(230,172,0,0.07); }
+        .translate-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            color: var(--accent-gold);
+            font-size: 13px;
+        }
+        .translate-spinner {
+            width: 14px; height: 14px;
+            border: 2px solid rgba(230,172,0,0.3);
+            border-top-color: var(--accent-gold);
+            border-radius: 50%;
+            animation: tts-spin 0.7s linear infinite;
+            flex-shrink: 0;
+        }
+        @keyframes tts-spin { to { transform: rotate(360deg); } }
+        .translate-restore-btn {
+            margin-top: 10px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 12px;
+            cursor: pointer;
+            padding: 0;
+        }
+        .translate-restore-btn:hover { color: var(--accent-gold); }
+
+        /* Highlight currently spoken paragraph/heading */
+        .article-body [data-tts-segment].tts-speaking {
+            background: rgba(230, 172, 0, 0.12);
+            border-radius: 4px;
+            outline: 2px solid rgba(230, 172, 0, 0.25);
+            transition: background 0.3s, outline 0.3s;
+        }
+
+        /* Word-level highlighting */
+        .article-body [data-tts-segment] .tts-word {
+            cursor: pointer;
+            border-radius: 2px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .article-body [data-tts-segment] .tts-word:hover {
+            background: rgba(230, 172, 0, 0.15);
+        }
+        .article-body [data-tts-segment] .tts-word.tts-word-active {
+            background: rgba(230, 172, 0, 0.35);
+            color: #fff;
+            border-radius: 2px;
+        }
+
+        /* Related Articles */
+        .related-article {
+            display: flex;
+            gap: var(--space-md);
+            padding: var(--space-sm) 0;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: opacity 0.2s ease;
+        }
+
+        .related-article:last-child {
+            border-bottom: none;
+        }
+
+        .related-article:hover {
+            opacity: 0.8;
+        }
+
+        .related-article-image {
+            width: 80px;
+            height: 60px;
+            border-radius: 4px;
+            overflow: hidden;
+            flex-shrink: 0;
+            background: var(--bg-tertiary);
+        }
+
+        .related-article-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .related-article-content {
+            flex: 1;
+        }
+
+        .related-article-title {
+            font-size: var(--font-sm);
+            font-weight: 500;
+            line-height: 1.4;
+            color: var(--text-primary);
+            margin-bottom: var(--space-xs);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .related-article-meta {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        /* Daily Verse */
+        .verse-widget {
+            border-left: 3px solid var(--accent-gold);
+        }
+
+        .verse-text {
+            font-size: var(--font-base);
+            font-style: italic;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            margin-bottom: var(--space-md);
+        }
+
+        .verse-reference {
+            font-size: var(--font-sm);
+            color: var(--accent-gold);
+            font-weight: 600;
+        }
+
+        /* Share Widget */
+        .share-buttons {
+            display: flex;
+            gap: var(--space-sm);
+            flex-wrap: wrap;
+        }
+
+        .share-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: var(--card-radius);
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .share-button:hover {
+            background: var(--accent-gold);
+            color: var(--bg-primary);
+        }
+
+        .share-button svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* ============================================
+           MORE ARTICLES SECTION
+           ============================================ */
+
+        .more-articles {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: var(--space-2xl) var(--space-lg);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .more-articles-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--space-lg);
+        }
+
+        .more-articles-title {
+            font-size: var(--font-md);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .more-articles-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: var(--space-md);
+        }
+
+        .more-article-card {
+            background: var(--bg-card);
+            border-radius: var(--card-radius);
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .more-article-card:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .more-article-image {
+            aspect-ratio: 16/9;
+            background: var(--bg-tertiary);
+            overflow: hidden;
+        }
+
+        .more-article-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .more-article-card:hover .more-article-image img {
+            transform: scale(1.02);
+        }
+
+        .more-article-body {
+            padding: var(--space-md);
+        }
+
+        .more-article-category {
+            font-size: 10px;
+            color: var(--accent-gold);
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: var(--space-xs);
+        }
+
+        .more-article-title {
+            font-size: var(--font-base);
+            font-weight: 600;
+            line-height: 1.35;
+            color: var(--text-primary);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* ============================================
+           FOOTER
+           ============================================ */
+
+        .footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: var(--space-xl) 0;
+            margin-top: var(--space-2xl);
+        }
+
+        .footer-inner {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 0 var(--space-lg);
+            text-align: center;
+        }
+
+        .footer-text {
+            font-size: var(--font-sm);
+            color: var(--text-muted);
+        }
+
+        /* ============================================
+           LOADING STATE
+           ============================================ */
+
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            gap: var(--space-md);
+        }
+
+        .loading-spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-gold);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: var(--font-sm);
+            color: var(--text-muted);
+        }
+
+        /* Error State */
+        .error-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+            gap: var(--space-md);
+            text-align: center;
+            padding: var(--space-xl);
+        }
+
+        .error-state svg {
+            width: 48px;
+            height: 48px;
+            color: var(--accent-red);
+            opacity: 0.5;
+        }
+
+        .error-state h2 {
+            font-size: var(--font-xl);
+            color: var(--text-primary);
+        }
+
+        .error-state p {
+            font-size: var(--font-base);
+            color: var(--text-muted);
+            max-width: 400px;
+        }
+
+        .error-state .btn {
+            margin-top: var(--space-md);
+            padding: var(--space-sm) var(--space-lg);
+            background: var(--accent-gold);
+            color: var(--bg-primary);
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .error-state .btn:hover {
+            background: var(--accent-gold-hover);
+        }
+
+        /* ============================================
+           RESPONSIVE DESIGN
+           ============================================ */
+
+        @media (max-width: 1280px) {
+            .more-articles-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .article-container {
+                grid-template-columns: 1fr;
+            }
+
+            .article-sidebar {
+                position: static;
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: var(--space-lg);
+            }
+
+            .more-articles-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .article-hero {
+                max-height: 525px;
+            }
+
+            .article-hero-image {
+                height: 525px;
+            }
+
+            .article-hero-overlay {
+                padding: var(--space-xl) var(--space-lg);
+            }
+
+            .article-hero-title {
+                font-size: var(--font-2xl);
+            }
+
+            .article-meta-bottom {
+                flex-wrap: wrap;
+                gap: var(--space-md);
+            }
+
+            .article-body {
+                font-size: var(--font-md);
+            }
+
+            .article-body p:first-child::first-letter {
+                font-size: 3rem;
+            }
+
+            .article-sidebar {
+                grid-template-columns: 1fr;
+            }
+
+            .more-articles-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-media-links {
+                display: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .back-btn-overlay span {
+                display: none;
+            }
+
+            .article-hero {
+                max-height: 420px;
+            }
+
+            .article-hero-image {
+                height: 420px;
+            }
+
+            .article-hero-title {
+                font-size: var(--font-xl);
+            }
+
+            .article-meta-top {
+                gap: var(--space-sm);
+            }
+
+            .article-source-badge,
+            .article-rank-badge {
+                font-size: 10px;
+                padding: 3px 8px;
+            }
+
+            .prominence-score {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Confirm-delete modal -->
+    <div class="confirm-modal-backdrop" id="confirmDeleteModal" role="dialog" aria-modal="true">
+        <div class="confirm-modal">
+            <p>Delete this article from the portal?<br>This cannot be undone.</p>
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-ok" id="confirmDeleteOk">OK</button>
+                <button class="confirm-modal-cancel" id="confirmDeleteCancel">CANCEL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-inner">
+            <a href="/" class="logo">
+                <img src="/images/JubileeLogo.png" alt="Jubilee" class="logo-icon">
+                <div class="logo-text">Jubilee<span class="logo-verse">Verse</span><span class="logo-dotcom">.com</span></div>
+            </a>
+
+            <div class="header-actions">
+                <div class="header-media-links">
+                    <a href="/prayer">Prayer</a>
+                    <span class="divider">|</span>
+                    <a href="/sermons">Sermons</a>
+                    <span class="divider">|</span>
+                    <a href="/music">Music</a>
+                    <span class="divider">|</span>
+                    <a href="/radio">Radio</a>
+                    <span class="divider">|</span>
+                    <a href="https://www.jubileeinspire.com" target="_blank" rel="noopener">AI Bible Chat</a>
+                </div>
+                <a href="/signin" class="btn-sign-in" id="signInBtn">Sign In</a>
+                <div class="profile-btn-container" id="profileBtnContainer" style="display: none;">
+                    <button class="profile-btn" id="profileBtn" onclick="toggleProfileDropdown(event)">
+                        <span id="profileInitials">?</span>
+                    </button>
+                    <div class="profile-dropdown" id="profileDropdown">
+                        <a href="/settings" class="profile-dropdown-item" id="profileSettingsLink" style="display: none;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            Profile Settings
+                        </a>
+                        <div class="profile-dropdown-divider" id="profileDivider" style="display: none;"></div>
+                        <a href="#" class="profile-dropdown-item" id="profileSignOut" onclick="signOut(); return false;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                            Sign Out
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main id="articleContent">
+        <!-- Loading State -->
+        <div class="loading-state" id="loadingState">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Loading article...</div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-inner">
+            <p class="footer-text">&copy; 2026 JubileeVerse. Part of the Jubilee Enterprise Network. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        // ============================================
+        // ARTICLE DATA MANAGEMENT
+        // ============================================
+
+        let currentArticle = null;
+        let relatedArticles = [];
+
+        // Sample related articles for demonstration
+        const sampleRelatedArticles = [
+            // Faith
+            { id: 1, title: "Finding Peace in Uncertain Times", category: "Faith", image: "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=250&fit=crop", timestamp: Date.now() - 3600000 },
+            { id: 4, title: "The Power of Gratitude in Daily Life", category: "Faith", image: "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?w=400&h=250&fit=crop", timestamp: Date.now() - 14400000 },
+            { id: 9, title: "Trusting God When the Path Is Unclear", category: "Faith", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=250&fit=crop", timestamp: Date.now() - 32400000 },
+            { id: 16, title: "Walking by Faith, Not by Sight", category: "Faith", image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=400&h=250&fit=crop", timestamp: Date.now() - 57600000 },
+            // Community
+            { id: 2, title: "Local Church Launches Food Drive", category: "Community", image: "https://images.unsplash.com/photo-1489659639091-8b687bc4386e?w=400&h=250&fit=crop", timestamp: Date.now() - 7200000 },
+            { id: 10, title: "Neighbors Unite to Rebuild After Storm", category: "Community", image: "https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=400&h=250&fit=crop", timestamp: Date.now() - 36000000 },
+            { id: 17, title: "Volunteers Transform Abandoned Lot Into Garden", category: "Community", image: "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400&h=250&fit=crop", timestamp: Date.now() - 61200000 },
+            // Inspiration
+            { id: 3, title: "Morning Devotionals That Transform", category: "Inspiration", image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=250&fit=crop", timestamp: Date.now() - 10800000 },
+            { id: 11, title: "From Despair to Hope: One Family's Journey", category: "Inspiration", image: "https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=400&h=250&fit=crop", timestamp: Date.now() - 39600000 },
+            { id: 18, title: "Small Acts of Kindness That Changed Lives", category: "Inspiration", image: "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=400&h=250&fit=crop", timestamp: Date.now() - 64800000 },
+            // Worship
+            { id: 5, title: "How Worship Music Heals the Soul", category: "Worship", image: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=250&fit=crop", timestamp: Date.now() - 18000000 },
+            { id: 12, title: "New Hymns Reviving Ancient Prayers", category: "Worship", image: "https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=400&h=250&fit=crop", timestamp: Date.now() - 43200000 },
+            // Family
+            { id: 6, title: "Building Stronger Family Bonds Through Prayer", category: "Family", image: "https://images.unsplash.com/photo-1511895426328-dc8714191300?w=400&h=250&fit=crop", timestamp: Date.now() - 21600000 },
+            { id: 13, title: "Teaching Children the Value of Compassion", category: "Family", image: "https://images.unsplash.com/photo-1536640712-4d4c36ff0e4e?w=400&h=250&fit=crop", timestamp: Date.now() - 46800000 },
+            // Revival
+            { id: 7, title: "Youth Revival Movement Sweeps Campuses", category: "Revival", image: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400&h=250&fit=crop", timestamp: Date.now() - 25200000 },
+            { id: 14, title: "Historic Church Sees Record Baptisms", category: "Revival", image: "https://images.unsplash.com/photo-1438232992991-995b7058bbb3?w=400&h=250&fit=crop", timestamp: Date.now() - 50400000 },
+            // Mission
+            { id: 8, title: "Missionaries Report Breakthrough in Asia", category: "Mission", image: "https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?w=400&h=250&fit=crop", timestamp: Date.now() - 28800000 },
+            { id: 15, title: "Clean Water Project Transforms Village", category: "Mission", image: "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=400&h=250&fit=crop", timestamp: Date.now() - 54000000 }
+        ];
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadArticle();
+        });
+
+        async function loadArticle() {
+            showLoading();
+
+            // Sync role from server before rendering — ensures reviewer badge/delete button
+            // reflects the current DB role even if localStorage is from before role was assigned
+            try {
+                const storedAuth = JSON.parse(localStorage.getItem('jubileeVerseAuth') || '{}');
+                const token = storedAuth.token || (storedAuth.tokens && storedAuth.tokens.access);
+                if (token) {
+                    const meRes = await fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } });
+                    if (meRes.ok) {
+                        const meData = await meRes.json();
+                        if (meData.success && meData.user) {
+                            storedAuth.user = { ...storedAuth.user, ...meData.user };
+                            localStorage.setItem('jubileeVerseAuth', JSON.stringify(storedAuth));
+                        }
+                    }
+                }
+            } catch (_) { /* non-fatal — rendering continues with cached role */ }
+
+            try {
+                // Get article data from URL parameters or sessionStorage
+                const urlParams = new URLSearchParams(window.location.search);
+                const articleId = urlParams.get('id');
+                const articleIndex = urlParams.get('index');
+
+                // Try to get article from sessionStorage (passed from index.html)
+                const storedArticle = sessionStorage.getItem('selectedArticle');
+
+                if (storedArticle) {
+                    currentArticle = JSON.parse(storedArticle);
+                } else if (articleId || articleIndex !== null) {
+                    // Fallback: Try to fetch from stored hero stories
+                    const storedStories = sessionStorage.getItem('heroStories');
+                    if (storedStories) {
+                        const stories = JSON.parse(storedStories);
+                        const index = parseInt(articleIndex) || 0;
+                        if (stories[index]) {
+                            currentArticle = stories[index];
+                        }
+                    }
+                }
+
+                if (currentArticle) {
+                    // Current event article — always fetch fresh from server (generates content on-demand if missing)
+                    if (currentArticle.isCurrentEvent && currentArticle.id) {
+                        fetch(`/api/current-events/article/${currentArticle.id}`)
+                            .then(r => r.json())
+                            .then(data => {
+                                if (data.success && data.article) {
+                                    currentArticle.rewrittenContent = data.article.full_article || currentArticle.rewrittenContent;
+                                    currentArticle.imageUrl = currentArticle.imageUrl || data.article.cached_image_path || data.article.image_url;
+                                }
+                                loadRelatedArticles();
+                                renderArticle();
+                            })
+                            .catch(() => {
+                                loadRelatedArticles();
+                                renderArticle();
+                            });
+                    // jv_content_objects article — fetch from public endpoint (no auth required)
+                    } else if (currentArticle.isJVContent && currentArticle.id) {
+                        fetch(`/api/public/article/${currentArticle.id}`)
+                            .then(r => r.json())
+                            .then(data => {
+                                if (data && data.id) {
+                                    const ext = data.extension_data || {};
+                                    currentArticle.rewrittenContent = ext.body || data.summary || '';
+                                    currentArticle.imageUrl = currentArticle.imageUrl || ext.hero_image_path || '';
+                                    if (!currentArticle.title && data.title) currentArticle.title = data.title;
+                                    if (!currentArticle.rewrittenTitle && data.title) currentArticle.rewrittenTitle = data.title;
+                                }
+                                loadRelatedArticles();
+                                renderArticle();
+                            })
+                            .catch(() => {
+                                loadRelatedArticles();
+                                renderArticle();
+                            });
+                    // Non-current-event article with no content — fetch from inspire DB
+                    } else if (currentArticle.id && !currentArticle.content && !currentArticle.rewrittenContent) {
+                        fetch(`/api/articles/${currentArticle.id}`)
+                            .then(r => r.json())
+                            .then(data => {
+                                if (data.success && data.article) {
+                                    currentArticle.content = data.article.content;
+                                    currentArticle.imageUrl = currentArticle.imageUrl || data.article.image;
+                                }
+                                loadRelatedArticles();
+                                renderArticle();
+                            })
+                            .catch(() => {
+                                loadRelatedArticles();
+                                renderArticle();
+                            });
+                    } else {
+                        loadRelatedArticles();
+                        renderArticle();
+                    }
+                } else {
+                    showError();
+                }
+
+            } catch (error) {
+                console.error('Error loading article:', error);
+                showError();
+            }
+        }
+
+        function loadRelatedArticles() {
+            const currentTitle = currentArticle?.rewrittenTitle || currentArticle?.title || '';
+            const currentCategory = (currentArticle?.storyCluster || currentArticle?.category || '').toLowerCase();
+
+            // Gather candidate articles, excluding the current one
+            let candidates = [];
+
+            // Try to get other stories from sessionStorage
+            const storedStories = sessionStorage.getItem('heroStories');
+            if (storedStories) {
+                const stories = JSON.parse(storedStories);
+                candidates = stories.filter(s => {
+                    const t = s.rewrittenTitle || s.title || '';
+                    return t !== currentTitle;
+                });
+            }
+
+            // Add sample articles (excluding current by title)
+            const samples = sampleRelatedArticles.filter(s => s.title !== currentTitle);
+            candidates = [...candidates, ...samples];
+
+            // Deduplicate by title
+            const seen = new Set();
+            candidates = candidates.filter(a => {
+                const t = a.rewrittenTitle || a.title;
+                if (seen.has(t)) return false;
+                seen.add(t);
+                return true;
+            });
+
+            // Sort: same category first, then others
+            if (currentCategory) {
+                const sameCategory = candidates.filter(a => (a.storyCluster || a.category || '').toLowerCase() === currentCategory);
+                const otherCategory = candidates.filter(a => (a.storyCluster || a.category || '').toLowerCase() !== currentCategory);
+                relatedArticles = [...sameCategory, ...otherCategory].slice(0, 10);
+            } else {
+                relatedArticles = candidates.slice(0, 10);
+            }
+        }
+
+        // ============================================
+        // RENDERING
+        // ============================================
+
+        // Track article view (fire-and-forget, deduped by session)
+        var _viewTracked = false;
+        function trackArticleView() {
+            if (_viewTracked || !currentArticle || !currentArticle.id) return;
+            _viewTracked = true;
+            var aType = currentArticle.isCurrentEvent ? 'current_event' : 'article';
+            var sid = sessionStorage.getItem('_jv_sid');
+            if (!sid) { sid = 'sid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8); sessionStorage.setItem('_jv_sid', sid); }
+            var token = getAuthToken();
+            var headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            fetch('/api/track/view', {
+                method: 'POST', headers: headers,
+                body: JSON.stringify({ article_id: currentArticle.id, article_type: aType, event_type: 'view', session_id: sid })
+            }).catch(function() {});
+        }
+
+        function renderAuthorByline(authors) {
+            if (!authors || authors.length === 0) return '';
+
+            // Separate by role
+            const primary     = authors.filter(a => a.role === 'primary_author');
+            const contributors = authors.filter(a => a.role === 'contributor');
+            const editors      = authors.filter(a => a.role === 'editor');
+            const translators  = authors.filter(a => a.role === 'translator');
+
+            function authorLink(a) {
+                const name = a.display_name || 'Unknown Author';
+                if (a.canonical_slug) {
+                    return `<a href="/authors/${encodeURIComponent(a.canonical_slug)}">${name}</a>`;
+                }
+                return name;
+            }
+
+            function joinNames(arr) {
+                if (arr.length === 0) return '';
+                if (arr.length === 1) return authorLink(arr[0]);
+                const last = arr[arr.length - 1];
+                const rest = arr.slice(0, -1);
+                return rest.map(authorLink).join(', ') + ' and ' + authorLink(last);
+            }
+
+            // Build credit line
+            let namesHtml = joinNames(primary.length > 0 ? primary : authors);
+            let roleSuffix = '';
+            if (contributors.length > 0) roleSuffix += ` · ${joinNames(contributors)}, contributor${contributors.length > 1 ? 's' : ''}`;
+            if (editors.length > 0)      roleSuffix += ` · Edited by ${joinNames(editors)}`;
+            if (translators.length > 0)  roleSuffix += ` · Translated by ${joinNames(translators)}`;
+
+            // Avatars (first 3)
+            const hues = [0, 30, 60, 120, 160, 200, 240, 280, 320];
+            function avatarHtml(a) {
+                const name = a.display_name || '?';
+                const initials = name.trim().split(/\s+/).length >= 2
+                    ? (name.trim().split(/\s+/)[0][0] + name.trim().split(/\s+/)[1][0]).toUpperCase()
+                    : name.slice(0, 2).toUpperCase();
+                let hash = 0;
+                for (let i = 0; i < a.author_id.length; i++) hash = (hash * 31 + a.author_id.charCodeAt(i)) | 0;
+                const hue = hues[Math.abs(hash) % 9];
+                return `<div class="article-byline-avatar" style="background-color:hsl(${hue},55%,45%)" title="${name}">${initials}</div>`;
+            }
+            const avatarsHtml = authors.slice(0, 3).map(avatarHtml).join('');
+
+            // Bio excerpt: prefer channel_bio.bio_short, fall back to primary_bio.bio_short
+            const bioSource = (primary[0] || authors[0]);
+            const bioShort  = bioSource?.channel_bio?.bio_short || bioSource?.primary_bio?.bio_short || '';
+            const bioHtml   = bioShort ? `<div class="author-bio-excerpt">${bioShort}</div>` : '';
+
+            return `
+                <div class="article-byline">
+                    <div class="article-byline-avatars">${avatarsHtml}</div>
+                    <div class="article-byline-text">
+                        <div class="article-byline-credit">Written by</div>
+                        <div class="article-byline-names">${namesHtml}</div>
+                        ${roleSuffix ? `<div class="article-byline-roles">${roleSuffix}</div>` : ''}
+                        ${bioHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderArticle() {
+            if (!currentArticle) {
+                showError();
+                return;
+            }
+
+            // Update page title
+            document.title = `${currentArticle.rewrittenTitle || currentArticle.title} - JubileeVerse`;
+
+            const content = document.getElementById('articleContent');
+            const rankLabels = { 1: '1st', 2: '2nd', 3: '3rd' };
+
+            // Determine image URL
+            const imageUrl = currentArticle.downloadedImage ||
+                             currentArticle.imageUrl ||
+                             'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&h=600&fit=crop';
+
+            // Build rank badge if applicable
+            const rankBadge = currentArticle.rank ? `
+                <span class="article-rank-badge rank-${currentArticle.rank}">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    </svg>
+                    ${rankLabels[currentArticle.rank]} Most Prominent
+                </span>
+            ` : '';
+
+            // Build source badge
+            const sourceBadge = currentArticle.isCurrentEvent
+                ? '<span class="article-source-badge default">JubileeVerse</span>'
+                : currentArticle.source
+                    ? `<span class="article-source-badge ${currentArticle.source}">${currentArticle.sourceName || currentArticle.source}</span>`
+                    : '<span class="article-source-badge default">Good News</span>';
+
+            // Build category (topic slugs → readable labels for current events)
+            const TOPIC_LABELS = {
+                'christian-watch-us': 'Christian Watch — US',
+                'church-us':   'Church — United States',
+                'church-global': 'Church — Global',
+                'faith':       'Faith',
+                'finance':     'Finance',
+                'technology':  'Technology',
+                'health':      'Health & Wellness',
+                'social':      'Social',
+                'entertainment': 'Entertainment',
+            };
+            const categoryLabel = currentArticle.isCurrentEvent
+                ? (TOPIC_LABELS[currentArticle.storyCluster] || capitalizeFirst(currentArticle.storyCluster || ''))
+                : currentArticle.storyCluster;
+            const category = categoryLabel ? `
+                <span class="article-category">${categoryLabel}</span>
+            ` : '';
+
+            // Format article body content
+            const articleBody = formatArticleContent(currentArticle.rewrittenContent || currentArticle.content || '');
+
+            // Build author byline (multi-author, Section 6)
+            const authorByline = renderAuthorByline(currentArticle.authors);
+
+            // Build prominence score if available
+            const prominenceScore = currentArticle.score ? `
+                <div class="prominence-score">
+                    <div class="score-circle-small">${currentArticle.score.normalized}</div>
+                    <span>Prominence</span>
+                </div>
+            ` : '';
+
+            // Reviewer delete button — only for current event articles
+            const reviewerDeleteBtn = (currentArticle.isCurrentEvent && currentArticle.id && isReviewer())
+                ? `<button class="reviewer-delete-btn" title="Delete article (Reviewer)" onclick="event.stopPropagation(); deleteCurrentEventArticle(${currentArticle.id});">✕</button>`
+                : '';
+
+            // Reviewer image-regeneration button — ALL articles when reviewer
+            const reviewerRegenBtn = (isReviewer() && currentArticle.id)
+                ? `<button class="reviewer-regen-btn" id="articleRegenBtn" title="Regenerate image (Reviewer)" onclick="event.stopPropagation(); regenerateCurrentArticleImage(this);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 .49-4.59"></path></svg></button>`
+                : '';
+
+            // Reviewer article-rewrite button — current event articles only
+            const reviewerRewriteBtn = (isReviewer() && currentArticle.id && currentArticle.isCurrentEvent)
+                ? `<button class="reviewer-rewrite-btn" id="articleRewriteBtn" title="Rewrite article (Reviewer)" onclick="event.stopPropagation(); rewriteCurrentArticle(this);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>`
+                : '';
+
+            content.innerHTML = `
+                <!-- Hero Section -->
+                <section class="article-hero">
+                    <img src="${imageUrl}" alt="${currentArticle.rewrittenTitle || currentArticle.title}" class="article-hero-image" onerror="this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&h=600&fit=crop'">
+                    <button class="back-btn-overlay" onclick="goBack()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"/>
+                        </svg>
+                        <span>Back</span>
+                    </button>
+                    ${reviewerDeleteBtn}
+                    ${reviewerRegenBtn}
+                    ${reviewerRewriteBtn}
+                    <div class="article-hero-overlay">
+                        <div class="article-hero-content">
+                            <div class="article-meta-top">
+                                ${sourceBadge}
+                                ${rankBadge}
+                                ${category}
+                            </div>
+                            <h1 class="article-hero-title">${currentArticle.rewrittenTitle || currentArticle.title}</h1>
+                            <div class="article-meta-bottom">
+                                <div class="article-meta-item">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                                    </svg>
+                                    <span>${estimateReadTime(articleBody)} min read</span>
+                                </div>
+                                ${prominenceScore}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Article Content -->
+                <div class="article-container">
+                    <article class="article-main">
+                        <div class="article-body">
+                            ${articleBody}
+                        </div>
+
+                        ${authorByline}
+
+                        <!-- Hopeful Call-to-Action -->
+                        <div class="hope-callout">
+                            <div class="hope-callout-title">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                </svg>
+                                A Word of Encouragement
+                            </div>
+                            <p class="hope-callout-text">
+                                In every story, we find opportunities for hope, growth, and renewed faith.
+                                As we navigate the complexities of our world, let us remember that we are called
+                                to be lights in the darkness, bringing compassion and understanding to every situation.
+                            </p>
+                        </div>
+
+                    </article>
+
+                    <!-- Sidebar -->
+                    <aside class="article-sidebar">
+                        <!-- Read Aloud Widget -->
+                        <div class="sidebar-widget">
+                            <h3 class="widget-title">
+                                Read Aloud
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                            </h3>
+                            <div class="tts-controls">
+                                <button class="tts-play-btn" id="ttsPlayBtn" onclick="ttsTogglePlay()" title="Play">
+                                    <svg id="ttsPlayIcon" viewBox="0 0 24 24" fill="currentColor">
+                                        <polygon points="5 3 19 12 5 21 5 3"/>
+                                    </svg>
+                                </button>
+                                <button class="tts-stop-btn" onclick="ttsStop()" title="Stop">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                                </button>
+                                <button class="tts-speed-btn" id="ttsSpeedBtn" onclick="ttsCycleSpeed()">1x</button>
+                                <div class="tts-gender-toggle">
+                                    <button class="tts-gender-btn female-btn active" id="ttsGenderFemale" onclick="ttsSetVoice('female')" title="Female voice">
+                                        <svg viewBox="0 0 100 120" fill="currentColor">
+                                            <circle cx="50" cy="14" r="10"/>
+                                            <!-- Torso -->
+                                            <path d="M42 26 L42 48 L58 48 L58 26 Z"/>
+                                            <!-- Arms -->
+                                            <path d="M42 28 L26 50 L32 54 L42 38"/>
+                                            <path d="M58 28 L74 50 L68 54 L58 38"/>
+                                            <!-- Skirt -->
+                                            <path d="M42 48 L26 78 L74 78 L58 48 Z"/>
+                                            <!-- Legs -->
+                                            <path d="M38 78 L36 112 L46 112 L48 78 Z"/>
+                                            <path d="M52 78 L54 112 L64 112 L62 78 Z"/>
+                                        </svg>
+                                    </button>
+                                    <button class="tts-gender-btn male-btn" id="ttsGenderMale" onclick="ttsSetVoice('male')" title="Male voice">
+                                        <svg viewBox="0 0 100 120" fill="currentColor">
+                                            <circle cx="50" cy="14" r="10"/>
+                                            <path d="M36 28 L36 68 L64 68 L64 28 Z"/>
+                                            <path d="M36 32 L20 54 L26 58 L40 40"/>
+                                            <path d="M64 32 L80 54 L74 58 L60 40"/>
+                                            <path d="M36 68 L34 110 L46 110 L48 68 Z"/>
+                                            <path d="M52 68 L54 110 L66 110 L64 68 Z"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="tts-progress-bar" id="ttsProgressBar" onclick="ttsHandleProgressClick(event)">
+                                <div class="tts-progress-fill" id="ttsProgressFill"></div>
+                            </div>
+                            <div class="tts-time-display" id="ttsTimeDisplay">
+                                <span id="ttsElapsed">00:00</span>
+                                <span class="tts-time-sep">/</span>
+                                <span id="ttsDuration">00:00</span>
+                            </div>
+                        </div>
+
+                        <!-- Translate Widget -->
+                        <div class="sidebar-widget" id="translateWidget">
+                            <h3 class="widget-title">
+                                Translate Article
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/></svg>
+                            </h3>
+                            <div class="translate-dropdown" id="translateDropdown">
+                                <div class="translate-dropdown-trigger" id="translateDropdownTrigger" onclick="toggleTranslateDropdown(event)">
+                                    <span class="translate-dropdown-label" id="translateDropdownLabel">Select language...</span>
+                                    <svg class="translate-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                                </div>
+                                <div class="translate-dropdown-panel" id="translateDropdownPanel">
+                                    <div style="padding:6px 6px 2px;position:sticky;top:0;z-index:1;background:var(--bg-tertiary);">
+                                        <input type="text" class="translate-search-input" id="translateSearchInput" placeholder="Search language..." oninput="filterTranslateLanguages()" onclick="event.stopPropagation()">
+                                    </div>
+                                    <div id="translateOptionsContainer"></div>
+                                </div>
+                            </div>
+                            <div class="translate-prev-lang-section" id="translatePrevLangSection" style="display:none"></div>
+                            <div id="translateStatus" class="translate-status" style="display:none">
+                                <div class="translate-spinner"></div>
+                                <span id="translateStatusText">Translating...</span>
+                            </div>
+                            <button id="translateRestoreBtn" class="translate-restore-btn" onclick="restoreOriginalArticle()" style="display:none">
+                                ← Restore English
+                            </button>
+                        </div>
+
+                        <!-- Share Widget -->
+                        <div class="sidebar-widget">
+                            <h3 class="widget-title">
+                                Share This Story
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                            </h3>
+                            <div class="share-buttons">
+                                <button class="share-button" onclick="shareToFacebook()" title="Share on Facebook">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+                                    </svg>
+                                </button>
+                                <button class="share-button" onclick="shareToTwitter()" title="Share on Twitter">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"/>
+                                    </svg>
+                                </button>
+                                <button class="share-button" onclick="shareToLinkedIn()" title="Share on LinkedIn">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/>
+                                        <rect x="2" y="9" width="4" height="12"/>
+                                        <circle cx="4" cy="4" r="2"/>
+                                    </svg>
+                                </button>
+                                <button class="share-button" onclick="copyLink()" title="Copy Link">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Daily Verse -->
+                        <div class="sidebar-widget verse-widget">
+                            <h3 class="widget-title">
+                                Daily Bible Verse
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                            </h3>
+                            <p class="verse-text" id="verseText">"For I know the plans I have for you," declares the LORD, "plans to prosper you and not to harm you, plans to give you hope and a future."</p>
+                            <p class="verse-reference" id="verseReference">Jeremiah 29:11</p>
+                        </div>
+
+                        <!-- Related Articles -->
+                        <div class="sidebar-widget">
+                            <h3 class="widget-title">Related Stories<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h10M4 18h8"/></svg></h3>
+                            <div id="relatedArticlesList">
+                                ${renderRelatedArticles()}
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+
+                <!-- More Articles Section -->
+                <section class="more-articles">
+                    <div class="more-articles-header">
+                        <h2 class="more-articles-title">More Good News</h2>
+                    </div>
+                    <div class="more-articles-grid" id="moreArticlesGrid">
+                        ${renderMoreArticles()}
+                    </div>
+                </section>
+            `;
+
+            // Fetch daily verse
+            fetchDailyVerse();
+
+            // Reviewer inline editing — attach after DOM is set (works for all article types)
+            if (isReviewer() && currentArticle.id) {
+                const rawContent = currentArticle.isCurrentEvent
+                    ? (currentArticle.full_article || currentArticle.rewrittenContent || '')
+                    : (currentArticle.content || '');
+                setTimeout(() => initReviewerEditing(currentArticle.id, rawContent), 50);
+            }
+
+            // Populate translate dropdown (must run after content.innerHTML is set)
+            populateTranslateDropdown();
+            // Show previous language quick-link if cookie set
+            translateUpdatePrevLangSection(false, null);
+
+            // Reset and initialise TTS segments for the new article
+            ttsStop();
+            ttsSegments = [];
+            // Small delay to let innerHTML settle before querying DOM
+            setTimeout(() => { ttsSegments = ttsExtractSegments(); }, 100);
+
+            // Auto-translate article if user selected a non-English language from homepage lang-panel
+            const siteLang = localStorage.getItem('siteLang');
+            if (siteLang && !siteLang.startsWith('en')) {
+                const langObj = TRANSLATE_LANGUAGES.find(l => l.code === siteLang);
+                if (langObj) {
+                    // Small delay so TTS segments and translate dropdown are ready
+                    setTimeout(() => selectTranslateLanguage(siteLang, langObj.name), 200);
+                }
+            }
+
+            // Track this article view
+            trackArticleView();
+        }
+
+        function renderRelatedArticles() {
+            return relatedArticles.map((article, index) => `
+                <div class="related-article" onclick="openRelatedArticle(${index})">
+                    <div class="related-article-image">
+                        <img src="${article.downloadedImage || article.imageUrl || article.image}" alt="${article.rewrittenTitle || article.title}" onerror="this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=200&h=150&fit=crop'">
+                    </div>
+                    <div class="related-article-content">
+                        <h4 class="related-article-title">${article.rewrittenTitle || article.title}</h4>
+                        <span class="related-article-meta">${formatTimestamp(article.timestamp || Date.now())}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderMoreArticles() {
+            return relatedArticles.map((article, index) => `
+                <div class="more-article-card" onclick="openRelatedArticle(${index})">
+                    <div class="more-article-image">
+                        <img src="${article.downloadedImage || article.imageUrl || article.image}" alt="${article.rewrittenTitle || article.title}" onerror="this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=250&fit=crop'">
+                    </div>
+                    <div class="more-article-body">
+                        <span class="more-article-category">${article.storyCluster || article.category || 'Faith'}</span>
+                        <h3 class="more-article-title">${article.rewrittenTitle || article.title}</h3>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showLoading() {
+            document.getElementById('articleContent').innerHTML = `
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <div class="loading-text">Loading article...</div>
+                </div>
+            `;
+        }
+
+        function showError() {
+            document.getElementById('articleContent').innerHTML = `
+                <div class="error-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    <h2>Article Not Found</h2>
+                    <p>We couldn't find the article you're looking for. It may have been moved or is no longer available.</p>
+                    <button class="btn" onclick="goBack()">Return to Home</button>
+                </div>
+            `;
+        }
+
+        // ============================================
+        // UTILITY FUNCTIONS
+        // ============================================
+
+        function formatArticleContent(content) {
+            if (!content) {
+                return '<p>Content is being prepared. Please check back soon for the full article.</p>';
+            }
+
+            // If content already has HTML block tags, return as-is (existing DB articles)
+            if (content.includes('<p>') || content.includes('<h2>')) {
+                return content;
+            }
+
+            // Use marked.js to parse Markdown → HTML
+            if (typeof marked !== 'undefined') {
+                marked.setOptions({
+                    breaks: true,       // single newline → <br>
+                    gfm: true,          // GitHub-flavoured: tables, strikethrough, task lists
+                    pedantic: false,
+                });
+                // Strip a leading # h1 line before parsing — the title is already
+                // displayed in the hero overlay and must not be repeated in the body.
+                const stripped = content.replace(/^#\s+[^\n]*\n?/, '').trimStart();
+                return marked.parse(stripped);
+            }
+
+            // Fallback if CDN fails: basic paragraph splitting
+            return content.split('\n\n').filter(p => p.trim()).map(p => `<p>${p.trim()}</p>`).join('');
+        }
+
+        function formatTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) return 'Just now';
+            if (diffMins < 60) return `${diffMins} min ago`;
+            if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+            if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+            });
+        }
+
+        function estimateReadTime(content) {
+            const text = content.replace(/<[^>]*>/g, '');
+            const words = text.split(/\s+/).length;
+            return Math.max(1, Math.ceil(words / 200));
+        }
+
+        function capitalizeFirst(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+
+        async function fetchDailyVerse() {
+            try {
+                const response = await fetch('/api/verse');
+                if (response.ok) {
+                    const verse = await response.json();
+                    document.getElementById('verseText').textContent = `"${verse.text}"`;
+                    document.getElementById('verseReference').textContent = verse.reference;
+                }
+            } catch (error) {
+                console.log('Using default verse');
+            }
+        }
+
+        // ============================================
+        // NAVIGATION
+        // ============================================
+
+        function goBack() {
+            if (document.referrer && document.referrer.includes(window.location.hostname)) {
+                window.history.back();
+            } else {
+                window.location.href = '/';
+            }
+        }
+
+        function generateArticleContent(title, summary, category) {
+            const categoryContent = {
+                faith: [
+                    `<p>In a world that often feels uncertain and overwhelming, the power of faith continues to serve as an anchor for millions of people across the globe. ${summary} This truth has been reaffirmed time and again through the testimonies of believers who have experienced God's faithfulness in every season of life, from moments of great joy to the deepest valleys of despair.</p>`,
+                    `<p>The Scriptures remind us in Hebrews 11:1 that "faith is the substance of things hoped for, the evidence of things not seen." This timeless truth speaks directly to the human condition — our innate need to believe in something greater than ourselves, to trust in a plan that extends beyond what our eyes can see. Throughout history, men and women of faith have drawn upon this promise to navigate the complexities of their lives with courage and conviction.</p>`,
+                    `<p>Community plays an essential role in nurturing and sustaining faith. When believers gather together — whether in grand cathedrals or humble living rooms — something powerful happens. Burdens are shared, prayers are lifted, and hope is renewed. The early church understood this principle deeply, as described in Acts 2:42-47, where believers devoted themselves to fellowship, breaking of bread, and prayer. This model of community continues to inspire congregations around the world today.</p>`,
+                    `<p>Modern research increasingly validates what people of faith have known for centuries: spiritual practices like prayer, meditation on Scripture, and communal worship have measurable positive effects on mental health, emotional resilience, and overall well-being. Studies from leading universities have found that individuals who maintain an active spiritual life report higher levels of life satisfaction, lower rates of depression, and stronger social connections.</p>`,
+                    `<p>One of the most remarkable aspects of faith is its ability to transform perspective. When we view our circumstances through the lens of God's sovereignty, even our greatest challenges take on new meaning. The apostle Paul, writing from a Roman prison, declared in Philippians 4:11-13 that he had learned to be content in every situation — whether in plenty or in want — because of the strength he found in Christ. This radical contentment is available to every believer who chooses to anchor their identity in God's unchanging character rather than in shifting circumstances.</p>`,
+                    `<p>Churches and faith-based organizations are also leading the charge in addressing some of society's most pressing issues. From feeding the hungry and sheltering the homeless to providing counseling services and addiction recovery programs, communities of faith are making tangible differences in the lives of those who need it most. These acts of service flow naturally from a genuine faith that compels believers to love their neighbors in practical, meaningful ways.</p>`,
+                    `<p>For those who may be exploring faith for the first time or returning after a season away, the invitation remains open and genuine. God's grace knows no bounds, and His love is not reserved for those who have it all figured out. In fact, Jesus Himself said, "It is not the healthy who need a doctor, but the sick" (Mark 2:17). This message of radical inclusion continues to draw people from every walk of life into a relationship with the Creator who made them and loves them unconditionally.</p>`,
+                    `<p>As we look toward the future, the landscape of faith continues to evolve while its core truths remain steadfast. New expressions of worship emerge, creative approaches to ministry develop, and technology opens doors for the Gospel to reach corners of the world previously untouched. Through it all, the message remains the same: God is faithful, His love endures forever, and those who put their trust in Him will never be put to shame.</p>`,
+                    `<p>The journey of faith is not always easy. There will be seasons of doubt, moments of confusion, and times when the path forward seems unclear. But it is precisely in these moments that faith grows deepest. Like a tree whose roots grow stronger in the wind, believers who persevere through trials develop a resilience and depth of character that cannot be achieved any other way. As James 1:2-4 encourages us, we can "consider it pure joy" when we face trials, because the testing of our faith produces perseverance, and perseverance leads to maturity and completeness.</p>`,
+                    `<p>Ultimately, faith is not merely an intellectual exercise or a cultural tradition — it is a living, breathing relationship with the God who created us, sustains us, and has prepared an eternal future for us. It is the confident assurance that we are known, loved, and held in the palm of His hand, no matter what tomorrow may bring. And that assurance changes everything.</p>`
+                ],
+                default: [
+                    `<p>${summary} This story reflects a growing movement that is touching communities across the nation and around the world. As more people embrace the values of compassion, generosity, and hope, the ripple effects are being felt in homes, workplaces, schools, and neighborhoods everywhere.</p>`,
+                    `<p>The foundation of this movement lies in the simple yet powerful belief that every person has inherent worth and dignity. When communities operate from this principle, remarkable things begin to happen. Neighbors reach out to one another, strangers become friends, and barriers that once seemed insurmountable begin to crumble. This is the transformative power of love in action — not merely as an abstract ideal, but as a daily practice that shapes every interaction and decision.</p>`,
+                    `<p>Across the country, faith-based organizations are at the forefront of this cultural shift. Churches, ministries, and nonprofit organizations are partnering together in unprecedented ways to address the needs of their communities. Food pantries are stocked, clothing drives are organized, tutoring programs are launched, and mentoring relationships are formed. Each initiative, no matter how small, contributes to a larger tapestry of goodness that is redefining what it means to be a neighbor.</p>`,
+                    `<p>The impact extends far beyond material provision. Perhaps the most significant contribution of these efforts is the restoration of hope. In a media landscape often dominated by negative headlines and divisive rhetoric, communities of faith are offering an alternative narrative — one centered on the belief that better days are not only possible but inevitable when people commit to working together with shared purpose and mutual respect.</p>`,
+                    `<p>Education and mentorship have emerged as particularly powerful tools in this movement. Young people who receive guidance and encouragement from caring adults are more likely to succeed academically, develop healthy relationships, and contribute positively to their communities. Churches and youth organizations are investing heavily in the next generation, recognizing that the seeds planted today will bear fruit for decades to come.</p>`,
+                    `<p>Technology is also playing an increasingly important role in connecting people with resources and opportunities. Online platforms make it possible for individuals to find volunteer opportunities, access educational content, connect with counselors and mentors, and participate in virtual faith communities. While technology can never replace the warmth of in-person connection, it serves as a valuable complement that extends the reach of compassion beyond geographical boundaries.</p>`,
+                    `<p>The economic dimension of community care is also noteworthy. When people invest in one another — through job training programs, small business incubators, financial literacy classes, and micro-lending initiatives — entire communities experience uplift. Families achieve stability, local economies strengthen, and a cycle of generosity is established that perpetuates itself across generations.</p>`,
+                    `<p>Health and wellness initiatives represent another critical area of community investment. Congregations are increasingly recognizing the connection between physical health, mental well-being, and spiritual vitality. Programs that address all three dimensions — through exercise groups, support groups, nutritional education, and spiritual formation — are producing holistic transformation in the lives of participants.</p>`,
+                    `<p>The arts and creative expression also play a vital role in community building. Music, visual arts, theater, and storytelling bring people together in ways that transcend language and cultural barriers. Faith-inspired creative works have the unique ability to touch hearts, open minds, and inspire action. From worship music that lifts the spirit to films that challenge perspectives, the creative arts continue to be a powerful vehicle for communicating truth and beauty.</p>`,
+                    `<p>Looking ahead, the momentum of this movement shows no signs of slowing. New leaders are emerging, innovative approaches are being developed, and partnerships are forming across denominational and organizational lines. The shared conviction that binds these diverse efforts together is simple yet profound: when people choose love over fear, generosity over greed, and hope over despair, the world becomes a better place for everyone. This is the good news that communities of faith are living out each and every day, and it is making all the difference.</p>`
+                ]
+            };
+
+            const paragraphs = categoryContent[category] || categoryContent.default;
+            return paragraphs.join('\n');
+        }
+
+        function openRelatedArticle(index) {
+            const article = relatedArticles[index];
+            if (!article) return;
+
+            const title = article.rewrittenTitle || article.title;
+            const summary = article.rewrittenContent || '';
+            const category = (article.storyCluster || article.category || 'faith').toLowerCase();
+
+            // Ensure the article has full content before navigating
+            if (!article.rewrittenContent) {
+                article.rewrittenTitle = title;
+                article.rewrittenContent = generateArticleContent(title, summary, category);
+                article.imageUrl = article.imageUrl || article.image;
+                article.storyCluster = category;
+                article.timestamp = article.timestamp || Date.now();
+            }
+
+            sessionStorage.setItem('selectedArticle', JSON.stringify(article));
+            window.location.reload();
+        }
+
+        // ============================================
+        // SHARING
+        // ============================================
+
+        function shareArticle() {
+            if (navigator.share && currentArticle) {
+                navigator.share({
+                    title: currentArticle.rewrittenTitle || currentArticle.title,
+                    text: 'Check out this inspiring article from JubileeVerse',
+                    url: window.location.href
+                }).catch(console.error);
+            } else {
+                copyLink();
+            }
+        }
+
+        function shareToFacebook() {
+            const url = encodeURIComponent(window.location.href);
+            window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank', 'width=600,height=400');
+        }
+
+        function shareToTwitter() {
+            const url = encodeURIComponent(window.location.href);
+            const text = encodeURIComponent(currentArticle?.rewrittenTitle || 'Check out this article');
+            window.open(`https://twitter.com/intent/tweet?url=${url}&text=${text}`, '_blank', 'width=600,height=400');
+        }
+
+        function shareToLinkedIn() {
+            const url = encodeURIComponent(window.location.href);
+            window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${url}`, '_blank', 'width=600,height=400');
+        }
+
+        function copyLink() {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                showNotification('Link copied to clipboard!');
+            }).catch(() => {
+                showNotification('Failed to copy link', 'error');
+            });
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                bottom: 24px;
+                left: 50%;
+                transform: translateX(-50%);
+                padding: 12px 24px;
+                background: ${type === 'success' ? 'var(--accent-green)' : 'var(--accent-red)'};
+                color: white;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                z-index: 10000;
+                animation: slideUp 0.3s ease;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.animation = 'slideDown 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        // Add animation styles
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideUp {
+                from { transform: translateX(-50%) translateY(100%); opacity: 0; }
+                to { transform: translateX(-50%) translateY(0); opacity: 1; }
+            }
+            @keyframes slideDown {
+                from { transform: translateX(-50%) translateY(0); opacity: 1; }
+                to { transform: translateX(-50%) translateY(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // ============================================
+        // AUTH STATE MANAGEMENT
+        // ============================================
+
+        function checkAuthState() {
+            var authData = localStorage.getItem('jubileeVerseAuth');
+            var signInBtn = document.getElementById('signInBtn');
+            var profileBtnContainer = document.getElementById('profileBtnContainer');
+            var profileInitials = document.getElementById('profileInitials');
+            var profileSettingsLink = document.getElementById('profileSettingsLink');
+            var profileDivider = document.getElementById('profileDivider');
+
+            if (authData) {
+                try {
+                    var parsed = JSON.parse(authData);
+                    if (parsed.authenticated && parsed.user) {
+                        var firstName = parsed.user.firstName || parsed.user.first_name || '';
+                        var lastName = parsed.user.lastName || parsed.user.last_name || '';
+                        var displayName = parsed.user.displayName || parsed.user.name || parsed.user.email || '';
+                        var initials = '?';
+                        if (firstName && lastName) {
+                            initials = (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
+                        } else if (firstName) {
+                            initials = firstName.charAt(0).toUpperCase();
+                        } else if (displayName) {
+                            initials = displayName.split(' ').map(function(n) { return n[0]; }).join('').toUpperCase().substring(0, 2);
+                        }
+                        signInBtn.style.display = 'none';
+                        profileBtnContainer.style.display = 'inline-flex';
+                        profileInitials.textContent = initials;
+                        if (profileSettingsLink) profileSettingsLink.style.display = 'flex';
+                        if (profileDivider) profileDivider.style.display = 'block';
+                        return;
+                    }
+                } catch(e) {}
+            }
+
+            signInBtn.style.display = '';
+            profileBtnContainer.style.display = 'none';
+        }
+
+        function getAuthToken() {
+            try {
+                var auth = JSON.parse(localStorage.getItem('jubileeVerseAuth') || '{}');
+                return auth.token || (auth.tokens && (auth.tokens.access || auth.tokens.accessToken)) || '';
+            } catch(e) { return ''; }
+        }
+
+        function isReviewer() {
+            try {
+                var auth = JSON.parse(localStorage.getItem('jubileeVerseAuth') || '{}');
+                return !!(auth.authenticated && auth.user && auth.user.role === 'reviewer');
+            } catch(e) { return false; }
+        }
+
+        function deleteCurrentEventArticle(id) {
+            const modal   = document.getElementById('confirmDeleteModal');
+            const okBtn   = document.getElementById('confirmDeleteOk');
+            const cancelBtn = document.getElementById('confirmDeleteCancel');
+            modal.classList.add('open');
+
+            function close() {
+                modal.classList.remove('open');
+                okBtn.removeEventListener('click', onOk);
+                cancelBtn.removeEventListener('click', close);
+            }
+
+            async function onOk() {
+                close();
+                const token = getAuthToken();
+                if (!token) {
+                    alert('Session token not found. Please sign out and sign back in.');
+                    return;
+                }
+                try {
+                    const res = await fetch('/api/current-events/' + id, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        window.location.href = '/';
+                    } else {
+                        alert('Delete failed: ' + (data.error || 'Unknown error'));
+                    }
+                } catch(e) {
+                    alert('Network error: ' + e.message);
+                }
+            }
+
+            okBtn.addEventListener('click', onOk);
+            cancelBtn.addEventListener('click', close);
+            modal.addEventListener('click', function onBackdrop(e) {
+                if (e.target === modal) { close(); modal.removeEventListener('click', onBackdrop); }
+            });
+        }
+
+        // ── Reviewer inline editing ──────────────────────────────────────
+        let _reviewerEditingTitle = false;
+        let _reviewerEditingBody  = false;
+
+        async function patchCurrentEventArticle(id, fields) {
+            const token = getAuthToken();
+            if (!token) { alert('Session token not found. Please sign out and sign back in.'); return false; }
+            const res = await fetch('/api/current-events/' + id, {
+                method: 'PATCH',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                body: JSON.stringify(fields)
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) { alert('Save failed: ' + (data.error || 'Unknown error')); return false; }
+            return true;
+        }
+
+        async function patchRegularArticle(id, fields) {
+            const token = getAuthToken();
+            if (!token) { alert('Session token not found. Please sign out and sign back in.'); return false; }
+            const res = await fetch('/api/articles/' + id, {
+                method: 'PATCH',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                body: JSON.stringify(fields)
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) { alert('Save failed: ' + (data.error || 'Unknown error')); return false; }
+            return true;
+        }
+
+        async function regenerateCurrentArticleImage(btnEl) {
+            if (!currentArticle || !currentArticle.id) return;
+            alert('This image will now be generated');
+            const token = getAuthToken();
+            if (!token) return;
+            btnEl.disabled = true;
+            btnEl.style.opacity = '0.4';
+            try {
+                const endpoint = currentArticle.isCurrentEvent
+                    ? '/api/current-events/' + currentArticle.id + '/regenerate-image'
+                    : '/api/articles/' + currentArticle.id + '/regenerate-image';
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (res.ok && data.success && data.imagePath) {
+                    const heroImg = document.querySelector('.article-hero-image');
+                    if (heroImg) heroImg.src = data.imagePath + '?t=' + Date.now();
+                }
+            } catch (e) {
+                console.warn('[Reviewer] Article image regeneration error:', e.message);
+            } finally {
+                btnEl.disabled = false;
+                btnEl.style.opacity = '';
+            }
+        }
+
+        async function rewriteCurrentArticle(btnEl) {
+            if (!currentArticle || !currentArticle.id || !currentArticle.isCurrentEvent) return;
+            if (!confirm('Rewrite this article using the AI prompts? The existing content will be replaced.')) return;
+            const token = getAuthToken();
+            if (!token) return;
+            btnEl.disabled = true;
+            btnEl.style.opacity = '0.4';
+            try {
+                const res = await fetch('/api/current-events/' + currentArticle.id + '/rewrite-article', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (res.ok && data.success && data.full_article) {
+                    currentArticle.rewrittenContent = data.full_article;
+                    const bodyEl = document.querySelector('.article-body');
+                    if (bodyEl && window.marked) {
+                        bodyEl.innerHTML = marked.parse(data.full_article.replace(/^#[^\n]*\n/, ''));
+                    }
+                    console.log('[Reviewer] Article rewritten successfully.');
+                } else {
+                    alert('Rewrite failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (e) {
+                console.warn('[Reviewer] Article rewrite error:', e.message);
+                alert('Rewrite failed — check console.');
+            } finally {
+                btnEl.disabled = false;
+                btnEl.style.opacity = '';
+            }
+        }
+
+        function initReviewerEditing(articleId, rawContent) {
+            if (!isReviewer()) return;
+
+            // ── Title editing ─────────────────────────────────────
+            const titleEl = document.querySelector('.article-hero-title');
+            if (titleEl) {
+                titleEl.title = 'Double-click to edit title';
+                titleEl.style.cursor = 'text';
+                // Small hint badge
+                titleEl.style.position = 'relative';
+
+                titleEl.addEventListener('dblclick', function() {
+                    if (_reviewerEditingTitle) return;
+                    _reviewerEditingTitle = true;
+                    const original = titleEl.textContent.trim();
+                    const wrap = document.createElement('div');
+                    wrap.className = 'reviewer-title-edit-wrap';
+                    wrap.innerHTML = `
+                        <textarea class="reviewer-title-input" rows="2">${original}</textarea>
+                        <div class="reviewer-edit-actions">
+                            <button class="reviewer-save-btn">Save Title</button>
+                            <button class="reviewer-cancel-btn">Cancel</button>
+                        </div>
+                    `;
+                    titleEl.replaceWith(wrap);
+                    const textarea = wrap.querySelector('textarea');
+                    textarea.focus();
+                    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+                    wrap.querySelector('.reviewer-cancel-btn').addEventListener('click', function() {
+                        wrap.replaceWith(titleEl);
+                        _reviewerEditingTitle = false;
+                    });
+
+                    wrap.querySelector('.reviewer-save-btn').addEventListener('click', async function() {
+                        const newTitle = textarea.value.trim();
+                        if (!newTitle) return;
+                        const ok = currentArticle.isCurrentEvent
+                            ? await patchCurrentEventArticle(articleId, { headline: newTitle })
+                            : await patchRegularArticle(articleId, { title: newTitle });
+                        if (ok) {
+                            titleEl.textContent = newTitle;
+                            if (currentArticle.isCurrentEvent) { currentArticle.headline = newTitle; }
+                            else { currentArticle.title = newTitle; }
+                            document.title = newTitle + ' — JubileeVerse';
+                        }
+                        wrap.replaceWith(titleEl);
+                        _reviewerEditingTitle = false;
+                    });
+                });
+            }
+
+            // ── Body editing ──────────────────────────────────────
+            const bodyEl = document.querySelector('.article-body');
+            if (bodyEl) {
+                bodyEl.title = 'Double-click to edit content';
+                bodyEl.style.cursor = 'text';
+
+                bodyEl.addEventListener('dblclick', function() {
+                    if (_reviewerEditingBody) return;
+                    _reviewerEditingBody = true;
+                    const renderedHTML = bodyEl.innerHTML;
+
+                    const wrap = document.createElement('div');
+                    wrap.className = 'reviewer-body-edit-wrap';
+                    wrap.innerHTML = `
+                        <p class="reviewer-body-hint">✏️ ${currentArticle.isCurrentEvent ? 'Editing raw Markdown — save to re-render' : 'Editing HTML content — save to update'}</p>
+                        <textarea class="reviewer-body-textarea">${(rawContent || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                        <div class="reviewer-edit-actions">
+                            <button class="reviewer-save-btn">Save Content</button>
+                            <button class="reviewer-cancel-btn">Cancel</button>
+                        </div>
+                    `;
+                    bodyEl.replaceWith(wrap);
+                    const textarea = wrap.querySelector('textarea');
+                    // Decode entities back to raw markdown in textarea value
+                    textarea.value = rawContent || '';
+                    textarea.focus();
+
+                    wrap.querySelector('.reviewer-cancel-btn').addEventListener('click', function() {
+                        bodyEl.innerHTML = renderedHTML;
+                        wrap.replaceWith(bodyEl);
+                        _reviewerEditingBody = false;
+                        initReviewerEditing(articleId, rawContent);
+                    });
+
+                    wrap.querySelector('.reviewer-save-btn').addEventListener('click', async function() {
+                        const newContent = textarea.value;
+                        const ok = currentArticle.isCurrentEvent
+                            ? await patchCurrentEventArticle(articleId, { full_article: newContent })
+                            : await patchRegularArticle(articleId, { content: newContent });
+                        if (ok) {
+                            rawContent = newContent;
+                            const rendered = formatArticleContent(newContent);
+                            bodyEl.innerHTML = rendered;
+                            if (currentArticle.isCurrentEvent) { currentArticle.full_article = newContent; }
+                            else { currentArticle.content = newContent; }
+                        } else {
+                            bodyEl.innerHTML = renderedHTML;
+                        }
+                        wrap.replaceWith(bodyEl);
+                        _reviewerEditingBody = false;
+                        initReviewerEditing(articleId, rawContent);
+                    });
+                });
+            }
+        }
+
+        function toggleProfileDropdown(e) {
+            e.stopPropagation();
+            var dropdown = document.getElementById('profileDropdown');
+            dropdown.classList.toggle('open');
+        }
+
+        function signOut() {
+            localStorage.removeItem('jubileeVerseAuth');
+            window.location.reload();
+        }
+
+        document.addEventListener('click', function(e) {
+            var dropdown = document.getElementById('profileDropdown');
+            if (dropdown && !e.target.closest('.profile-btn-container')) {
+                dropdown.classList.remove('open');
+            }
+        });
+
+        checkAuthState();
+
+        // Populate translate dropdown after DOM is ready
+        document.addEventListener('DOMContentLoaded', populateTranslateDropdown);
+        // Also call immediately in case DOM is already loaded
+        if (document.readyState !== 'loading') populateTranslateDropdown();
+        // Close translate dropdown on outside click
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#translateDropdown')) closeTranslateDropdown();
+        });
+
+        // ============================================
+        // TRANSLATE ENGINE
+        // ============================================
+
+        // Languages are limited to those with high-quality Microsoft Edge Neural TTS voices (male + female)
+        // English (United States) is pinned first; all others sorted A-Z by name
+        const TRANSLATE_LANGUAGES = [
+            { code: 'en-US',  name: 'English (United States)' },
+            { code: 'af-ZA',  name: 'Afrikaans' },
+            { code: 'sq-AL',  name: 'Albanian' },
+            { code: 'am-ET',  name: 'Amharic' },
+            { code: 'ar-DZ',  name: 'Arabic (Algeria)' },
+            { code: 'ar-BH',  name: 'Arabic (Bahrain)' },
+            { code: 'ar-EG',  name: 'Arabic (Egypt)' },
+            { code: 'ar-IQ',  name: 'Arabic (Iraq)' },
+            { code: 'ar-JO',  name: 'Arabic (Jordan)' },
+            { code: 'ar-KW',  name: 'Arabic (Kuwait)' },
+            { code: 'ar-LB',  name: 'Arabic (Lebanon)' },
+            { code: 'ar-LY',  name: 'Arabic (Libya)' },
+            { code: 'ar-MA',  name: 'Arabic (Morocco)' },
+            { code: 'ar-OM',  name: 'Arabic (Oman)' },
+            { code: 'ar-QA',  name: 'Arabic (Qatar)' },
+            { code: 'ar-SA',  name: 'Arabic (Saudi Arabia)' },
+            { code: 'ar-SY',  name: 'Arabic (Syria)' },
+            { code: 'ar-TN',  name: 'Arabic (Tunisia)' },
+            { code: 'ar-AE',  name: 'Arabic (UAE)' },
+            { code: 'ar-YE',  name: 'Arabic (Yemen)' },
+            { code: 'hy-AM',  name: 'Armenian' },
+            { code: 'az-AZ',  name: 'Azerbaijani' },
+            { code: 'bn-BD',  name: 'Bengali (Bangladesh)' },
+            { code: 'bn-IN',  name: 'Bengali (India)' },
+            { code: 'bs-BA',  name: 'Bosnian' },
+            { code: 'bg-BG',  name: 'Bulgarian' },
+            { code: 'my-MM',  name: 'Burmese' },
+            { code: 'ca-ES',  name: 'Catalan' },
+            { code: 'yue-CN', name: 'Chinese (Cantonese)' },
+            { code: 'zh-HK',  name: 'Chinese (Hong Kong)' },
+            { code: 'zh-CN',  name: 'Chinese (Simplified)' },
+            { code: 'zh-TW',  name: 'Chinese (Traditional)' },
+            { code: 'wuu-CN', name: 'Chinese (Wu / Shanghainese)' },
+            { code: 'hr-HR',  name: 'Croatian' },
+            { code: 'cs-CZ',  name: 'Czech' },
+            { code: 'da-DK',  name: 'Danish' },
+            { code: 'nl-NL',  name: 'Dutch' },
+            { code: 'nl-BE',  name: 'Dutch (Belgium)' },
+            { code: 'en-AU',  name: 'English (Australia)' },
+            { code: 'en-CA',  name: 'English (Canada)' },
+            { code: 'en-HK',  name: 'English (Hong Kong)' },
+            { code: 'en-IN',  name: 'English (India)' },
+            { code: 'en-IE',  name: 'English (Ireland)' },
+            { code: 'en-KE',  name: 'English (Kenya)' },
+            { code: 'en-NZ',  name: 'English (New Zealand)' },
+            { code: 'en-NG',  name: 'English (Nigeria)' },
+            { code: 'en-PH',  name: 'English (Philippines)' },
+            { code: 'en-SG',  name: 'English (Singapore)' },
+            { code: 'en-ZA',  name: 'English (South Africa)' },
+            { code: 'en-TZ',  name: 'English (Tanzania)' },
+            { code: 'en-GB',  name: 'English (United Kingdom)' },
+            { code: 'et-EE',  name: 'Estonian' },
+            { code: 'fil-PH', name: 'Filipino' },
+            { code: 'fi-FI',  name: 'Finnish' },
+            { code: 'fr-BE',  name: 'French (Belgium)' },
+            { code: 'fr-CA',  name: 'French (Canada)' },
+            { code: 'fr-FR',  name: 'French (France)' },
+            { code: 'fr-CH',  name: 'French (Switzerland)' },
+            { code: 'gl-ES',  name: 'Galician' },
+            { code: 'ka-GE',  name: 'Georgian' },
+            { code: 'de-DE',  name: 'German' },
+            { code: 'de-AT',  name: 'German (Austria)' },
+            { code: 'de-CH',  name: 'German (Switzerland)' },
+            { code: 'el-GR',  name: 'Greek' },
+            { code: 'gu-IN',  name: 'Gujarati' },
+            { code: 'he-IL',  name: 'Hebrew' },
+            { code: 'hi-IN',  name: 'Hindi' },
+            { code: 'hu-HU',  name: 'Hungarian' },
+            { code: 'is-IS',  name: 'Icelandic' },
+            { code: 'id-ID',  name: 'Indonesian' },
+            { code: 'ga-IE',  name: 'Irish (Gaelic)' },
+            { code: 'it-IT',  name: 'Italian' },
+            { code: 'ja-JP',  name: 'Japanese' },
+            { code: 'jv-ID',  name: 'Javanese' },
+            { code: 'kn-IN',  name: 'Kannada' },
+            { code: 'kk-KZ',  name: 'Kazakh' },
+            { code: 'km-KH',  name: 'Khmer' },
+            { code: 'ko-KR',  name: 'Korean' },
+            { code: 'lo-LA',  name: 'Lao' },
+            { code: 'lv-LV',  name: 'Latvian' },
+            { code: 'lt-LT',  name: 'Lithuanian' },
+            { code: 'mk-MK',  name: 'Macedonian' },
+            { code: 'ms-MY',  name: 'Malay' },
+            { code: 'ml-IN',  name: 'Malayalam' },
+            { code: 'mt-MT',  name: 'Maltese' },
+            { code: 'mr-IN',  name: 'Marathi' },
+            { code: 'mn-MN',  name: 'Mongolian' },
+            { code: 'ne-NP',  name: 'Nepali' },
+            { code: 'nb-NO',  name: 'Norwegian' },
+            { code: 'or-IN',  name: 'Odia (Oriya)' },
+            { code: 'ps-AF',  name: 'Pashto' },
+            { code: 'fa-IR',  name: 'Persian (Farsi)' },
+            { code: 'pl-PL',  name: 'Polish' },
+            { code: 'pt-BR',  name: 'Portuguese (Brazil)' },
+            { code: 'pt-PT',  name: 'Portuguese (Portugal)' },
+            { code: 'pa-IN',  name: 'Punjabi' },
+            { code: 'ro-RO',  name: 'Romanian' },
+            { code: 'ru-RU',  name: 'Russian' },
+            { code: 'sr-RS',  name: 'Serbian' },
+            { code: 'si-LK',  name: 'Sinhala' },
+            { code: 'sk-SK',  name: 'Slovak' },
+            { code: 'sl-SI',  name: 'Slovenian' },
+            { code: 'so-SO',  name: 'Somali' },
+            { code: 'es-AR',  name: 'Spanish (Argentina)' },
+            { code: 'es-BO',  name: 'Spanish (Bolivia)' },
+            { code: 'es-CL',  name: 'Spanish (Chile)' },
+            { code: 'es-CO',  name: 'Spanish (Colombia)' },
+            { code: 'es-CR',  name: 'Spanish (Costa Rica)' },
+            { code: 'es-CU',  name: 'Spanish (Cuba)' },
+            { code: 'es-DO',  name: 'Spanish (Dominican Republic)' },
+            { code: 'es-EC',  name: 'Spanish (Ecuador)' },
+            { code: 'es-SV',  name: 'Spanish (El Salvador)' },
+            { code: 'es-GQ',  name: 'Spanish (Equatorial Guinea)' },
+            { code: 'es-GT',  name: 'Spanish (Guatemala)' },
+            { code: 'es-HN',  name: 'Spanish (Honduras)' },
+            { code: 'es-MX',  name: 'Spanish (Mexico)' },
+            { code: 'es-NI',  name: 'Spanish (Nicaragua)' },
+            { code: 'es-PA',  name: 'Spanish (Panama)' },
+            { code: 'es-PY',  name: 'Spanish (Paraguay)' },
+            { code: 'es-PE',  name: 'Spanish (Peru)' },
+            { code: 'es-PR',  name: 'Spanish (Puerto Rico)' },
+            { code: 'es-ES',  name: 'Spanish (Spain)' },
+            { code: 'es-US',  name: 'Spanish (United States)' },
+            { code: 'es-UY',  name: 'Spanish (Uruguay)' },
+            { code: 'es-VE',  name: 'Spanish (Venezuela)' },
+            { code: 'su-ID',  name: 'Sundanese' },
+            { code: 'sw-KE',  name: 'Swahili (Kenya)' },
+            { code: 'sw-TZ',  name: 'Swahili (Tanzania)' },
+            { code: 'sv-SE',  name: 'Swedish' },
+            { code: 'ta-IN',  name: 'Tamil (India)' },
+            { code: 'ta-MY',  name: 'Tamil (Malaysia)' },
+            { code: 'ta-SG',  name: 'Tamil (Singapore)' },
+            { code: 'ta-LK',  name: 'Tamil (Sri Lanka)' },
+            { code: 'te-IN',  name: 'Telugu' },
+            { code: 'th-TH',  name: 'Thai' },
+            { code: 'tr-TR',  name: 'Turkish' },
+            { code: 'uk-UA',  name: 'Ukrainian' },
+            { code: 'ur-IN',  name: 'Urdu (India)' },
+            { code: 'ur-PK',  name: 'Urdu (Pakistan)' },
+            { code: 'uz-UZ',  name: 'Uzbek' },
+            { code: 'vi-VN',  name: 'Vietnamese' },
+            { code: 'cy-GB',  name: 'Welsh' },
+            { code: 'zu-ZA',  name: 'Zulu' },
+        ];
+
+        let translateCurrentLang = null;
+        let translateOriginalTitle = null;
+        let translateOriginalContent = null;
+        let translateOriginalSegments = [];
+
+        function populateTranslateDropdown() {
+            const container = document.getElementById('translateOptionsContainer');
+            if (!container || container.childElementCount > 0) return;
+            TRANSLATE_LANGUAGES.forEach(({ code, name }) => {
+                const opt = document.createElement('div');
+                opt.className = 'translate-dropdown-option';
+                opt.dataset.code = code;
+                opt.dataset.name = name.toLowerCase();
+                opt.textContent = name;
+                opt.onclick = (e) => { e.stopPropagation(); selectTranslateLanguage(code, name); };
+                container.appendChild(opt);
+            });
+        }
+
+
+        function filterTranslateLanguages() {
+            const query = (document.getElementById('translateSearchInput').value || '').toLowerCase().trim();
+            const options = document.querySelectorAll('#translateOptionsContainer .translate-dropdown-option');
+            let visibleCount = 0;
+            options.forEach(opt => {
+                const match = !query || opt.dataset.name.includes(query);
+                opt.style.display = match ? '' : 'none';
+                if (match) visibleCount++;
+            });
+            let noResults = document.getElementById('translateNoResults');
+            if (visibleCount === 0) {
+                if (!noResults) {
+                    noResults = document.createElement('div');
+                    noResults.id = 'translateNoResults';
+                    noResults.className = 'translate-no-results';
+                    noResults.textContent = 'No languages found';
+                    document.getElementById('translateOptionsContainer').appendChild(noResults);
+                }
+                noResults.style.display = '';
+            } else if (noResults) {
+                noResults.style.display = 'none';
+            }
+        }
+
+        function toggleTranslateDropdown(e) {
+            if (e) e.stopPropagation();
+            const dd = document.getElementById('translateDropdown');
+            if (!dd) return;
+            const isOpen = dd.classList.contains('open');
+            if (!isOpen) {
+                // Determine if panel should open above or below
+                const panel = document.getElementById('translateDropdownPanel');
+                const trigger = document.getElementById('translateDropdownTrigger');
+                if (panel && trigger) {
+                    const rect = trigger.getBoundingClientRect();
+                    const spaceBelow = window.innerHeight - rect.bottom;
+                    const panelHeight = Math.min(372, TRANSLATE_LANGUAGES.length * 31);
+                    if (spaceBelow < panelHeight && rect.top > panelHeight) {
+                        panel.classList.add('panel-above');
+                    } else {
+                        panel.classList.remove('panel-above');
+                    }
+                }
+            }
+            dd.classList.toggle('open');
+        }
+
+        function closeTranslateDropdown() {
+            const dd = document.getElementById('translateDropdown');
+            if (dd) dd.classList.remove('open');
+            const searchInput = document.getElementById('translateSearchInput');
+            if (searchInput) { searchInput.value = ''; filterTranslateLanguages(); }
+        }
+
+        function selectTranslateLanguage(code, name) {
+            const lbl = document.getElementById('translateDropdownLabel');
+            if (lbl) lbl.textContent = name;
+            document.querySelectorAll('.translate-dropdown-option').forEach(o => {
+                o.classList.toggle('active', o.dataset.code === code);
+            });
+            closeTranslateDropdown();
+            // Save as previous language in cookie (skip English — restoring original is not a "translation")
+            if (code !== 'en-US') translateSetPrevLangCookie(code, name);
+            onTranslateLangChange(code);
+        }
+
+        function translateSetPrevLangCookie(code, name) {
+            const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+            document.cookie = `tl_prev_code=${encodeURIComponent(code)};expires=${expires};path=/`;
+            document.cookie = `tl_prev_name=${encodeURIComponent(name)};expires=${expires};path=/`;
+        }
+
+        function translateGetPrevLangCookie() {
+            const get = (key) => {
+                const m = document.cookie.match(new RegExp('(?:^|; )' + key + '=([^;]*)'));
+                return m ? decodeURIComponent(m[1]) : null;
+            };
+            const code = get('tl_prev_code');
+            const name = get('tl_prev_name');
+            return (code && name) ? { code, name } : null;
+        }
+
+        function translateUpdatePrevLangSection(isTranslated, currentLangName) {
+            const section = document.getElementById('translatePrevLangSection');
+            if (!section) return;
+            section.innerHTML = '';
+            const prev = translateGetPrevLangCookie();
+            if (isTranslated) {
+                const a = document.createElement('a');
+                a.textContent = '↩ BACK TO: English (Original)';
+                a.addEventListener('click', function(e) { e.preventDefault(); restoreOriginalArticle(); });
+                section.appendChild(a);
+            } else if (prev) {
+                const label = document.createTextNode('⚡ TRANSLATE TO: ');
+                const a = document.createElement('a');
+                a.textContent = prev.name + ' (Previously Used)';
+                a.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    selectTranslateLanguage(prev.code, prev.name);
+                });
+                section.appendChild(label);
+                section.appendChild(a);
+            }
+            section.style.display = section.childNodes.length ? 'block' : 'none';
+        }
+
+        function showTranslateStatus(msg) {
+            const el = document.getElementById('translateStatus');
+            const txt = document.getElementById('translateStatusText');
+            if (el) el.style.display = 'flex';
+            if (txt) txt.textContent = msg;
+        }
+        function hideTranslateStatus() {
+            const el = document.getElementById('translateStatus');
+            if (el) el.style.display = 'none';
+        }
+
+        async function onTranslateLangChange(langCode) {
+            if (!langCode || langCode === 'en-US') { restoreOriginalArticle(); return; }
+            const langObj = TRANSLATE_LANGUAGES.find(l => l.code === langCode);
+            if (!langObj) return;
+            ttsStop();
+            // Disable TTS play button until first paragraph is ready
+            const playBtn = document.getElementById('ttsPlayBtn');
+            if (playBtn) playBtn.classList.add('tts-inactive');
+            showTranslateStatus('Checking database...');
+            const articleId = (currentArticle && currentArticle.id) || 0;
+
+            // Check translation cache — fail silently and fall through to streaming on any error
+            if (articleId > 0) {
+                try {
+                    const r = await fetch(`/api/articles/${articleId}/translation/${langCode}`);
+                    if (r.ok && r.headers.get('content-type')?.includes('json')) {
+                        const data = await r.json();
+                        if (data.found) {
+                            displayTranslation(data.title, data.content, langCode);
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[Translate] Cache check failed, proceeding to stream:', e.message);
+                }
+            }
+
+            // Stream translation (pass fallback content for articles not in local DB)
+            // Use saved originals if available (prevents sending already-translated content)
+            const titleEl = document.querySelector('.article-hero-title');
+            const bodyEl = document.querySelector('.article-body');
+            const fbTitle = translateOriginalTitle || (titleEl ? titleEl.textContent.trim() : '');
+            const fbContent = translateOriginalContent || (bodyEl ? bodyEl.innerHTML : '');
+            streamTranslation(articleId, langCode, langObj.name, fbTitle, fbContent);
+        }
+
+        async function streamTranslation(articleId, langCode, langName, fbTitle, fbContent) {
+            showTranslateStatus('Translating with AI...');
+            // Save originals before overwriting
+            if (!translateOriginalTitle) {
+                const titleEl = document.querySelector('.article-hero-title');
+                translateOriginalTitle = titleEl ? titleEl.textContent : '';
+                const bodyEl = document.querySelector('.article-body');
+                translateOriginalContent = bodyEl ? bodyEl.innerHTML : '';
+                translateOriginalSegments = [...ttsSegments];
+            }
+            try {
+                const response = await fetch(`/api/articles/${articleId}/translate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ language_code: langCode, language_name: langName, fallback_title: fbTitle, fallback_content: fbContent })
+                });
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let fullContent = '';
+                let titleSet = false;
+                let firstParaReady = false;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        try {
+                            const evt = JSON.parse(line.slice(6));
+                            if (evt.type === 'title' && !titleSet) {
+                                titleSet = true;
+                                const titleEl = document.querySelector('.article-hero-title');
+                                if (titleEl) titleEl.textContent = evt.title;
+                            } else if (evt.type === 'chunk') {
+                                fullContent += evt.text;
+                                const ci = fullContent.indexOf('\n\n');
+                                if (ci !== -1) {
+                                    const htmlPart = fullContent.substring(ci + 2);
+                                    const bodyEl = document.querySelector('.article-body');
+                                    if (bodyEl) {
+                                        bodyEl.innerHTML = htmlPart;
+                                        // Activate TTS after first complete paragraph arrives
+                                        if (!firstParaReady && htmlPart.includes('</p>')) {
+                                            firstParaReady = true;
+                                            translateCurrentLang = langCode;
+                                            ttsSegments = ttsExtractSegments();
+                                            const playBtn = document.getElementById('ttsPlayBtn');
+                                            if (playBtn) playBtn.classList.remove('tts-inactive');
+                                        }
+                                    }
+                                }
+                            } else if (evt.type === 'done' || evt.type === 'cached') {
+                                displayTranslation(evt.title, evt.content, langCode);
+                                return;
+                            } else if (evt.type === 'error') {
+                                hideTranslateStatus();
+                                const playBtn = document.getElementById('ttsPlayBtn');
+                                if (playBtn) playBtn.classList.remove('tts-inactive');
+                                alert('Translation failed: ' + evt.message);
+                                return;
+                            }
+                        } catch {}
+                    }
+                }
+            } catch (e) {
+                hideTranslateStatus();
+                const playBtn = document.getElementById('ttsPlayBtn');
+                if (playBtn) playBtn.classList.remove('tts-inactive');
+                console.error('Stream translation error:', e);
+            }
+        }
+
+        function displayTranslation(title, content, langCode) {
+            if (!translateOriginalTitle) {
+                const titleEl = document.querySelector('.article-hero-title');
+                translateOriginalTitle = titleEl ? titleEl.textContent : '';
+                const bodyEl = document.querySelector('.article-body');
+                translateOriginalContent = bodyEl ? bodyEl.innerHTML : '';
+                translateOriginalSegments = [...ttsSegments];
+            }
+            const titleEl = document.querySelector('.article-hero-title');
+            if (titleEl) titleEl.textContent = title;
+            const bodyEl = document.querySelector('.article-body');
+            if (bodyEl) bodyEl.innerHTML = content;
+            translateCurrentLang = langCode;
+            ttsStop();
+            ttsSegments = ttsExtractSegments();
+            hideTranslateStatus();
+            const rb = document.getElementById('translateRestoreBtn');
+            if (rb) rb.style.display = 'block';
+            // Re-enable TTS play button
+            const playBtn = document.getElementById('ttsPlayBtn');
+            if (playBtn) playBtn.classList.remove('tts-inactive');
+            // Show BACK TO link
+            const langObj = TRANSLATE_LANGUAGES.find(l => l.code === langCode);
+            translateUpdatePrevLangSection(true, langObj ? langObj.name : langCode);
+        }
+
+        function restoreOriginalArticle() {
+            if (translateOriginalTitle) {
+                const titleEl = document.querySelector('.article-hero-title');
+                if (titleEl) titleEl.textContent = translateOriginalTitle;
+            }
+            if (translateOriginalContent) {
+                const bodyEl = document.querySelector('.article-body');
+                if (bodyEl) bodyEl.innerHTML = translateOriginalContent;
+            }
+            translateCurrentLang = null;
+            translateOriginalTitle = null;
+            translateOriginalContent = null;
+            ttsStop();
+            ttsSegments = ttsExtractSegments();
+            const lbl = document.getElementById('translateDropdownLabel');
+            if (lbl) lbl.textContent = 'Select language...';
+            document.querySelectorAll('.translate-dropdown-option').forEach(o => o.classList.remove('active'));
+            const rb = document.getElementById('translateRestoreBtn');
+            if (rb) rb.style.display = 'none';
+            hideTranslateStatus();
+            // Re-enable TTS
+            const playBtn = document.getElementById('ttsPlayBtn');
+            if (playBtn) playBtn.classList.remove('tts-inactive');
+            // Show TRANSLATE TO link if previous language in cookie
+            translateUpdatePrevLangSection(false, null);
+        }
+
+        // ============================================
+        // TTS — READ ALOUD ENGINE (Microsoft Edge Neural via /api/tts)
+        // ============================================
+
+        let ttsSegments = [];
+        let ttsIsPlaying = false;
+        let ttsIsPaused = false;
+        let ttsCurrentSegIdx = -1;
+        let ttsPausedSegIdx = 0;
+        let ttsProgressInterval = null;
+        let ttsVoiceGender = 'female';
+        let ttsRate = 1;
+        const ttsSpeedOptions = [1, 1.5, 2];
+        let ttsSpeedIdx = 0;
+        let ttsAudio = null;
+        let ttsQueue = [];
+        let ttsQueueIdx = 0;
+        let ttsTotalChars = 0;
+        let ttsSpokenChars = 0;
+        let ttsElapsedSec = 0;
+        let ttsTimerInterval = null;
+        let ttsPauseTimeout = null;
+
+        function ttsExtractSegments() {
+            const body = document.querySelector('.article-body');
+            if (!body) return [];
+            const segments = [];
+            let idx = 0;
+            body.querySelectorAll('p, h2, h3, h4, li').forEach(el => {
+                const text = el.textContent.trim();
+                if (text.length > 10) {
+                    el.setAttribute('data-tts-segment', idx);
+                    segments.push(text);
+                    // Wrap individual words in spans for word-level highlighting
+                    ttsWrapWords(el, idx);
+                    idx++;
+                }
+            });
+            ttsTotalChars = segments.join('').length;
+            return segments;
+        }
+
+        // Wrap each word in a tts-word span, preserving existing HTML
+        function ttsWrapWords(el, segIdx) {
+            // Skip if already wrapped
+            if (el.querySelector('.tts-word')) return;
+            const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+            const textNodes = [];
+            while (walker.nextNode()) textNodes.push(walker.currentNode);
+            let wordIdx = 0;
+            textNodes.forEach(node => {
+                const parts = node.textContent.split(/(\s+)/);
+                if (parts.length <= 1 && !parts[0].trim()) return;
+                const frag = document.createDocumentFragment();
+                parts.forEach(part => {
+                    if (part.trim()) {
+                        const span = document.createElement('span');
+                        span.className = 'tts-word';
+                        span.setAttribute('data-tts-seg', segIdx);
+                        span.setAttribute('data-tts-widx', wordIdx++);
+                        span.textContent = part;
+                        frag.appendChild(span);
+                    } else {
+                        frag.appendChild(document.createTextNode(part));
+                    }
+                });
+                node.parentNode.replaceChild(frag, node);
+            });
+        }
+
+        // Word highlight state
+        let ttsWordTimer = null;
+        let ttsWordElements = [];
+        let ttsWordIdx = 0;
+        let ttsWordPausedIdx = 0; // saved word index when paused
+
+        function ttsWordStartHighlight(segIdx, startFromWordIdx) {
+            ttsWordStopTimer();
+            // Collect word elements for this segment
+            const segEl = document.querySelector('[data-tts-segment="' + segIdx + '"]');
+            if (!segEl) return;
+            ttsWordElements = Array.from(segEl.querySelectorAll('.tts-word'));
+            if (!ttsWordElements.length) return;
+
+            // Start from specified word index (for resume) or 0
+            ttsWordIdx = startFromWordIdx || 0;
+            // Clear any previous active word
+            ttsWordElements.forEach(el => el.classList.remove('tts-word-active'));
+
+            const totalWords = ttsWordElements.length;
+            const wordsToSpeak = totalWords - ttsWordIdx;
+            if (wordsToSpeak <= 0) return;
+
+            function step() {
+                // Remove previous highlight
+                if (ttsWordIdx > 0 && ttsWordElements[ttsWordIdx - 1]) {
+                    ttsWordElements[ttsWordIdx - 1].classList.remove('tts-word-active');
+                }
+                if (ttsWordIdx < totalWords && ttsIsPlaying) {
+                    ttsWordElements[ttsWordIdx].classList.add('tts-word-active');
+                    ttsWordPausedIdx = ttsWordIdx;
+                    ttsWordIdx++;
+                    // Calculate ms per word from remaining audio time
+                    const remaining = ttsAudio && ttsAudio.duration && isFinite(ttsAudio.duration)
+                        ? (ttsAudio.duration - ttsAudio.currentTime) * 1000
+                        : (totalWords - ttsWordIdx) * 250;
+                    const wordsLeft = totalWords - ttsWordIdx;
+                    const msPerWord = wordsLeft > 0 ? remaining / wordsLeft : 250;
+                    ttsWordTimer = setTimeout(step, Math.max(80, msPerWord / ttsRate));
+                }
+            }
+
+            // Small delay for audio to start, then begin stepping
+            ttsWordTimer = setTimeout(step, 150);
+        }
+
+        function ttsWordStopTimer() {
+            if (ttsWordTimer) { clearTimeout(ttsWordTimer); ttsWordTimer = null; }
+        }
+
+        function ttsWordClearHighlight() {
+            ttsWordStopTimer();
+            ttsWordElements.forEach(el => el.classList.remove('tts-word-active'));
+            ttsWordElements = [];
+            ttsWordIdx = 0;
+            ttsWordPausedIdx = 0;
+        }
+
+        // Click on a word to start reading from that segment
+        document.addEventListener('click', function(e) {
+            const wordEl = e.target.closest('.tts-word');
+            if (!wordEl) return;
+            const segIdx = parseInt(wordEl.getAttribute('data-tts-seg'));
+            if (isNaN(segIdx)) return;
+            if (!ttsSegments.length) ttsSegments = ttsExtractSegments();
+            // Stop current playback and start from clicked segment
+            ttsStop();
+            ttsSpeakFrom(segIdx);
+        });
+
+        // TTS pre-fetch cache: segIdx -> { url, blob } pre-downloaded audio
+        const ttsPrefetchCache = {};
+
+        async function ttsPrefetchSegment(segIdx) {
+            if (segIdx >= ttsSegments.length || ttsPrefetchCache[segIdx]) return;
+            const text = ttsSegments[segIdx];
+            const lang = translateCurrentLang || 'en-US';
+            try {
+                const response = await fetch('/api/tts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, voice: ttsVoiceGender, lang })
+                });
+                if (!response.ok) return;
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                ttsPrefetchCache[segIdx] = { url, blob };
+            } catch {}
+        }
+
+        async function ttsFetchAndPlay(segIdx) {
+            if (!ttsIsPlaying || segIdx >= ttsSegments.length) {
+                ttsIsPlaying = false;
+                ttsIsPaused = false;
+                ttsStopTimer();
+                if (segIdx >= ttsSegments.length) {
+                    ttsElapsedSec = ttsEstimateDuration();
+                    ttsUpdateTimeDisplay();
+                }
+                ttsUpdatePlayIcon();
+                ttsClearHighlights();
+                const fill = document.getElementById('ttsProgressFill');
+                if (fill) fill.style.width = segIdx >= ttsSegments.length ? '100%' : fill.style.width;
+                return;
+            }
+            ttsPausedSegIdx = segIdx;
+            ttsHighlightSegment(segIdx);
+
+            // Update progress
+            ttsSpokenChars = ttsSegments.slice(0, segIdx).join('').length;
+            ttsUpdateProgress();
+
+            const text = ttsSegments[segIdx];
+            const lang = translateCurrentLang || 'en-US';
+            try {
+                let url;
+                // Use pre-fetched audio if available
+                if (ttsPrefetchCache[segIdx]) {
+                    url = ttsPrefetchCache[segIdx].url;
+                    delete ttsPrefetchCache[segIdx];
+                } else {
+                    const response = await fetch('/api/tts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text, voice: ttsVoiceGender, lang })
+                    });
+                    if (!response.ok) throw new Error('TTS fetch failed');
+                    const blob = await response.blob();
+                    url = URL.createObjectURL(blob);
+                }
+
+                // Pre-fetch next paragraph in background while current plays
+                ttsPrefetchSegment(segIdx + 1);
+
+                ttsAudio = new Audio(url);
+                ttsAudio.playbackRate = ttsRate;
+                ttsAudio.onended = () => {
+                    URL.revokeObjectURL(url);
+                    ttsWordClearHighlight();
+                    if (ttsIsPlaying) {
+                        ttsPauseTimeout = setTimeout(() => {
+                            ttsPauseTimeout = null;
+                            if (ttsIsPlaying) ttsFetchAndPlay(segIdx + 1);
+                        }, 2000);
+                    }
+                };
+                ttsAudio.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    ttsWordClearHighlight();
+                    if (ttsIsPlaying) ttsFetchAndPlay(segIdx + 1);
+                };
+                await ttsAudio.play();
+                // Start word-level highlighting once audio begins
+                ttsWordStartHighlight(segIdx);
+            } catch (e) {
+                console.error('[TTS] Playback error:', e);
+                if (ttsIsPlaying) ttsFetchAndPlay(segIdx + 1);
+            }
+        }
+
+        function ttsSpeakFrom(fromSeg) {
+            if (ttsPauseTimeout) { clearTimeout(ttsPauseTimeout); ttsPauseTimeout = null; }
+            if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+            ttsWordClearHighlight();
+            clearInterval(ttsProgressInterval);
+            if (!ttsSegments.length) ttsSegments = ttsExtractSegments();
+            ttsPausedSegIdx = fromSeg;
+            ttsIsPaused = false;
+            ttsIsPlaying = true;
+            ttsUpdatePlayIcon();
+            ttsUpdateTimeDisplay();
+            ttsStartTimer();
+            ttsFetchAndPlay(fromSeg);
+        }
+
+        function ttsHighlightSegment(idx) {
+            if (idx === ttsCurrentSegIdx) return;
+            ttsCurrentSegIdx = idx;
+            document.querySelectorAll('[data-tts-segment]').forEach(el => {
+                el.classList.toggle('tts-speaking', parseInt(el.getAttribute('data-tts-segment')) === idx);
+            });
+            const speaking = document.querySelector('.tts-speaking');
+            if (speaking) speaking.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function ttsClearHighlights() {
+            ttsCurrentSegIdx = -1;
+            ttsWordClearHighlight();
+            document.querySelectorAll('[data-tts-segment]').forEach(el => el.classList.remove('tts-speaking'));
+        }
+
+        function ttsFormatTime(sec) {
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+        }
+
+        function ttsEstimateDuration() {
+            // ~14 chars/sec at 1x speed for neural TTS
+            if (ttsTotalChars <= 0) return 0;
+            return ttsTotalChars / (14 * ttsRate);
+        }
+
+        function ttsUpdateTimeDisplay() {
+            const elapsedEl = document.getElementById('ttsElapsed');
+            const durationEl = document.getElementById('ttsDuration');
+            if (!elapsedEl || !durationEl) return;
+            const est = ttsEstimateDuration();
+            elapsedEl.textContent = ttsFormatTime(Math.min(ttsElapsedSec, est));
+            durationEl.textContent = ttsFormatTime(est);
+        }
+
+        function ttsStartTimer() {
+            ttsStopTimer();
+            ttsTimerInterval = setInterval(() => {
+                ttsElapsedSec += 1;
+                ttsUpdateTimeDisplay();
+            }, 1000);
+        }
+
+        function ttsStopTimer() {
+            if (ttsTimerInterval) { clearInterval(ttsTimerInterval); ttsTimerInterval = null; }
+        }
+
+        function ttsResetTimer() {
+            ttsStopTimer();
+            ttsElapsedSec = 0;
+            ttsUpdateTimeDisplay();
+        }
+
+        function ttsUpdateProgress() {
+            if (ttsTotalChars <= 0) return;
+            const pct = Math.min(100, (ttsSpokenChars / ttsTotalChars) * 100);
+            const fill = document.getElementById('ttsProgressFill');
+            if (fill) fill.style.width = pct + '%';
+            // Sync elapsed estimate from progress
+            ttsElapsedSec = (pct / 100) * ttsEstimateDuration();
+            ttsUpdateTimeDisplay();
+        }
+
+        function ttsUpdatePlayIcon() {
+            const icon = document.getElementById('ttsPlayIcon');
+            if (!icon) return;
+            icon.innerHTML = ttsIsPlaying
+                ? '<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>'
+                : '<polygon points="5 3 19 12 5 21 5 3"/>';
+        }
+
+        function ttsTogglePlay() {
+            if (!ttsSegments.length) ttsSegments = ttsExtractSegments();
+            ttsUpdateTimeDisplay();
+            if (ttsIsPlaying) {
+                // Pause: keep ttsAudio alive so we can resume from same position
+                if (ttsPauseTimeout) { clearTimeout(ttsPauseTimeout); ttsPauseTimeout = null; }
+                if (ttsAudio) ttsAudio.pause();
+                ttsIsPlaying = false;
+                ttsIsPaused = true;
+                ttsStopTimer();
+                // Save word position, then stop word timer (but don't reset index)
+                ttsWordPausedIdx = ttsWordIdx > 0 ? ttsWordIdx - 1 : 0;
+                ttsWordStopTimer();
+                // Keep active word highlighted while paused (don't clear)
+            } else if (ttsIsPaused) {
+                // Resume: if audio element still exists, resume it from paused position
+                ttsIsPlaying = true;
+                ttsIsPaused = false;
+                ttsStartTimer();
+                const savedWordIdx = ttsWordPausedIdx;
+                if (ttsAudio && ttsAudio.paused && ttsAudio.currentTime > 0) {
+                    ttsAudio.play().then(() => {
+                        ttsWordStartHighlight(ttsPausedSegIdx, savedWordIdx);
+                    }).catch(() => {
+                        ttsFetchAndPlay(ttsPausedSegIdx);
+                    });
+                } else {
+                    // Audio was lost (e.g. between segments), re-fetch
+                    ttsFetchAndPlay(ttsPausedSegIdx);
+                }
+            } else {
+                ttsPausedSegIdx = 0;
+                ttsSpokenChars = 0;
+                ttsElapsedSec = 0;
+                ttsSpeakFrom(0);
+            }
+            ttsUpdatePlayIcon();
+        }
+
+        function ttsStop() {
+            if (ttsPauseTimeout) { clearTimeout(ttsPauseTimeout); ttsPauseTimeout = null; }
+            if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+            ttsIsPlaying = false;
+            ttsIsPaused = false;
+            ttsPausedSegIdx = 0;
+            ttsSpokenChars = 0;
+            clearInterval(ttsProgressInterval);
+            ttsResetTimer();
+            ttsClearHighlights();
+            const fill = document.getElementById('ttsProgressFill');
+            if (fill) fill.style.width = '0%';
+            ttsUpdatePlayIcon();
+            // Revoke and clear any pre-fetched audio
+            Object.values(ttsPrefetchCache).forEach(c => { try { URL.revokeObjectURL(c.url); } catch {} });
+            Object.keys(ttsPrefetchCache).forEach(k => delete ttsPrefetchCache[k]);
+        }
+
+        function ttsSetVoice(gender) {
+            ttsVoiceGender = gender;
+            const femaleBtn = document.getElementById('ttsGenderFemale');
+            const maleBtn = document.getElementById('ttsGenderMale');
+            const toggle = femaleBtn ? femaleBtn.closest('.tts-gender-toggle') : null;
+            if (femaleBtn) femaleBtn.classList.toggle('active', gender === 'female');
+            if (maleBtn) maleBtn.classList.toggle('active', gender === 'male');
+            if (toggle) toggle.classList.toggle('male-active', gender === 'male');
+            if (ttsIsPlaying || ttsIsPaused) {
+                // Save position: which segment and how far through it
+                const seg = ttsPausedSegIdx;
+                const savedWordIdx = ttsWordIdx > 0 ? ttsWordIdx - 1 : ttsWordPausedIdx;
+                const posRatio = ttsAudio && ttsAudio.duration && isFinite(ttsAudio.duration) && ttsAudio.duration > 0
+                    ? ttsAudio.currentTime / ttsAudio.duration : 0;
+                // Stop everything cleanly
+                if (ttsPauseTimeout) { clearTimeout(ttsPauseTimeout); ttsPauseTimeout = null; }
+                if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+                ttsWordClearHighlight();
+                // Re-fetch with new voice, then seek to approximate position
+                ttsIsPlaying = true;
+                ttsIsPaused = false;
+                ttsUpdatePlayIcon();
+                ttsStartTimer();
+                (async function() {
+                    const text = ttsSegments[seg];
+                    const lang = translateCurrentLang || 'en-US';
+                    try {
+                        const response = await fetch('/api/tts', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ text, voice: ttsVoiceGender, lang })
+                        });
+                        if (!response.ok) throw new Error('TTS fetch failed');
+                        const blob = await response.blob();
+                        const url = URL.createObjectURL(blob);
+                        ttsAudio = new Audio(url);
+                        ttsAudio.playbackRate = ttsRate;
+                        ttsHighlightSegment(seg);
+                        ttsPausedSegIdx = seg;
+                        ttsAudio.onended = () => {
+                            URL.revokeObjectURL(url);
+                            ttsWordClearHighlight();
+                            if (ttsIsPlaying) {
+                                ttsPauseTimeout = setTimeout(() => {
+                                    ttsPauseTimeout = null;
+                                    if (ttsIsPlaying) ttsFetchAndPlay(seg + 1);
+                                }, 2000);
+                            }
+                        };
+                        ttsAudio.onerror = () => {
+                            URL.revokeObjectURL(url);
+                            ttsWordClearHighlight();
+                            if (ttsIsPlaying) ttsFetchAndPlay(seg + 1);
+                        };
+                        // Seek to approximate position once metadata loads
+                        ttsAudio.onloadedmetadata = () => {
+                            if (posRatio > 0 && ttsAudio.duration && isFinite(ttsAudio.duration)) {
+                                ttsAudio.currentTime = posRatio * ttsAudio.duration;
+                            }
+                        };
+                        await ttsAudio.play();
+                        ttsPrefetchSegment(seg + 1);
+                        ttsWordStartHighlight(seg, savedWordIdx);
+                    } catch (e) {
+                        console.error('[TTS] Voice switch error:', e);
+                        if (ttsIsPlaying) ttsFetchAndPlay(seg + 1);
+                    }
+                })();
+            }
+        }
+
+        function ttsCycleSpeed() {
+            ttsSpeedIdx = (ttsSpeedIdx + 1) % ttsSpeedOptions.length;
+            ttsRate = ttsSpeedOptions[ttsSpeedIdx];
+            const btn = document.getElementById('ttsSpeedBtn');
+            if (btn) btn.textContent = ttsRate + 'x';
+            if (ttsAudio) ttsAudio.playbackRate = ttsRate;
+            ttsUpdateTimeDisplay();
+        }
+
+        function ttsHandleProgressClick(e) {
+            if (!ttsSegments.length) return;
+            const bar = document.getElementById('ttsProgressBar');
+            const rect = bar.getBoundingClientRect();
+            const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            const seg = Math.min(Math.floor(pct * ttsSegments.length), ttsSegments.length - 1);
+            ttsStop();
+            ttsSpeakFrom(seg);
+        }
+    </script>
+    <script src="/js/site-translate.js"></script>
+</body>
+</html>

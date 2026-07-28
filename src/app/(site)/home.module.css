@@ -1,0 +1,449 @@
+/* Home-page-specific styling (hero bento, sidebar, newsletter, local news).
+   Ported from index.html; shared chrome/card/grid styles live in globals.css. */
+
+.heroBento {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+  width: 100%;
+  max-width: var(--max-width);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.heroContainer {
+  position: relative;
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  background: var(--bg-card);
+  min-height: 400px;
+}
+
+.heroSlide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 2s ease-in-out;
+  pointer-events: none;
+  cursor: pointer;
+}
+
+.heroSlide.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.heroSlide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.heroOverlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: var(--space-xl);
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
+}
+
+.heroRank {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: var(--space-sm);
+  background: var(--accent-gold);
+  color: var(--bg-primary);
+}
+
+.heroTitle {
+  font-size: var(--font-2xl);
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: var(--space-sm);
+  color: var(--text-primary);
+}
+
+.heroExcerpt {
+  font-size: var(--font-base);
+  color: var(--text-secondary);
+  line-height: 1.5;
+  max-width: 600px;
+  margin-bottom: var(--space-md);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.heroReadMore {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--accent-gold);
+  color: var(--bg-primary);
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: var(--font-sm);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.heroReadMore:hover {
+  background: var(--accent-gold-hover);
+}
+
+.heroProgress {
+  position: absolute;
+  bottom: var(--space-md);
+  right: var(--space-md);
+  display: flex;
+  gap: var(--space-xs);
+  z-index: 10;
+}
+
+.heroDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  padding: 0;
+}
+
+.heroDot.active {
+  background: var(--accent-gold);
+  width: 24px;
+  border-radius: 4px;
+}
+
+.heroLoading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 400px;
+  gap: var(--space-md);
+}
+
+.heroLoadingText {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+}
+
+/* Hero empty/error state (shown once loading finishes with no stories) */
+.heroStateIcon {
+  font-size: 40px;
+  line-height: 1;
+}
+
+.heroStateTitle {
+  font-size: var(--font-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.heroRetryBtn {
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--accent-gold);
+  color: var(--bg-primary);
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: var(--font-sm);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.heroRetryBtn:hover {
+  background: var(--accent-gold-hover);
+}
+
+/* Sidebar */
+.heroSidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  align-self: start;
+}
+
+.heroSidebarCard {
+  position: relative;
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  height: 185px;
+}
+
+.heroSidebarCard:hover {
+  background: var(--bg-card-hover);
+}
+
+.heroSidebarCard img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.heroSidebarOverlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: var(--space-md);
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+}
+
+.heroSidebarCategory {
+  display: inline-block;
+  color: var(--accent-gold);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: var(--space-xs);
+}
+
+.heroSidebarTitle {
+  font-size: var(--font-base);
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Newsletter card */
+.newsletterCard {
+  flex: 0 0 300px;
+  width: 300px;
+  background: var(--bg-card);
+  border-radius: var(--card-radius);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.newsletterTitle {
+  font-size: var(--font-md);
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+}
+
+.newsletterDesc {
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-md);
+  line-height: 1.5;
+}
+
+.newsletterInput {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: var(--font-sm);
+  margin-bottom: var(--space-sm);
+  box-sizing: border-box;
+}
+
+.newsletterBtn {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--accent-gold);
+  border: none;
+  border-radius: 8px;
+  color: var(--bg-primary);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.newsletterBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.newsletterMsg {
+  font-size: var(--font-xs);
+  min-height: 16px;
+  margin-bottom: var(--space-xs);
+}
+
+.newsletterMsg.success {
+  color: var(--accent-green);
+}
+
+.newsletterMsg.error {
+  color: var(--accent-red);
+}
+
+/* ---------------------------------------------------------------------------
+   In-grid widget cards (compact Weather / Finance / Sports cards in the feed).
+   Sized like a .content-card (300×304) so they slot into the .content-grid.
+--------------------------------------------------------------------------- */
+.widgetCard {
+  flex: 0 0 300px;
+  width: 300px;
+  height: 304px;
+  background: var(--bg-card);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-lg);
+  box-sizing: border-box;
+  text-decoration: none;
+  color: inherit;
+}
+
+.widgetCard:hover {
+  background: var(--bg-card-hover);
+}
+
+.widgetHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+}
+
+.widgetKicker {
+  font-size: 10px;
+  color: var(--accent-gold);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.widgetArrow {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.widgetBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  flex: 1;
+  min-height: 0;
+}
+
+.widgetFoot {
+  margin-top: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Weather widget */
+.weatherTop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.weatherIcon {
+  font-size: 44px;
+  line-height: 1;
+}
+
+.weatherTemp {
+  font-size: 38px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.weatherCity {
+  font-size: var(--font-md);
+  font-weight: 600;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.weatherCond {
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}
+
+/* Finance + sports rows */
+.widgetRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-size: var(--font-sm);
+}
+
+.widgetRowName {
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 1;
+}
+
+.widgetRowValue {
+  color: var(--text-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.widgetUp {
+  color: var(--accent-green);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.widgetDown {
+  color: var(--accent-red);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.widgetTitle {
+  font-size: var(--font-md);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+
+@media (max-width: 955px) {
+  .heroBento {
+    grid-template-columns: 1fr;
+  }
+
+  .heroSidebar {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .heroSidebarCard {
+    flex: 0 0 70%;
+  }
+}

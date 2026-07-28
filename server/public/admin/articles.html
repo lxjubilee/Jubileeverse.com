@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="JubileeVerse Admin - Articles Management">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Articles Management - JubileeVerse Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1b1b1b;
+            --bg-secondary: #242424;
+            --bg-tertiary: #2d2d2d;
+            --bg-card: #2d2d2d;
+            --bg-card-hover: #3a3a3a;
+            --text-primary: #ffffff;
+            --text-secondary: #c4c4c4;
+            --text-muted: #8a8a8a;
+            --accent-gold: #E6AC00;
+            --accent-gold-hover: #F5C518;
+            --accent-blue: #0078d4;
+            --accent-red: #d13438;
+            --accent-green: #107c10;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --border-hover: rgba(255, 255, 255, 0.2);
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 12px;
+            --space-lg: 16px;
+            --space-xl: 24px;
+            --space-2xl: 32px;
+            --font-xs: 11px;
+            --font-sm: 12px;
+            --font-base: 14px;
+            --font-md: 16px;
+            --font-lg: 18px;
+            --font-xl: 20px;
+            --category-panel-width: 280px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* HEADER */
+        .admin-header {
+            background: var(--bg-secondary);
+            padding: 0 var(--space-lg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 56px;
+        }
+        .admin-header h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: var(--font-lg);
+            font-weight: 700;
+            color: var(--accent-gold);
+        }
+        .header-actions { display: flex; align-items: center; gap: var(--space-md); }
+        .header-actions a, .header-actions button {
+            color: var(--text-secondary);
+            background: none;
+            border: 1px solid var(--border-color);
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: var(--font-sm);
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .header-actions a:hover, .header-actions button:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-gold);
+        }
+
+        /* LAYOUT */
+        .dashboard-container {
+            display: flex;
+            height: calc(100vh - 56px);
+            overflow: hidden;
+        }
+
+        /* CATEGORY PANEL */
+        .category-panel {
+            width: var(--category-panel-width);
+            min-width: 220px;
+            max-width: 400px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .category-panel-header {
+            padding: var(--space-md) var(--space-lg);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: var(--font-base);
+            color: var(--accent-gold);
+        }
+        .category-search {
+            padding: var(--space-sm) var(--space-md);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .category-search input {
+            width: 100%;
+            padding: 7px 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: var(--font-sm);
+            outline: none;
+        }
+        .category-search input:focus { border-color: var(--accent-gold); }
+        .category-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-sm) 0;
+        }
+        .category-list::-webkit-scrollbar { width: 6px; }
+        .category-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+        .cat-node {
+            display: flex;
+            align-items: center;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: var(--font-sm);
+            color: var(--text-secondary);
+            transition: background 0.15s;
+            user-select: none;
+        }
+        .cat-node:hover { background: var(--bg-card-hover); }
+        .cat-node.active { background: rgba(230,172,0,0.12); color: var(--accent-gold); font-weight: 600; }
+        .cat-node .toggle {
+            width: 18px;
+            text-align: center;
+            font-size: 10px;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            margin-right: 4px;
+        }
+        .cat-children { display: none; }
+        .cat-children.open { display: block; }
+        .cat-children .cat-node { padding-left: 28px; }
+        .cat-children .cat-children .cat-node { padding-left: 44px; }
+
+        /* RESIZE HANDLE */
+        .resize-handle {
+            width: 4px;
+            cursor: col-resize;
+            background: transparent;
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+        .resize-handle:hover, .resize-handle.dragging { background: var(--accent-gold); }
+
+        /* ARTICLE PANEL */
+        .article-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* BULK TOOLBAR */
+        .bulk-toolbar {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            padding: var(--space-md) var(--space-lg);
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            flex-wrap: wrap;
+        }
+        .bulk-toolbar label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: var(--font-sm);
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+        .bulk-toolbar .selected-count {
+            font-size: var(--font-sm);
+            color: var(--accent-gold);
+            font-weight: 600;
+            min-width: 80px;
+        }
+        .bulk-btn {
+            padding: 5px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: var(--font-sm);
+            transition: all 0.2s;
+        }
+        .bulk-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .bulk-btn.activate:not(:disabled):hover { background: var(--accent-green); color: #fff; border-color: var(--accent-green); }
+        .bulk-btn.deactivate:not(:disabled):hover { background: var(--accent-red); color: #fff; border-color: var(--accent-red); }
+        .toolbar-spacer { flex: 1; }
+        .article-count { font-size: var(--font-sm); color: var(--text-muted); }
+
+        /* TABLE */
+        .table-container {
+            flex: 1;
+            overflow: auto;
+        }
+        .table-container::-webkit-scrollbar { width: 6px; height: 6px; }
+        .table-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--font-sm);
+        }
+        thead th {
+            position: sticky;
+            top: 0;
+            background: var(--bg-tertiary);
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+            z-index: 2;
+        }
+        thead th.stat-col { text-align: center; min-width: 60px; }
+        tbody tr {
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            transition: background 0.15s;
+        }
+        tbody tr:hover { background: var(--bg-card-hover); }
+        td {
+            padding: 10px 12px;
+            vertical-align: middle;
+        }
+        td.title-col {
+            max-width: 320px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        td.stat-cell { text-align: center; color: var(--text-muted); }
+        td input[type="checkbox"], th input[type="checkbox"] { accent-color: var(--accent-gold); cursor: pointer; }
+
+        /* BADGES */
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: var(--font-xs);
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        .badge-article { background: rgba(0,120,212,0.2); color: #5bb8ff; }
+        .badge-current-event { background: rgba(230,172,0,0.2); color: var(--accent-gold); }
+        .badge-published, .badge-approved { background: rgba(16,124,16,0.2); color: #5cdb5c; }
+        .badge-unpublished, .badge-unapproved { background: rgba(209,52,56,0.2); color: #ff7b7f; }
+
+        /* ROW ACTIONS */
+        .row-actions { display: flex; gap: 6px; white-space: nowrap; }
+        .action-btn {
+            padding: 4px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: var(--font-xs);
+            transition: all 0.15s;
+        }
+        .action-btn:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
+        .action-btn.edit:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+        /* EMPTY STATE */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            font-size: var(--font-base);
+            gap: var(--space-md);
+        }
+        .empty-state svg { width: 48px; height: 48px; opacity: 0.3; }
+
+        /* MODAL */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-lg) var(--space-xl);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .modal-header h2 {
+            font-size: var(--font-lg);
+            color: var(--accent-gold);
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .modal-close:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+        .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-xl);
+        }
+        .modal-body::-webkit-scrollbar { width: 6px; }
+        .modal-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+        .form-group { margin-bottom: var(--space-lg); }
+        .form-group label {
+            display: block;
+            font-size: var(--font-sm);
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: var(--font-base);
+            font-family: inherit;
+            outline: none;
+        }
+        .form-group input:focus, .form-group textarea:focus { border-color: var(--accent-gold); }
+        .form-group textarea { min-height: 300px; resize: vertical; line-height: 1.6; }
+        .form-row { display: flex; gap: var(--space-lg); }
+        .form-row .form-group { flex: 1; }
+        .modal-footer {
+            padding: var(--space-lg) var(--space-xl);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--space-md);
+        }
+        .modal-footer button {
+            padding: 8px 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: var(--font-base);
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-cancel { background: transparent; color: var(--text-secondary); }
+        .btn-cancel:hover { border-color: var(--text-muted); }
+        .btn-save { background: var(--accent-gold); color: #000; border-color: var(--accent-gold); }
+        .btn-save:hover { background: var(--accent-gold-hover); }
+
+        /* LOADING */
+        .loading { text-align: center; padding: 40px; color: var(--text-muted); }
+        .spinner {
+            display: inline-block;
+            width: 24px; height: 24px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-gold);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* TOAST */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: var(--font-sm);
+            color: #fff;
+            z-index: 9999;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background: var(--accent-green); }
+        .toast.error { background: var(--accent-red); }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="admin-header">
+        <h1>ARTICLES MANAGEMENT</h1>
+        <div class="header-actions">
+            <a href="/admin/dashboard.html">Dashboard</a>
+            <button id="btnLogout" onclick="logout()">Sign Out</button>
+        </div>
+    </header>
+
+    <!-- MAIN LAYOUT -->
+    <div class="dashboard-container">
+        <!-- CATEGORY PANEL -->
+        <div class="category-panel" id="categoryPanel">
+            <div class="category-panel-header">Categories</div>
+            <div class="category-search">
+                <input type="text" id="catSearch" placeholder="Search categories..." oninput="filterCategories(this.value)">
+            </div>
+            <div class="category-list" id="categoryList">
+                <div class="loading"><div class="spinner"></div><br>Loading...</div>
+            </div>
+        </div>
+
+        <!-- RESIZE HANDLE -->
+        <div class="resize-handle" id="resizeHandle"></div>
+
+        <!-- ARTICLE PANEL -->
+        <div class="article-panel" id="articlePanel">
+            <div class="bulk-toolbar" id="bulkToolbar">
+                <label><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)"> Select All</label>
+                <span class="selected-count" id="selectedCount">0 selected</span>
+                <button class="bulk-btn activate" id="bulkActivateBtn" disabled onclick="bulkAction('activate')">Activate</button>
+                <button class="bulk-btn deactivate" id="bulkDeactivateBtn" disabled onclick="bulkAction('deactivate')">Deactivate</button>
+                <div class="toolbar-spacer"></div>
+                <span class="article-count" id="articleCount"></span>
+            </div>
+            <div class="table-container" id="tableContainer">
+                <div class="empty-state" id="emptyState">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-3-3v6m-7 4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    <span>Select a category to view articles</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT MODAL -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modalTitle">Edit Article</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Title</label>
+                        <input type="text" id="editTitle">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Author / Source</label>
+                        <input type="text" id="editAuthor" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Type</label>
+                        <input type="text" id="editType" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="editStatus">
+                            <option value="published">Published</option>
+                            <option value="unpublished">Unpublished</option>
+                            <option value="approved">Approved</option>
+                            <option value="unapproved">Unapproved</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Content (Markdown)</label>
+                    <textarea id="editContent"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+                <button class="btn-save" id="btnSave" onclick="saveArticle()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+    (function() {
+        'use strict';
+
+        // =============================================
+        // AUTH
+        // =============================================
+        function getAuthToken() {
+            try {
+                var auth = JSON.parse(localStorage.getItem('jubileeVerseAuth') || '{}');
+                return auth.token || (auth.tokens && (auth.tokens.access || auth.tokens.accessToken)) || '';
+            } catch(e) { return ''; }
+        }
+
+        function isReviewer() {
+            try {
+                var auth = JSON.parse(localStorage.getItem('jubileeVerseAuth') || '{}');
+                return !!(auth.authenticated && auth.user && auth.user.role === 'reviewer');
+            } catch(e) { return false; }
+        }
+
+        function logout() {
+            localStorage.removeItem('jubileeVerseAuth');
+            window.location.href = '/signin';
+        }
+
+        // Auth guard
+        if (!isReviewer()) {
+            alert('Reviewer access required. Please sign in.');
+            window.location.href = '/signin';
+        }
+
+        // =============================================
+        // STATE
+        // =============================================
+        var currentCategoryId = null;
+        var currentArticles = [];
+        var currentStats = {};
+        var editingArticle = null; // { id, source_type }
+        var expandedNodes = {};
+        try { expandedNodes = JSON.parse(localStorage.getItem('jvAdminExpanded') || '{}'); } catch(e) {}
+
+        // =============================================
+        // CATEGORY TREE
+        // =============================================
+        var ROOT_IDS = [64166, 64148];
+        var categoryCache = {};
+
+        async function loadRootCategories() {
+            var catList = document.getElementById('categoryList');
+            try {
+                var all = [];
+                for (var i = 0; i < ROOT_IDS.length; i++) {
+                    var token = getAuthToken();
+                    var resp = await fetch('/api/admin/categories?parent_id=' + ROOT_IDS[i], {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    var data = await resp.json();
+                    if (data.success && data.categories) all = all.concat(data.categories);
+                }
+                all.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+                categoryCache['root'] = all;
+                renderCategoryList(all, catList, 0);
+            } catch(e) {
+                catList.innerHTML = '<div class="loading" style="color:var(--accent-red)">Failed to load categories</div>';
+            }
+        }
+
+        function renderCategoryList(categories, container, depth) {
+            container.innerHTML = '';
+            categories.forEach(function(cat) {
+                var wrapper = document.createElement('div');
+                wrapper.className = 'cat-wrapper';
+                wrapper.setAttribute('data-name', (cat.name || '').toLowerCase());
+                wrapper.setAttribute('data-id', cat.id);
+
+                var node = document.createElement('div');
+                node.className = 'cat-node' + (currentCategoryId === cat.id ? ' active' : '');
+                node.setAttribute('data-id', cat.id);
+
+                var toggle = document.createElement('span');
+                toggle.className = 'toggle';
+                toggle.textContent = expandedNodes[cat.id] ? '▾' : '▸';
+                toggle.onclick = function(e) { e.stopPropagation(); toggleCategory(cat.id, wrapper); };
+
+                var label = document.createElement('span');
+                label.textContent = cat.name;
+                label.style.flex = '1';
+
+                node.appendChild(toggle);
+                node.appendChild(label);
+                node.onclick = function() { selectCategory(cat.id, node); };
+
+                wrapper.appendChild(node);
+
+                var children = document.createElement('div');
+                children.className = 'cat-children' + (expandedNodes[cat.id] ? ' open' : '');
+                children.id = 'children-' + cat.id;
+                wrapper.appendChild(children);
+
+                if (expandedNodes[cat.id]) loadChildren(cat.id, children, depth + 1);
+
+                container.appendChild(wrapper);
+            });
+        }
+
+        async function loadChildren(parentId, container, depth) {
+            if (categoryCache[parentId]) {
+                renderCategoryList(categoryCache[parentId], container, depth);
+                return;
+            }
+            container.innerHTML = '<div style="padding:6px 12px;color:var(--text-muted);font-size:11px">Loading...</div>';
+            try {
+                var token = getAuthToken();
+                var resp = await fetch('/api/admin/categories?parent_id=' + parentId, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                var data = await resp.json();
+                var cats = (data.success && data.categories) ? data.categories : [];
+                cats.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+                categoryCache[parentId] = cats;
+                if (cats.length === 0) {
+                    container.innerHTML = '<div style="padding:6px 28px;color:var(--text-muted);font-size:11px;font-style:italic">No subcategories</div>';
+                } else {
+                    renderCategoryList(cats, container, depth);
+                }
+            } catch(e) {
+                container.innerHTML = '<div style="padding:6px 12px;color:var(--accent-red);font-size:11px">Error loading</div>';
+            }
+        }
+
+        function toggleCategory(catId, wrapper) {
+            var children = wrapper.querySelector('.cat-children');
+            var toggle = wrapper.querySelector('.toggle');
+            if (children.classList.contains('open')) {
+                children.classList.remove('open');
+                toggle.textContent = '▸';
+                delete expandedNodes[catId];
+            } else {
+                children.classList.add('open');
+                toggle.textContent = '▾';
+                expandedNodes[catId] = true;
+                if (!children.querySelector('.cat-wrapper')) {
+                    loadChildren(catId, children, 1);
+                }
+            }
+            localStorage.setItem('jvAdminExpanded', JSON.stringify(expandedNodes));
+        }
+
+        function selectCategory(catId, nodeEl) {
+            document.querySelectorAll('.cat-node.active').forEach(function(n) { n.classList.remove('active'); });
+            if (nodeEl) nodeEl.classList.add('active');
+            currentCategoryId = catId;
+            loadArticlesForCategory(catId);
+        }
+
+        function filterCategories(query) {
+            var q = query.toLowerCase();
+            document.querySelectorAll('.cat-wrapper').forEach(function(w) {
+                var name = w.getAttribute('data-name') || '';
+                w.style.display = !q || name.includes(q) ? '' : 'none';
+            });
+        }
+
+        // =============================================
+        // ARTICLE TABLE
+        // =============================================
+        async function loadArticlesForCategory(categoryId) {
+            var container = document.getElementById('tableContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><br>Loading articles...</div>';
+            document.getElementById('selectAll').checked = false;
+            updateBulkToolbar();
+
+            var token = getAuthToken();
+            try {
+                var resp = await fetch('/api/admin/articles-mgmt?category_id=' + categoryId + '&aggregate=true', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                var data = await resp.json();
+                if (!data.success) throw new Error(data.error || 'Failed');
+
+                currentArticles = data.articles || [];
+
+                // Build article keys for stats request
+                var keys = currentArticles.map(function(a) {
+                    return (a.source_type === 'article' ? 'a:' : 'ce:') + a.id;
+                });
+
+                currentStats = {};
+                if (keys.length > 0) {
+                    try {
+                        var statsResp = await fetch('/api/admin/article-stats?ids=' + encodeURIComponent(keys.join(',')), {
+                            headers: { 'Authorization': 'Bearer ' + token }
+                        });
+                        var statsData = await statsResp.json();
+                        if (statsData.success) currentStats = statsData.stats;
+                    } catch(e) { /* stats unavailable */ }
+                }
+
+                renderArticleTable();
+            } catch(e) {
+                container.innerHTML = '<div class="empty-state"><span style="color:var(--accent-red)">Error: ' + escapeHtml(e.message) + '</span></div>';
+            }
+        }
+
+        function renderArticleTable() {
+            var container = document.getElementById('tableContainer');
+
+            if (currentArticles.length === 0) {
+                container.innerHTML = '<div class="empty-state"><span>No articles in this category</span></div>';
+                document.getElementById('articleCount').textContent = '';
+                return;
+            }
+
+            document.getElementById('articleCount').textContent = currentArticles.length + ' article' + (currentArticles.length !== 1 ? 's' : '');
+
+            var html = '<table><thead><tr>';
+            html += '<th style="width:36px"><input type="checkbox" id="selectAllHeader" onchange="document.getElementById(\'selectAll\').checked=this.checked; window._toggleSelectAll(this.checked)"></th>';
+            html += '<th>Title</th>';
+            html += '<th>Type</th>';
+            html += '<th>Status</th>';
+            html += '<th>Created</th>';
+            html += '<th>Published</th>';
+            html += '<th class="stat-col">Likes</th>';
+            html += '<th class="stat-col">Dislikes</th>';
+            html += '<th class="stat-col">Views</th>';
+            html += '<th class="stat-col">Clicks</th>';
+            html += '<th>Actions</th>';
+            html += '</tr></thead><tbody>';
+
+            currentArticles.forEach(function(a) {
+                var key = (a.source_type === 'article' ? 'a:' : 'ce:') + a.id;
+                var stat = currentStats[key] || { views: 0, clicks: 0, likes: 0, dislikes: 0 };
+                var isActive = (a.source_type === 'article')
+                    ? (a.status === 'published')
+                    : (a.status === 'approved' || a.approved === true);
+                var statusLabel = a.source_type === 'article'
+                    ? (a.status || 'published')
+                    : (isActive ? 'approved' : 'unapproved');
+                var statusClass = isActive ? 'badge-published' : 'badge-unpublished';
+                var typeClass = a.source_type === 'article' ? 'badge-article' : 'badge-current-event';
+                var typeLabel = a.source_type === 'article' ? 'Article' : 'Current Event';
+
+                html += '<tr data-id="' + a.id + '" data-type="' + a.source_type + '">';
+                html += '<td><input type="checkbox" class="row-cb" value="' + a.id + ':' + a.source_type + '" onchange="window._updateBulkToolbar()"></td>';
+                html += '<td class="title-col" title="' + escapeHtml(a.title || '') + '">' + escapeHtml(a.title || 'Untitled') + '</td>';
+                html += '<td><span class="badge ' + typeClass + '">' + typeLabel + '</span></td>';
+                html += '<td><span class="badge ' + statusClass + '">' + capitalize(statusLabel) + '</span></td>';
+                html += '<td>' + formatDate(a.created_at) + '</td>';
+                html += '<td>' + formatDate(a.updated_at || a.pub_date) + '</td>';
+                html += '<td class="stat-cell">' + stat.likes + '</td>';
+                html += '<td class="stat-cell">' + stat.dislikes + '</td>';
+                html += '<td class="stat-cell">' + stat.views + '</td>';
+                html += '<td class="stat-cell">' + stat.clicks + '</td>';
+                html += '<td class="row-actions">';
+                html += '<button class="action-btn" onclick="window._toggleStatus(\'' + a.source_type + '\', ' + a.id + ', ' + isActive + ', this)">' + (isActive ? 'Deactivate' : 'Activate') + '</button>';
+                html += '<button class="action-btn edit" onclick="window._openEditModal(\'' + a.source_type + '\', ' + a.id + ')">Edit</button>';
+                html += '</td>';
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // =============================================
+        // BULK ACTIONS
+        // =============================================
+        function toggleSelectAll(checked) {
+            document.querySelectorAll('.row-cb').forEach(function(cb) { cb.checked = checked; });
+            updateBulkToolbar();
+        }
+
+        function updateBulkToolbar() {
+            var checked = document.querySelectorAll('.row-cb:checked');
+            var count = checked.length;
+            document.getElementById('selectedCount').textContent = count + ' selected';
+            document.getElementById('bulkActivateBtn').disabled = count === 0;
+            document.getElementById('bulkDeactivateBtn').disabled = count === 0;
+        }
+
+        async function bulkAction(action) {
+            var checked = Array.from(document.querySelectorAll('.row-cb:checked'));
+            if (checked.length === 0) return;
+
+            var items = checked.map(function(cb) {
+                var parts = cb.value.split(':');
+                return { id: parseInt(parts[0]), source_type: parts[1] };
+            });
+
+            var token = getAuthToken();
+            try {
+                var resp = await fetch('/api/admin/articles-mgmt/bulk-status', {
+                    method: 'PATCH',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items: items, action: action })
+                });
+                var data = await resp.json();
+                if (data.success) {
+                    showToast((action === 'activate' ? 'Activated' : 'Deactivated') + ' ' + items.length + ' article(s)', 'success');
+                    loadArticlesForCategory(currentCategoryId);
+                } else {
+                    showToast('Error: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch(e) {
+                showToast('Network error', 'error');
+            }
+        }
+
+        // =============================================
+        // INDIVIDUAL STATUS TOGGLE
+        // =============================================
+        async function toggleStatus(sourceType, articleId, currentlyActive, btn) {
+            var action = currentlyActive ? 'deactivate' : 'activate';
+            btn.disabled = true;
+            btn.textContent = '...';
+            var token = getAuthToken();
+            try {
+                var resp = await fetch('/api/admin/articles-mgmt/' + sourceType + '/' + articleId + '/status', {
+                    method: 'PATCH',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: action })
+                });
+                var data = await resp.json();
+                if (data.success) {
+                    showToast(action === 'activate' ? 'Activated' : 'Deactivated', 'success');
+                    loadArticlesForCategory(currentCategoryId);
+                } else {
+                    showToast('Error: ' + (data.error || 'Failed'), 'error');
+                    btn.disabled = false;
+                    btn.textContent = currentlyActive ? 'Deactivate' : 'Activate';
+                }
+            } catch(e) {
+                showToast('Network error', 'error');
+                btn.disabled = false;
+                btn.textContent = currentlyActive ? 'Deactivate' : 'Activate';
+            }
+        }
+
+        // =============================================
+        // EDIT MODAL
+        // =============================================
+        async function openEditModal(sourceType, articleId) {
+            editingArticle = { id: articleId, source_type: sourceType };
+            var token = getAuthToken();
+            document.getElementById('modalTitle').textContent = 'Edit ' + (sourceType === 'article' ? 'Article' : 'Current Event');
+            document.getElementById('btnSave').disabled = true;
+            document.getElementById('editTitle').value = '';
+            document.getElementById('editAuthor').value = '';
+            document.getElementById('editContent').value = '';
+            document.getElementById('editModal').classList.add('open');
+
+            try {
+                var url, resp, data;
+                if (sourceType === 'article') {
+                    url = '/api/admin/articles/' + articleId;
+                    resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+                    data = await resp.json();
+                    if (data.success !== false && data.article) {
+                        var art = data.article;
+                        document.getElementById('editTitle').value = art.title || '';
+                        document.getElementById('editAuthor').value = art.author || '';
+                        document.getElementById('editType').value = 'Article (' + (art.content_type || 'article') + ')';
+                        document.getElementById('editContent').value = art.content || '';
+                        // Status options for articles
+                        var statusSel = document.getElementById('editStatus');
+                        statusSel.innerHTML = '<option value="published">Published</option><option value="unpublished">Unpublished</option>';
+                        statusSel.value = art.status || 'published';
+                    }
+                } else {
+                    url = '/api/admin/current-events/' + articleId;
+                    resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+                    data = await resp.json();
+                    if (data.success && data.article) {
+                        var ce = data.article;
+                        document.getElementById('editTitle').value = ce.headline || '';
+                        document.getElementById('editAuthor').value = ce.source_name || '';
+                        document.getElementById('editType').value = 'Current Event (' + (ce.topic || '') + ')';
+                        document.getElementById('editContent').value = ce.full_article || ce.excerpt || '';
+                        var statusSel2 = document.getElementById('editStatus');
+                        statusSel2.innerHTML = '<option value="approved">Approved</option><option value="unapproved">Unapproved</option>';
+                        statusSel2.value = ce.approved ? 'approved' : 'unapproved';
+                    }
+                }
+                document.getElementById('btnSave').disabled = false;
+            } catch(e) {
+                showToast('Failed to load article', 'error');
+            }
+        }
+
+        async function saveArticle() {
+            if (!editingArticle) return;
+            var token = getAuthToken();
+            var title = document.getElementById('editTitle').value.trim();
+            var content = document.getElementById('editContent').value;
+            var status = document.getElementById('editStatus').value;
+            var btn = document.getElementById('btnSave');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            try {
+                if (editingArticle.source_type === 'article') {
+                    await fetch('/api/admin/articles/' + editingArticle.id, {
+                        method: 'PUT',
+                        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title: title, content: content, status: status })
+                    });
+                } else {
+                    // Update headline + full_article via existing PATCH
+                    await fetch('/api/current-events/' + editingArticle.id, {
+                        method: 'PATCH',
+                        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ headline: title, full_article: content })
+                    });
+                    // Update status separately
+                    var action = status === 'approved' ? 'activate' : 'deactivate';
+                    await fetch('/api/admin/articles-mgmt/current_event/' + editingArticle.id + '/status', {
+                        method: 'PATCH',
+                        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: action })
+                    });
+                }
+                showToast('Article saved', 'success');
+                closeModal();
+                loadArticlesForCategory(currentCategoryId);
+            } catch(e) {
+                showToast('Save failed: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save Changes';
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('editModal').classList.remove('open');
+            editingArticle = null;
+        }
+
+        // Close modal on overlay click
+        document.getElementById('editModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        // Close modal on Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        // =============================================
+        // RESIZE HANDLE
+        // =============================================
+        (function() {
+            var handle = document.getElementById('resizeHandle');
+            var panel = document.getElementById('categoryPanel');
+            var dragging = false;
+
+            handle.addEventListener('mousedown', function(e) {
+                dragging = true;
+                handle.classList.add('dragging');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!dragging) return;
+                var newWidth = Math.max(200, Math.min(500, e.clientX));
+                panel.style.width = newWidth + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+                if (!dragging) return;
+                dragging = false;
+                handle.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            });
+        })();
+
+        // =============================================
+        // UTILITIES
+        // =============================================
+        function escapeHtml(str) {
+            var div = document.createElement('div');
+            div.textContent = str || '';
+            return div.innerHTML;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            try {
+                var d = new Date(dateStr);
+                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            } catch(e) { return '-'; }
+        }
+
+        function capitalize(s) {
+            return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+        }
+
+        function showToast(msg, type) {
+            var el = document.getElementById('toast');
+            el.textContent = msg;
+            el.className = 'toast ' + (type || 'success') + ' show';
+            clearTimeout(el._timeout);
+            el._timeout = setTimeout(function() { el.classList.remove('show'); }, 3000);
+        }
+
+        // Expose functions to global scope for inline onclick handlers
+        window._toggleSelectAll = toggleSelectAll;
+        window._updateBulkToolbar = updateBulkToolbar;
+        window._toggleStatus = toggleStatus;
+        window._openEditModal = openEditModal;
+        window.logout = logout;
+        window.filterCategories = filterCategories;
+        window.bulkAction = bulkAction;
+
+        // =============================================
+        // INIT
+        // =============================================
+        loadRootCategories();
+
+    })();
+    </script>
+</body>
+</html>

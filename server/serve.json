@@ -1,0 +1,9 @@
+{
+  "public": ".",
+  "rewrites": [
+    { "source": "/article", "destination": "/article.html" },
+    { "source": "/scanner", "destination": "/scanner.html" }
+  ],
+  "trailingSlash": false,
+  "cleanUrls": true
+}

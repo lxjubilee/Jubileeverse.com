@@ -1,0 +1,386 @@
+/* ============================================================================
+   FINANCE module — ported from the original static finance.html inline <style>.
+   The site header/nav/footer come from the (site) layout, so this module omits
+   the page's own header/back-link styles and keeps only the finance-specific
+   layout: market tabs, indices banner, stat cards, stock table, news grid and
+   the loading spinner. Design tokens (var(--bg-*), var(--accent-*), etc.) are
+   defined globally and reused here (with the page's local --accent-green/red
+   tweaks preserved as literals to match the original colors).
+   ============================================================================ */
+
+/* The original page used slightly different green/red than the global tokens;
+   keep them faithful by scoping local overrides on the page wrapper. */
+.financePage {
+  --finance-green: #0a8043;
+  --finance-red: #d93025;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  width: 100%;
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 16px;
+}
+
+.loadingSpinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--accent-gold);
+  border-radius: 50%;
+  animation: financeSpin 0.8s linear infinite;
+}
+
+.loadingText {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+@keyframes financeSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Market tabs */
+.marketTabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+
+.marketTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.marketTab {
+  flex-shrink: 0;
+  padding: 8px 20px;
+  border-radius: 24px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+}
+
+.marketTab:hover {
+  border-color: var(--accent-gold);
+  color: var(--text-primary);
+}
+
+.marketTab.active {
+  background: var(--accent-gold);
+  color: #000;
+  border-color: var(--accent-gold);
+  font-weight: 600;
+}
+
+/* Market indices banner */
+.indicesBanner {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 24px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.indicesBanner::-webkit-scrollbar {
+  height: 4px;
+}
+
+.indicesBanner::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.indexCard {
+  flex: 0 0 200px;
+  background: var(--bg-card);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border-color);
+  padding: 16px;
+  transition: border-color 0.2s;
+}
+
+.indexCard:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.indexCardName {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.indexCardValue {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.indexCardChange {
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.indexCardChange.positive {
+  color: var(--finance-green);
+}
+
+.indexCardChange.negative {
+  color: var(--finance-red);
+}
+
+.indexCardChange svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Section title */
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sectionTitleIcon {
+  font-size: 20px;
+}
+
+/* Watchlist / Stock table */
+.stockTable {
+  background: var(--bg-card);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.stockTableHeader {
+  display: grid;
+  grid-template-columns: 2fr 1fr 100px 1fr;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.stockTableHeader span:nth-child(2),
+.stockTableHeader span:nth-child(3),
+.stockTableHeader span:nth-child(4) {
+  text-align: right;
+}
+
+.stockRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr 100px 1fr;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+  align-items: center;
+  transition: background 0.15s;
+  cursor: pointer;
+}
+
+.stockRow:last-child {
+  border-bottom: none;
+}
+
+.stockRow:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.stockInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.stockName {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stockTicker {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.stockChart {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.stockPrice {
+  text-align: right;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stockChange {
+  text-align: right;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stockChange.positive {
+  color: var(--finance-green);
+}
+
+.stockChange.negative {
+  color: var(--finance-red);
+}
+
+/* News cards grid */
+.newsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.newsCard {
+  background: var(--bg-card);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.newsCard:hover {
+  border-color: var(--accent-gold);
+  transform: translateY(-2px);
+}
+
+.newsCardImage {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  background: var(--bg-tertiary);
+  display: block;
+}
+
+.newsCardBody {
+  padding: 14px;
+}
+
+.newsCardCategory {
+  font-size: 10px;
+  color: var(--accent-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.newsCardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.newsCardMeta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Quick stats */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.statCard {
+  background: var(--bg-card);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border-color);
+  padding: 16px;
+  text-align: center;
+}
+
+.statCardValue {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.statCardLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .stockTableHeader {
+    grid-template-columns: 2fr 1fr 1fr;
+  }
+
+  .stockTableHeader span:nth-child(3) {
+    display: none;
+  }
+
+  .stockRow {
+    grid-template-columns: 2fr 1fr 1fr;
+  }
+
+  .stockChart {
+    display: none;
+  }
+
+  .indexCard {
+    flex: 0 0 160px;
+    padding: 12px;
+  }
+
+  .indexCardValue {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .financePage {
+    padding: 16px 10px;
+  }
+
+  .newsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

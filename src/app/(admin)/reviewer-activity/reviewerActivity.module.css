@@ -1,0 +1,296 @@
+/* ============================================================================
+   Reviewer Activity — back-office dashboard
+   Ported from the original static public/reviewer-activity.html inline <style>.
+   Class references renamed to CSS-Module-local names. Design tokens
+   (--bg-*, --text-*, --accent-*, --border-color) come from globals.css.
+   ============================================================================ */
+
+/* ── Header ── */
+.pageHeader {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.pageHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.backLink {
+  color: var(--accent-gold);
+  text-decoration: none;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.backLink:hover {
+  opacity: 0.8;
+}
+.pageTitle {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 22px;
+  color: var(--text-primary);
+}
+.pageTitle span {
+  color: var(--accent-gold);
+}
+.headerEmail {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Main ── */
+.pageMain {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+/* ── Stats bar ── */
+.statsBar {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+.statChip {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 10px 18px;
+  font-size: 13px;
+}
+.statChip strong {
+  color: var(--accent-gold);
+  font-size: 20px;
+  display: block;
+}
+
+/* ── Filter bar ── */
+.filterBar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.filterBtn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.filterBtn.active,
+.filterBtn:hover {
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+
+/* ── Table ── */
+.activityTableWrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.table thead th {
+  background: var(--bg-secondary);
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+.table tbody tr {
+  border-bottom: 1px solid var(--border-color);
+}
+.table tbody tr:last-child {
+  border-bottom: none;
+}
+.table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.table td {
+  padding: 12px 14px;
+  vertical-align: top;
+  color: var(--text-secondary);
+}
+
+/* Reviewer cell */
+.reviewerCell {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+/* Summary cell */
+.summaryCell {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+/* Action badge */
+.actionBadge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+.actionBadge.delete {
+  background: rgba(209, 52, 56, 0.2);
+  color: #f87171;
+}
+.actionBadge.update_title {
+  background: rgba(230, 172, 0, 0.2);
+  color: var(--accent-gold);
+}
+.actionBadge.update_content {
+  background: rgba(16, 124, 16, 0.2);
+  color: #4ade80;
+}
+
+/* Diff panel */
+.diffToggleBtn {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  margin-top: 4px;
+  font-family: inherit;
+}
+.diffToggleBtn:hover {
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+.diffPanel {
+  display: none;
+  margin-top: 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+.diffPanel.open {
+  display: block;
+}
+.diffColHeader {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.diffBefore,
+.diffAfter {
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.diffBefore {
+  background: rgba(209, 52, 56, 0.08);
+  border-right: 1px solid var(--border-color);
+}
+.diffAfter {
+  background: rgba(16, 124, 16, 0.08);
+}
+/* Inner text block (matches original inline padding) */
+.diffText {
+  padding: 10px 12px;
+  font-size: 12px;
+}
+.diffDash {
+  color: var(--text-muted);
+  padding: 10px 12px;
+  display: block;
+}
+.diffLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+.diffBefore .diffLabel {
+  color: #f87171;
+  background: rgba(209, 52, 56, 0.12);
+}
+.diffAfter .diffLabel {
+  color: #4ade80;
+  background: rgba(16, 124, 16, 0.12);
+}
+
+/* Empty state */
+.emptyState {
+  text-align: center;
+  padding: 60px 24px;
+  color: var(--text-muted);
+}
+.emptyState h3 {
+  font-size: 18px;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+}
+
+.loading {
+  color: var(--text-muted);
+  padding: 40px;
+  text-align: center;
+}
+
+.errorRow {
+  color: #f87171;
+  padding: 24px;
+}
+
+.dash {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* Timestamp */
+.ts {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.tsTime {
+  font-size: 10px;
+}
+
+/* Article link */
+.artHeadline {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  max-width: 260px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.artId {
+  font-size: 10px;
+  color: var(--text-muted);
+}

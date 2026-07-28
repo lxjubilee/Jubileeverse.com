@@ -1,0 +1,434 @@
+/* ============================================================================
+   SETTINGS — Profile / Security / Account page.
+   Ported from the original static settings.html inline styles. Header, nav and
+   footer chrome are provided by the (site) layout, so only the settings page
+   body, cards, forms, toggles and toast live here. Design tokens come from
+   globals.css (var(--bg-primary), var(--accent-gold), …).
+   ============================================================================ */
+
+.settingsPage {
+  flex: 1;
+  max-width: 820px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 32px 20px 60px;
+}
+
+/* Loading guard (auth check / profile fetch) */
+.loadingWrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  padding: var(--space-2xl);
+}
+
+/* Breadcrumb */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  margin-bottom: 28px;
+}
+
+.breadcrumb a {
+  color: var(--text-muted);
+}
+
+.breadcrumb a:hover {
+  color: var(--accent-gold);
+}
+
+.sep {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.current {
+  color: var(--text-secondary);
+}
+
+/* Profile Header Card */
+.profileHeaderCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 28px 32px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.profileAvatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f0ad4e 0%, #ec971f 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 700;
+  color: #000;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.profileHeaderInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.profileHeaderName {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profileHeaderEmail {
+  font-size: var(--font-base);
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profileHeaderMeta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.profileMetaBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--font-xs);
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(230, 172, 0, 0.12);
+  color: var(--accent-gold);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.profileMetaDate {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+/* Settings Nav Tabs */
+.settingsTabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 28px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.settingsTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.settingsTab {
+  padding: 12px 20px;
+  font-size: var(--font-base);
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.settingsTab:hover {
+  color: var(--text-secondary);
+}
+
+.settingsTab.active {
+  color: var(--accent-gold);
+  border-bottom-color: var(--accent-gold);
+}
+
+/* Settings Card */
+.settingsCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 28px 32px;
+  margin-bottom: 20px;
+}
+
+.settingsCardTitle {
+  font-size: var(--font-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.settingsCardDesc {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+/* Form Rows */
+.formRow {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.formRow .formGroup {
+  flex: 1;
+}
+
+.formGroup {
+  margin-bottom: 20px;
+}
+
+.formGroup:last-child {
+  margin-bottom: 0;
+}
+
+.formGroup label {
+  display: block;
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.formGroup input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: var(--font-base);
+  font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+.formGroup input:focus {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 0 3px rgba(230, 172, 0, 0.1);
+}
+
+.formGroup input[readonly] {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.hint {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* Password strength */
+.passwordStrength {
+  height: 4px;
+  border-radius: 2px;
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.passwordStrengthBar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s, background 0.3s;
+  width: 0;
+}
+
+.strengthText {
+  font-size: var(--font-xs);
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+/* Buttons */
+.btnGroup {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.btnGroupTight {
+  margin-top: 0;
+}
+
+.btn {
+  height: 42px;
+  padding: 0 24px;
+  border-radius: 8px;
+  font-size: var(--font-base);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btnPrimary {
+  background: linear-gradient(135deg, #f0ad4e 0%, #ec971f 100%);
+  color: #000;
+}
+
+.btnPrimary:hover {
+  background: linear-gradient(135deg, #ffcc00 0%, #f0ad4e 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(240, 173, 78, 0.3);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btnOutline {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.btnOutline:hover {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.btnDangerOutline {
+  background: transparent;
+  color: var(--accent-red);
+  border: 1px solid rgba(209, 52, 56, 0.3);
+}
+
+.btnDangerOutline:hover {
+  background: rgba(209, 52, 56, 0.1);
+  border-color: var(--accent-red);
+}
+
+/* Danger Zone */
+.dangerZone {
+  border-color: rgba(209, 52, 56, 0.25);
+}
+
+.dangerZone .settingsCardTitle {
+  color: var(--accent-red);
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: var(--font-base);
+  color: #fff;
+  z-index: 9999;
+  opacity: 0;
+  transition: all 0.3s;
+  pointer-events: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.toast.success {
+  background: var(--accent-green);
+}
+
+.toast.error {
+  background: var(--accent-red);
+}
+
+/* ============================================================================
+   RESPONSIVE
+   ============================================================================ */
+@media (max-width: 768px) {
+  .settingsPage {
+    padding: 20px 16px 40px;
+  }
+
+  .profileHeaderCard {
+    padding: 20px;
+    gap: 16px;
+  }
+
+  .profileAvatar {
+    width: 60px;
+    height: 60px;
+    font-size: 24px;
+  }
+
+  .profileHeaderName {
+    font-size: 18px;
+  }
+
+  .formRow {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .settingsCard {
+    padding: 20px;
+  }
+
+  .btnGroup {
+    flex-direction: column;
+  }
+
+  .btnGroup .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .profileHeaderCard {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .profileHeaderMeta {
+    justify-content: center;
+  }
+
+  .settingsTabs {
+    gap: 0;
+  }
+
+  .settingsTab {
+    padding: 10px 14px;
+    font-size: var(--font-sm);
+  }
+}

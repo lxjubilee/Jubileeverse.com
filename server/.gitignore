@@ -1,0 +1,65 @@
+node_modules
+.env
+.personas/
+.namespace/
+
+# Windows Service runtime files
+daemon/
+.cluster-master.pid
+.reload-trigger
+
+# Runtime artifacts
+*.pid
+run/
+nul
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+desktop.ini
+Thumbs.db
+
+# Build artifacts
+dist/
+*.log
+
+# Local model weights backup (large binaries — see docs/IMAGE-GENERATION-INFRA.md)
+models/
+*.safetensors
+
+# Generated image cache (large binary files, not source)
+public/images/prominence/
+public/images/current-events/
+public/images/JubileeVerse.com/
+
+# Music albums (large audio files, not source)
+albums/
+
+# Local data & scripts
+data/*.db
+data/*.db-shm
+data/*.db-wal
+database.db
+__pycache__/
+*.pyc
+failed_level4_categories.json
+first_100_missing_level3.txt
+missing_level3_results.txt
+placement_test.json
+insert_additional_subcategories.sql
+insert_level4_categories.py
+regenerate_existing_images.py
+regenerate_similar_images.py
+update_image_paths.js
+update_image_paths.py
+update_logo.py
+reviewer-activity.html
+
+# Runtime logs and namespace
+logs/
+.namespace/
+
+# Backups
+backup/
+public/images/deprecated/

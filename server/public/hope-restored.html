@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Hope Restored — JubileeVerse. Stories of renewal, healing, and the grace that finds us when we've given up. Rooted in Scripture.">
+    <title>Hope Restored — JubileeVerse</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary:   #1b1b1b;
+            --bg-secondary: #242424;
+            --bg-card:      #2d2d2d;
+            --text-primary: #ffffff;
+            --text-secondary: #c4c4c4;
+            --text-muted:   #8a8a8a;
+            --accent-gold:  #E6AC00;
+            --accent-gold-h:#F5C518;
+            --border:       rgba(255,255,255,0.1);
+            --card-radius:  10px;
+            --header-h:     52px;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: -apple-system, 'Segoe UI', BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ── Header ─────────────────────────────── */
+        .header {
+            height: var(--header-h);
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 16px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--accent-gold);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+            color: #000;
+        }
+        .logo-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .logo-text .gold { color: var(--accent-gold); }
+        .nav {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 20px;
+            letter-spacing: 0.3px;
+            transition: color 0.2s, background 0.2s;
+        }
+        .nav a:hover { color: var(--text-primary); background: rgba(255,255,255,0.07); }
+        .nav a.active {
+            color: #000;
+            background: var(--accent-gold);
+        }
+        @media (max-width: 600px) {
+            .nav a { font-size: 11px; padding: 5px 8px; }
+        }
+
+        /* ── Hero banner ─────────────────────────── */
+        .hero {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 56px 16px 48px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% 0%, rgba(230,172,0,0.12) 0%, transparent 70%);
+        }
+        .hero-eyebrow {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: var(--accent-gold);
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            position: relative;
+        }
+        .hero-title {
+            font-size: clamp(28px, 5vw, 48px);
+            font-weight: 800;
+            letter-spacing: -1px;
+            margin-bottom: 16px;
+            position: relative;
+        }
+        .hero-title .anchor { color: var(--accent-gold); }
+        .hero-sub {
+            font-size: 16px;
+            color: var(--text-secondary);
+            max-width: 560px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        /* ── Page layout ─────────────────────────── */
+        .page {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 36px 16px 60px;
+        }
+
+        /* ── Section header ──────────────────────── */
+        .section-header {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            margin-bottom: 28px;
+        }
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .section-count {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* ── Article grid ────────────────────────── */
+        .article-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 22px;
+        }
+        @media (max-width: 900px) { .article-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 560px) { .article-grid { grid-template-columns: 1fr; } }
+
+        /* ── Article card ────────────────────────── */
+        .article-card {
+            background: var(--bg-card);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s;
+            text-decoration: none;
+            color: inherit;
+        }
+        .article-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(230,172,0,0.4);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .card-img-wrap {
+            position: relative;
+            padding-top: 58%;
+            overflow: hidden;
+            background: #111;
+        }
+        .card-img-wrap img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.4s;
+        }
+        .article-card:hover .card-img-wrap img { transform: scale(1.04); }
+        .card-badge {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(230,172,0,0.92);
+            color: #000;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+        .card-body {
+            padding: 16px 18px 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .card-title {
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.35;
+            color: var(--text-primary);
+        }
+        .card-summary {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.55;
+            flex: 1;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .card-read-more {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: var(--accent-gold);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            margin-top: 4px;
+            transition: gap 0.15s;
+        }
+        .article-card:hover .card-read-more { gap: 8px; }
+        .card-read-more svg { width: 14px; height: 14px; }
+
+        /* ── Loading / empty states ──────────────── */
+        .state-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 320px;
+            gap: 16px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: var(--accent-gold);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Footer ──────────────────────────────── */
+        .footer {
+            border-top: 1px solid var(--border);
+            padding: 24px 16px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<header class="header">
+    <div class="header-inner">
+        <a href="/" class="logo">
+            <div class="logo-icon">J</div>
+            <div class="logo-text">Jubilee<span class="gold">Verse</span></div>
+        </a>
+        <nav class="nav">
+            <a href="/">HOME</a>
+            <a href="/encouragement">ENCOURAGEMENT</a>
+            <a href="/faith-builders">FAITH BUILDERS</a>
+            <a href="/hope-restored" class="active">HOPE RESTORED</a>
+        </nav>
+    </div>
+</header>
+
+<!-- ── Hero ────────────────────────────────────────────────────────────── -->
+<section class="hero">
+    <div class="hero-eyebrow">JubileeVerse · Faith Portal</div>
+    <h1 class="hero-title">Hope <span class="anchor">Restored</span></h1>
+    <p class="hero-sub">
+        When everything feels broken, grace finds a way. Stories of renewal,
+        redemption, and the God who rebuilds what we thought was lost forever.
+    </p>
+</section>
+
+<!-- ── Article Grid ────────────────────────────────────────────────────── -->
+<main class="page">
+    <div class="section-header">
+        <h2 class="section-title">Stories of Renewal</h2>
+        <span class="section-count" id="articleCount"></span>
+    </div>
+    <div id="articleGrid">
+        <div class="state-box">
+            <div class="spinner"></div>
+            <p>Loading stories…</p>
+        </div>
+    </div>
+</main>
+
+<footer class="footer">
+    &copy; 2026 JubileeVerse &mdash; Inspiring Faith, Sharing Hope
+</footer>
+
+<script>
+(async function () {
+    const grid = document.getElementById('articleGrid');
+    const countEl = document.getElementById('articleCount');
+
+    function cleanSummary(text) {
+        if (!text) return '';
+        return text
+            .replace(/^#+\s*[^\n]*\n+/gm, '')  // strip markdown headings
+            .replace(/\*\*/g, '')               // strip bold markers
+            .replace(/\*/g, '')                 // strip italic markers
+            .trim()
+            .slice(0, 200);
+    }
+
+    function renderCard(article) {
+        const card = document.createElement('a');
+        card.className = 'article-card';
+        card.href = `/article.html?id=${article.id}`;
+
+        // Store article data for article.html to pick up
+        card.addEventListener('click', (e) => {
+            e.preventDefault();
+            sessionStorage.setItem('currentArticle', JSON.stringify({
+                id:         article.id,
+                title:      article.title,
+                image:      article.image,
+                category:   article.category || 'Hope Restored',
+                isPortalArticle: true
+            }));
+            window.location.href = `/article.html?id=${article.id}`;
+        });
+
+        const summary = cleanSummary(article.summary);
+
+        card.innerHTML = `
+            <div class="card-img-wrap">
+                <img src="${article.image}" alt="${(article.title || '').replace(/"/g, '&quot;')}" loading="lazy" onerror="this.closest('.article-card').remove()">
+                <span class="card-badge">Hope Restored</span>
+            </div>
+            <div class="card-body">
+                <div class="card-title">${article.title || ''}</div>
+                ${summary ? `<div class="card-summary">${summary}</div>` : ''}
+                <div class="card-read-more">
+                    Read Story
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                </div>
+            </div>
+        `;
+        return card;
+    }
+
+    try {
+        const resp = await fetch('/api/portal/hope-restored');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+
+        const articles = (data.articles || []).filter(a => a.image && a.title);
+
+        if (articles.length === 0) {
+            grid.innerHTML = '<div class="state-box"><p>No stories found. Check back soon.</p></div>';
+            return;
+        }
+
+        countEl.textContent = `${articles.length} article${articles.length !== 1 ? 's' : ''}`;
+
+        const fragment = document.createDocumentFragment();
+        const articleGrid = document.createElement('div');
+        articleGrid.className = 'article-grid';
+
+        articles.forEach(a => articleGrid.appendChild(renderCard(a)));
+        fragment.appendChild(articleGrid);
+        grid.innerHTML = '';
+        grid.appendChild(fragment);
+
+    } catch (err) {
+        console.error('Hope Restored load error:', err);
+        grid.innerHTML = `<div class="state-box"><p>Could not load stories. Please try again.</p></div>`;
+    }
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,78 @@
+{
+  "name": "@jubilee/verse",
+  "version": "1.0.0",
+  "description": "JubileeVerse.com - Christian News and Content Portal",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "build": "echo 'Static site - no build required'",
+    "clean": "echo 'Static site - no clean required'",
+    "lint": "eslint server.js lib/ scripts/ --ext .js",
+    "test": "jest --passWithNoTests",
+    "test:unit": "jest tests/stubs --passWithNoTests",
+    "test:integration": "jest tests/integration --passWithNoTests"
+  },
+  "keywords": [
+    "christian",
+    "news",
+    "devotional",
+    "faith",
+    "inspiration"
+  ],
+  "author": "Jubilee Solutions",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@aws-sdk/client-s3": "^3.999.0",
+    "@aws-sdk/s3-request-presigner": "^3.999.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "msedge-tts": "^2.0.4",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^8.0.1",
+    "openai": "^6.34.0",
+    "otplib": "^13.3.0",
+    "pg": "^8.13.3",
+    "qrcode": "^1.5.4",
+    "sanitize-html": "^2.17.1",
+    "ssh2": "^1.17.0",
+    "uuid": "^13.0.0",
+    "ws": "^8.19.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.6.0",
+    "@commitlint/config-conventional": "^19.6.0",
+    "@eslint/js": "^10.0.1",
+    "artillery": "^2.0.30",
+    "eslint": "^9.17.0",
+    "jest": "^29.7.0",
+    "nock": "^13.3.8",
+    "sharp": "^0.34.5",
+    "supertest": "^7.2.2"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/stubs/**/*.test.js",
+      "**/tests/integration/**/*.test.js"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/integration/setup.js"
+    ],
+    "moduleNameMapper": {
+      "^uuid$": "<rootDir>/tests/__mocks__/uuid.js",
+      "^otplib$": "<rootDir>/tests/__mocks__/otplib.js"
+    }
+  }
+}

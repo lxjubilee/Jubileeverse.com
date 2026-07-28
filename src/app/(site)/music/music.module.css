@@ -1,0 +1,1131 @@
+/* ============================================================================
+   Music module — ported from the original static music.html inline styles.
+   The page is a self-contained "music app" (library sidebar, album view,
+   track list, popular sidebar, sticky footer player). The shared site chrome
+   (header/nav/footer) is provided by the (site) layout, so the original
+   page header/back-link are intentionally omitted.
+   --player-height drives the bottom padding so the sticky player never
+   covers content.
+   ============================================================================ */
+
+.musicApp {
+  --player-height: 80px;
+  --music-accent-green: #1db954;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Main Layout */
+.musicLayout {
+  display: grid;
+  grid-template-columns: 280px 1fr 300px;
+  height: calc(100vh - var(--header-height) - var(--player-height));
+  min-height: 480px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: var(--card-radius);
+}
+
+/* Left Sidebar */
+.librarySidebar {
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.libraryHeader {
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.libraryTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.libraryTitle svg {
+  opacity: 0.7;
+}
+
+.libraryAddBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all 0.15s;
+  display: flex;
+}
+
+.libraryAddBtn:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.libraryFilters {
+  padding: 0 16px 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.filterChip {
+  background: var(--bg-tertiary);
+  border: none;
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.filterChip:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.filterChip.active {
+  background: var(--accent-gold);
+  color: #000;
+}
+
+.librarySearch {
+  padding: 0 16px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.librarySearchLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.librarySort {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.librarySort:hover {
+  color: var(--text-primary);
+}
+
+.albumList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px;
+}
+
+.albumList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.albumList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.albumList::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.albumList::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.albumItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.albumItem:hover {
+  background: var(--bg-tertiary);
+}
+
+.albumItem.active {
+  background: var(--bg-tertiary);
+  border-left: 3px solid var(--accent-gold);
+}
+
+.albumItemArt {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.albumItemInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.albumItemName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.albumItem.active .albumItemName {
+  color: var(--accent-gold);
+}
+
+.albumItemArtist {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.albumItemMeta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Center Content */
+.mainContent {
+  overflow-y: auto;
+  background: var(--bg-primary);
+}
+
+.mainContent::-webkit-scrollbar {
+  width: 8px;
+}
+
+.mainContent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mainContent::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.mainContent::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Album Banner */
+.albumBanner {
+  padding: 32px 32px 24px;
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  background: linear-gradient(135deg, #3a2d1a 0%, var(--bg-primary) 100%);
+}
+
+.albumBannerArt {
+  width: 220px;
+  height: 220px;
+  border-radius: 6px;
+  object-fit: cover;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  flex-shrink: 0;
+}
+
+.albumBannerInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.albumBannerLabel {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.albumBannerTitle {
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.albumBannerMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+.albumBannerArtist {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.albumBannerDot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.albumBannerListeners {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Album Actions */
+.albumActions {
+  padding: 20px 32px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.btnPlayLarge {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent-gold);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.btnPlayLarge:hover {
+  transform: scale(1.05);
+  background: var(--accent-gold-hover);
+}
+
+.btnPlayLarge svg {
+  color: #000;
+  width: 24px;
+  height: 24px;
+  fill: #000;
+}
+
+.btnShuffle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  color: var(--text-secondary);
+}
+
+.btnShuffle:hover {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+
+.btnFollow {
+  padding: 6px 24px;
+  border-radius: 20px;
+  border: 1px solid var(--text-muted);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.btnFollow:hover {
+  border-color: var(--text-primary);
+  transform: scale(1.02);
+}
+
+.btnFollow.following {
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+
+.btnMore {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 8px;
+  transition: color 0.15s;
+}
+
+.btnMore:hover {
+  color: var(--text-primary);
+}
+
+/* Track List */
+.trackList {
+  padding: 0 16px 100px;
+}
+
+.trackHeader {
+  display: grid;
+  grid-template-columns: 40px 1fr 80px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 4px;
+}
+
+.trackHeader span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.trackHeader span:last-child {
+  text-align: right;
+}
+
+.trackRow {
+  display: grid;
+  grid-template-columns: 40px 1fr 80px;
+  padding: 10px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+  align-items: center;
+}
+
+.trackRow:hover {
+  background: var(--bg-tertiary);
+}
+
+.trackRow.playing {
+  background: rgba(230, 172, 0, 0.08);
+}
+
+.trackNum {
+  font-size: 14px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.trackRow.playing .trackNum {
+  color: var(--accent-gold);
+}
+
+.trackRow:hover .trackNumText {
+  display: none;
+}
+
+.trackRow:hover .trackNumPlay {
+  display: block;
+}
+
+.trackNumPlay {
+  display: none;
+  color: var(--text-primary);
+}
+
+.trackInfo {
+  min-width: 0;
+}
+
+.trackTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trackRow.playing .trackTitle {
+  color: var(--accent-gold);
+}
+
+.trackDuration {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Right Sidebar */
+.popularSidebar {
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.popularSidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.popularSidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.popularSidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.popularTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.popularCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-bottom: 4px;
+}
+
+.popularCard:hover {
+  background: var(--bg-tertiary);
+}
+
+.popularCardArt {
+  width: 56px;
+  height: 56px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.popularCardInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.popularCardName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.popularCardArtist {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.popularCardListeners {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.popularDivider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 16px 0;
+}
+
+.popularSectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+/* Sticky Footer Player */
+.musicPlayer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--player-height);
+  background: #181818;
+  border-top: 1px solid var(--border-color);
+  z-index: 1001;
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  align-items: center;
+  padding: 0 16px;
+}
+
+/* Player Left - Track Info */
+.playerTrackInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.playerTrackArt {
+  width: 56px;
+  height: 56px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.playerTrackText {
+  min-width: 0;
+}
+
+.playerTrackName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playerTrackArtist {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playerTrackLike {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.playerTrackLike:hover {
+  color: var(--accent-gold);
+}
+
+.playerTrackLike.liked {
+  color: var(--accent-gold);
+}
+
+/* Player Center - Controls */
+.playerControls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.playerButtons {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.playerBtn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.15s;
+  display: flex;
+  align-items: center;
+}
+
+.playerBtn:hover {
+  color: var(--text-primary);
+}
+
+.playerBtn.active {
+  color: var(--accent-gold);
+}
+
+.playerBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.playerBtnPlay {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s;
+}
+
+.playerBtnPlay:hover {
+  transform: scale(1.06);
+}
+
+.playerBtnPlay svg {
+  width: 16px;
+  height: 16px;
+  fill: #000;
+  color: #000;
+}
+
+.playerProgress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 600px;
+}
+
+.playerTime {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 35px;
+  text-align: center;
+}
+
+.progressBar {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  cursor: pointer;
+  position: relative;
+}
+
+.progressBar:hover {
+  height: 6px;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--text-secondary);
+  border-radius: 2px;
+  position: relative;
+  transition: width 0.1s linear;
+}
+
+.progressBar:hover .progressFill {
+  background: var(--accent-gold);
+}
+
+.progressKnob {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.progressBar:hover .progressKnob {
+  opacity: 1;
+}
+
+/* Player Right - Volume */
+.playerVolume {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.volumeBtn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  transition: color 0.15s;
+}
+
+.volumeBtn:hover {
+  color: var(--text-primary);
+}
+
+.volumeBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.volumeBar {
+  width: 100px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  cursor: pointer;
+  position: relative;
+}
+
+.volumeBar:hover {
+  height: 6px;
+}
+
+.volumeFill {
+  height: 100%;
+  width: 70%; /* fallback; actual width driven by React volume state inline */
+  background: var(--text-secondary);
+  border-radius: 2px;
+  position: relative;
+}
+
+.volumeBar:hover .volumeFill {
+  background: var(--accent-gold);
+}
+
+.volumeKnob {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+}
+
+.volumeBar:hover .volumeKnob {
+  opacity: 1;
+}
+
+.playerExtraBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  transition: color 0.15s;
+}
+
+.playerExtraBtn:hover {
+  color: var(--text-primary);
+}
+
+.playerExtraBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Empty state */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 40px;
+}
+
+.emptyState svg {
+  margin-bottom: 16px;
+  opacity: 0.3;
+}
+
+.emptyState h3 {
+  font-size: 18px;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.emptyState p {
+  font-size: 14px;
+}
+
+/* Hamburger Button */
+.hamburgerBtn {
+  display: none;
+  position: fixed;
+  top: 56px;
+  left: 16px;
+  z-index: 1100;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 0;
+}
+
+.hamburgerBtn:hover {
+  background: var(--bg-tertiary);
+}
+
+.hamburgerBtn.active {
+  left: 296px;
+  background: var(--bg-tertiary);
+}
+
+.hamburgerIcon {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  gap: 5px;
+}
+
+.hamburgerIcon span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--text-primary);
+  transition: all 0.3s ease;
+  border-radius: 2px;
+}
+
+.hamburgerBtn.active .hamburgerIcon span:nth-child(1) {
+  transform: rotate(45deg) translate(6px, 6px);
+}
+
+.hamburgerBtn.active .hamburgerIcon span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburgerBtn.active .hamburgerIcon span:nth-child(3) {
+  transform: rotate(-45deg) translate(6px, -6px);
+}
+
+/* Mobile Sidebar Overlay */
+.sidebarOverlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1050;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.sidebarOverlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Mobile Accordion */
+.mobileAccordion {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.accordionSection {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.accordionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+}
+
+.accordionHeader:hover {
+  background: var(--bg-tertiary);
+}
+
+.accordionTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.accordionTitle svg {
+  opacity: 0.8;
+}
+
+.accordionBadge {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.accordionToggle {
+  transition: transform 0.3s;
+  opacity: 0.6;
+}
+
+.accordionToggle.expanded {
+  transform: rotate(180deg);
+}
+
+.accordionContent {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.accordionContent.expanded {
+  max-height: none;
+  overflow-y: auto;
+}
+
+.accordionContent::-webkit-scrollbar {
+  width: 6px;
+}
+
+.accordionContent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.accordionContent::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .musicLayout {
+    grid-template-columns: 280px 1fr;
+  }
+
+  .popularSidebar {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .musicLayout {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: calc(100vh - var(--header-height));
+    overflow: visible;
+    padding-bottom: var(--player-height);
+  }
+
+  .mainContent {
+    height: auto;
+    overflow-y: visible;
+  }
+
+  .popularSidebar {
+    display: none;
+  }
+
+  /* Show hamburger button on mobile */
+  .hamburgerBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Show overlay on mobile */
+  .sidebarOverlay {
+    display: block;
+  }
+
+  /* Make sidebar slide in from left */
+  .librarySidebar {
+    position: fixed;
+    top: var(--header-height);
+    left: -280px;
+    bottom: 0;
+    width: 280px;
+    z-index: 1080;
+    transition: left 0.3s ease;
+    display: flex;
+    overflow-y: auto;
+  }
+
+  .librarySidebar.active {
+    left: 0;
+  }
+
+  /* Hide desktop sidebar elements on mobile */
+  .libraryHeader,
+  .libraryFilters,
+  .librarySearch,
+  .albumList {
+    display: none !important;
+  }
+
+  /* Show mobile accordion on mobile */
+  .mobileAccordion {
+    display: flex !important;
+  }
+
+  .albumBanner {
+    padding: 20px 16px 16px;
+    gap: 16px;
+  }
+
+  .albumBannerArt {
+    width: 140px;
+    height: 140px;
+  }
+
+  .albumBannerTitle {
+    font-size: 24px;
+  }
+
+  .albumActions {
+    padding: 16px;
+  }
+
+  .trackList {
+    padding: 0 8px 100px;
+  }
+
+  .playerVolume {
+    display: none;
+  }
+
+  .musicPlayer {
+    grid-template-columns: 1fr 1fr;
+  }
+}
