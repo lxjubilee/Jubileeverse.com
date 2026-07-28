@@ -1148,6 +1148,32 @@ app.use('/api/', requireCsrf);
 app.get('/favicon.svg', (_req, res) => res.redirect(301, '/images/jubilee-profile.png'));
 app.get('/favicon.ico', (_req, res) => res.redirect(301, '/images/jubilee-profile.png'));
 
+// -----------------------------------------------------------------------------
+// FRONTEND OWNERSHIP — Next.js is the sole frontend origin.
+// The browser only ever talks to the Next.js app; next.config.mjs (dev) and the
+// production reverse proxy forward a fixed allow-list of paths to this Express
+// process. Everything else is the legacy public/*.html site, now fully
+// superseded by Next.js, and must NOT be served from here — not even on a direct
+// hit to the Express port. This guard enforces that: only backend paths pass;
+// all legacy frontend routes 404.
+//
+// The prefix list mirrors the next.config.mjs rewrites (/api, /auth, /images,
+// /backoffice, /status, /health, /welcome.mp4) plus /internal — the
+// server-to-server content-sync endpoint (UAT→prod), which is never proxied
+// through the browser. Favicon requests are already handled by the redirects
+// above, so they never reach this guard.
+// -----------------------------------------------------------------------------
+const BACKEND_ONLY_PREFIXES = ['/api', '/auth', '/images', '/backoffice', '/status', '/health', '/internal'];
+const BACKEND_ONLY_EXACT = ['/welcome.mp4'];
+app.use((req, res, next) => {
+    const p = req.path;
+    if (BACKEND_ONLY_EXACT.includes(p)) return next();
+    if (BACKEND_ONLY_PREFIXES.some((prefix) => p === prefix || p.startsWith(prefix + '/'))) return next();
+    return res.status(404).json({
+        error: 'Not found. The JubileeVerse frontend is served by the Next.js app; this server exposes the API and backend assets only.',
+    });
+});
+
 // Static files — NO CACHE (dev mode: all assets served fresh every request)
 app.use(express.static(path.join(__dirname, 'public'), {
     etag:         false,
