@@ -22,7 +22,16 @@ export interface NavLink {
   label: string;
 }
 
-const FIVE_FOLD_ORDER = [957, 958, 959, 960, 961];
+// The five-fold ministry categories shown in the nav, in display order.
+// Matched by slug (robust across DB re-seeds) against the depth-1 children of
+// the taxonomy root returned by /api/taxonomy/all?type=topics.
+const FIVE_FOLD_SLUGS = [
+  'celebration-mishpakhah',
+  'teshuvah-restoration',
+  'shalom-salvation',
+  'covenant-identity',
+  'torah-hebraic-insights',
+];
 
 export function useTaxonomyNav(): NavLink[] {
   const [links, setLinks] = useState<NavLink[]>([]);
@@ -39,8 +48,8 @@ export function useTaxonomyNav(): NavLink[] {
         if (!root) return;
         const subcategories = nodes
           .filter((n) => n.parent_id === root.id && n.depth === 1)
-          .filter((n) => FIVE_FOLD_ORDER.includes(n.id))
-          .sort((a, b) => FIVE_FOLD_ORDER.indexOf(a.id) - FIVE_FOLD_ORDER.indexOf(b.id));
+          .filter((n) => FIVE_FOLD_SLUGS.includes(n.slug))
+          .sort((a, b) => FIVE_FOLD_SLUGS.indexOf(a.slug) - FIVE_FOLD_SLUGS.indexOf(b.slug));
         if (cancelled) return;
         setLinks(
           subcategories.map((n) => ({
