@@ -197,6 +197,17 @@ img {
   color: var(--text-muted);
 }
 
+/* Admin shortcut — only rendered for admin users, accented to stand apart from
+   the public media links next to it. */
+.header-media-links a.header-admin-link {
+  color: var(--accent-gold);
+  font-weight: 600;
+}
+
+.header-media-links a.header-admin-link:hover {
+  color: var(--accent-gold-hover);
+}
+
 /* Header hamburger */
 .header-hamburger-btn {
   display: none;

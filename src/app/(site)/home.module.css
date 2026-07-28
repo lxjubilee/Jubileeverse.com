@@ -1,11 +1,29 @@
 /* Home-page-specific styling (hero bento, sidebar, newsletter, local news).
    Ported from index.html; shared chrome/card/grid styles live in globals.css. */
 
+/* The Current Events grid below is a centred flex row of fixed 300px cards with
+   a 12px gap, so its visual width snaps to whole columns (n*300 + (n-1)*12) and
+   the remainder becomes equal side gutters. A full-width hero therefore overhangs
+   the cards at any viewport that is not an exact multiple.
+   This wrapper reruns the same column math with an auto-fill grid and lets the
+   hero span every generated column, so the two line up at every width — no
+   hard-coded breakpoints, and immune to scrollbar-width rounding. */
+.heroRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 300px);
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: var(--space-xl);
+}
+
+.heroRow > .heroBento {
+  grid-column: 1 / -1;
+}
+
 .heroBento {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: var(--space-md);
-  margin-bottom: var(--space-xl);
   width: 100%;
   max-width: var(--max-width);
   margin-left: auto;

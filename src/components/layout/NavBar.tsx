@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useTaxonomyNav } from '@/hooks/useTaxonomyNav';
 import { getLangFlag } from '@/lib/languages';
+import type { NavCategory } from '@/lib/cdn';
 
 interface Props {
+  /** Five-fold categories from the CDN catalog, resolved server-side. */
+  categories: NavCategory[];
   mobileMenuOpen: boolean;
   currentLang: string;
   onToggleMobileMenu: () => void;
@@ -22,6 +24,7 @@ const MEDIA_LINKS = [
 
 /** Secondary nav bar: taxonomy links, mobile menu, personalize + language. */
 export default function NavBar({
+  categories,
   mobileMenuOpen,
   currentLang,
   onToggleMobileMenu,
@@ -29,7 +32,6 @@ export default function NavBar({
   onOpenPersonalize,
 }: Props) {
   const pathname = usePathname();
-  const taxonomyLinks = useTaxonomyNav();
 
   const isActive = (href: string) => pathname === href || pathname === href.replace(/\/$/, '');
 
@@ -47,9 +49,9 @@ export default function NavBar({
             HOME
           </Link>
 
-          {taxonomyLinks.map((link) => (
+          {categories.map((link) => (
             <Link
-              key={link.id}
+              key={link.slug}
               href={`/${link.slug}`}
               className={`nav-link${isActive(`/${link.slug}`) ? ' active' : ''}`}
               data-taxonomy-slug={link.slug}

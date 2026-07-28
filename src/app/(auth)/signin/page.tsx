@@ -75,16 +75,23 @@ function writeRememberedEmail(value: string | null): void {
   }
 }
 
+/** Auth screens are never a valid post-login destination — they would bounce
+ *  the user straight back to sign-in. */
+const AUTH_PATHS = ['/signin', '/signup', '/forgot-password', '/reset-password'];
+
 /**
  * Resolve a safe post-login destination from ?redirect= / ?next=. Only same-site
  * relative paths are honored (must start with a single "/" and not "//"), to
- * avoid open-redirect to an external origin. Falls back to "/".
+ * avoid open-redirect to an external origin. Anything else — no param, an
+ * external URL, or an auth route — lands on the home screen.
  */
 function safeRedirectTarget(): string {
   const params = new URLSearchParams(window.location.search);
   const raw = params.get('redirect') || params.get('next') || '';
-  if (raw.startsWith('/') && !raw.startsWith('//')) return raw;
-  return '/';
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/';
+  const path = raw.split(/[?#]/)[0].replace(/\/+$/, '').toLowerCase() || '/';
+  if (AUTH_PATHS.includes(path)) return '/';
+  return raw;
 }
 
 export default function SignInPage() {
@@ -264,6 +271,18 @@ export default function SignInPage() {
                 </>
               ) : null}
 
+              <div className={styles.secondaryRow}>
+                <label className={styles.rememberMe}>
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  <span>Keep me signed in on this device</span>
+                </label>
+                <Link href="/forgot-password">Forgot password?</Link>
+              </div>
+
               <button
                 type="submit"
                 className={`${styles.submit} ${styles.submitBold}`}
@@ -278,18 +297,6 @@ export default function SignInPage() {
                 )}
               </button>
             </form>
-
-            <div className={styles.secondaryRow}>
-              <label className={styles.rememberMe}>
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                />
-                <span>Keep me signed in on this device</span>
-              </label>
-              <Link href="/forgot-password">Forgot password?</Link>
-            </div>
           </div>
 
           <div className={`${styles.footer} ${styles.footerBottom}`}>

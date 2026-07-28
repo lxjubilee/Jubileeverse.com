@@ -1,11 +1,15 @@
 'use client';
 
 import Link from 'next/link';
+import { useAuth } from '@/lib/auth';
 import ProfileMenu from './ProfileMenu';
 import SearchBox from './SearchBox';
 
 /** Sticky top header: branding, quick media links, search, and the auth area. */
 export default function SiteHeader() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+
   return (
     <header className="header">
       <div className="header-inner">
@@ -28,6 +32,14 @@ export default function SiteHeader() {
             <a href="https://www.jubileeinspire.com" target="_blank" rel="noopener noreferrer">
               AI Bible Chat
             </a>
+            {isAdmin && (
+              <>
+                <span className="divider">|</span>
+                <Link href="/admin" className="header-admin-link">
+                  Admin
+                </Link>
+              </>
+            )}
           </div>
 
           <SearchBox />

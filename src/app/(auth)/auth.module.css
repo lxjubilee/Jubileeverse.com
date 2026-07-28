@@ -592,14 +592,16 @@
   line-height: 1.4;
 }
 
-/* Secondary actions row (forgot password / SSO links) */
+/* Secondary actions row: keep-signed-in on the left, forgot-password on the
+   right, sitting between the password field and the submit button. The field
+   above supplies its own 18px bottom margin, so only a bottom gap is needed. */
 .secondaryRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 14px 0 4px;
+  margin: 0 0 18px;
 }
 
 .secondaryRow a {

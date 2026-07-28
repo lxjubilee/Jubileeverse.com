@@ -7,13 +7,20 @@ import PersonalizePopup from './PersonalizePopup';
 import SiteFooter from './SiteFooter';
 import SiteHeader from './SiteHeader';
 import { getSiteLang, observeContentTranslation, setSiteLang, translatePage } from '@/lib/translate';
+import type { NavCategory } from '@/lib/cdn';
+
+interface Props {
+  children: ReactNode;
+  /** Five-fold nav categories, read from the CDN catalog by the (site) layout. */
+  navCategories: NavCategory[];
+}
 
 /**
  * The public-site chrome: header + nav + footer plus the global language panel,
  * personalize popup, and the client-side translation pass. Wraps every page in
  * the (site) route group.
  */
-export default function SiteShell({ children }: { children: ReactNode }) {
+export default function SiteShell({ children, navCategories }: Props) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [personalizeOpen, setPersonalizeOpen] = useState(false);
@@ -51,6 +58,7 @@ export default function SiteShell({ children }: { children: ReactNode }) {
 
       <SiteHeader />
       <NavBar
+        categories={navCategories}
         mobileMenuOpen={mobileMenuOpen}
         currentLang={lang}
         onToggleMobileMenu={toggleMobileMenu}

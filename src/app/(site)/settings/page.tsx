@@ -11,7 +11,7 @@
  *  - Profile : edit display name + email (role / member-since are read-only),
  *              Save Changes / Discard.
  *  - Security: change password (current / new / confirm) with a live strength
- *              meter, plus a "Request Password Reset" link.
+ *              meter.
  *  - Account : Back to Home, Sign Out (with confirm), and a Danger Zone whose
  *              Delete Account is intentionally a no-op toast (as in the original).
  *
@@ -492,18 +492,6 @@ export default function SettingsPage() {
               >
                 {changingPassword ? 'Updating...' : 'Update Password'}
               </button>
-            </div>
-          </div>
-
-          <div className={styles.settingsCard} style={{ marginTop: 20 }}>
-            <div className={styles.settingsCardTitle}>Forgot Password</div>
-            <div className={styles.settingsCardDesc}>
-              If you&apos;ve forgotten your password, you can request a reset link.
-            </div>
-            <div className={`${styles.btnGroup} ${styles.btnGroupTight}`}>
-              <Link href="/forgot-password" className={`${styles.btn} ${styles.btnOutline}`}>
-                Request Password Reset
-              </Link>
             </div>
           </div>
         </>

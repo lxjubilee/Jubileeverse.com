@@ -287,24 +287,26 @@ export default function HomePage() {
 
   return (
     <main className="main-content">
-      {/* Hero bento */}
-      <div className={styles.heroBento}>
-        <section className={styles.heroContainer}>
-          <HeroCarousel stories={hero} status={heroStatus} onRetry={() => void loadPlacement()} />
-        </section>
-        <div className={styles.heroSidebar}>
-          {sidebar.map((story) => {
-            const img = resolveImageUrl(story);
-            return (
-              <div key={story.id} className={styles.heroSidebarCard} onClick={() => openStory(story)}>
-                {img ? <img src={img} alt={story.headline || ''} onError={handleImgError} /> : null}
-                <div className={styles.heroSidebarOverlay}>
-                  <span className={styles.heroSidebarCategory}>{story.topic || 'Faith'}</span>
-                  <h3 className={styles.heroSidebarTitle}>{story.headline || story.title}</h3>
+      {/* Hero bento — wrapper snaps its width to the Current Events card columns */}
+      <div className={styles.heroRow}>
+        <div className={styles.heroBento}>
+          <section className={styles.heroContainer}>
+            <HeroCarousel stories={hero} status={heroStatus} onRetry={() => void loadPlacement()} />
+          </section>
+          <div className={styles.heroSidebar}>
+            {sidebar.map((story) => {
+              const img = resolveImageUrl(story);
+              return (
+                <div key={story.id} className={styles.heroSidebarCard} onClick={() => openStory(story)}>
+                  {img ? <img src={img} alt={story.headline || ''} onError={handleImgError} /> : null}
+                  <div className={styles.heroSidebarOverlay}>
+                    <span className={styles.heroSidebarCategory}>{story.topic || 'Faith'}</span>
+                    <h3 className={styles.heroSidebarTitle}>{story.headline || story.title}</h3>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
 

@@ -32,3 +32,49 @@
   color: var(--text-muted);
   padding: 60px 20px;
 }
+
+/* Subcategories published for this category by the CDN articles catalog.
+   Presentational only for now — the slugs exist in the catalog but not in
+   jv_taxonomy, so there is no portal route or article endpoint to link to. */
+.subcategories {
+  margin-bottom: var(--space-xl);
+}
+
+.subcategoriesTitle {
+  font-size: var(--font-md);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-md);
+}
+
+.subcategoryList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.subcategoryChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 8px 14px;
+}
+
+.subcategoryName {
+  font-size: var(--font-base);
+  color: var(--text-primary);
+}
+
+.subcategoryTier {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent-gold);
+}
