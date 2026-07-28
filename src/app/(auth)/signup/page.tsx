@@ -31,11 +31,23 @@ const EyeIcon = ({ open }: { open: boolean }) =>
     </svg>
   );
 
+const CalendarIcon = () => (
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="5" width="18" height="16" rx="3" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+    <line x1="8" y1="3" x2="8" y2="6" />
+    <line x1="16" y1="3" x2="16" y2="6" />
+  </svg>
+);
+
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 export default function SignUpPage() {
   const router = useRouter();
-  const [displayName, setDisplayName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [dob, setDob] = useState('');
+  const [maxDob, setMaxDob] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -52,15 +64,24 @@ export default function SignUpPage() {
     if (getStoredAuth()?.authenticated) router.replace('/');
   }, [router]);
 
+  // Cap the date picker at today. Set client-side so SSR and hydration agree.
+  useEffect(() => {
+    setMaxDob(new Date().toISOString().slice(0, 10));
+  }, []);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorField(null);
 
     let msg: string | null = null;
     let field: string | null = null;
-    if (!displayName.trim()) (msg = 'Display name is required.'), (field = 'displayName');
-    else if (displayName.trim().length < 2)
-      (msg = 'Display name must be at least 2 characters.'), (field = 'displayName');
+    if (!firstName.trim()) (msg = 'First name is required.'), (field = 'firstName');
+    else if (!lastName.trim()) (msg = 'Last name is required.'), (field = 'lastName');
+    else if (!dob) (msg = 'Date of birth is required.'), (field = 'dob');
+    else if (Number.isNaN(Date.parse(dob)))
+      (msg = 'Please enter a valid date of birth.'), (field = 'dob');
+    else if (dob > new Date().toISOString().slice(0, 10))
+      (msg = 'Date of birth cannot be in the future.'), (field = 'dob');
     else if (!email.trim()) (msg = 'Email is required.'), (field = 'email');
     else if (!isValidEmail(email)) (msg = 'Please enter a valid email.'), (field = 'email');
     else if (!password) (msg = 'Password is required.'), (field = 'password');
@@ -79,7 +100,16 @@ export default function SignUpPage() {
     try {
       await api.post(
         '/api/auth/register',
-        { displayName: displayName.trim(), email: email.trim(), password },
+        {
+          // The backend register route reads `name`; firstName/lastName/dateOfBirth
+          // are sent for forward compatibility and ignored until it stores them.
+          name: `${firstName.trim()} ${lastName.trim()}`,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          dateOfBirth: dob,
+          email: email.trim(),
+          password,
+        },
         { auth: false },
       );
       router.push('/signin?registered=true');
@@ -97,7 +127,7 @@ export default function SignUpPage() {
     <>
       <div className={styles.waveBar} />
       <div className={styles.row}>
-        <div className={styles.formPanel}>
+        <div className={`${styles.formPanel} ${styles.formPanelStack}`}>
           <div className={styles.formContent}>
             <div className={styles.logo}>
               <Link href="/">
@@ -116,16 +146,47 @@ export default function SignUpPage() {
             </div>
 
             <form onSubmit={submit} noValidate>
+              <div className={styles.fieldRow}>
+                <div className={styles.floatingGroup}>
+                  <input
+                    type="text"
+                    className={`${styles.control}${errorField === 'firstName' ? ` ${styles.error}` : ''}`}
+                    placeholder=" "
+                    autoComplete="given-name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                  />
+                  <label className={styles.floatingLabel}>First Name</label>
+                </div>
+
+                <div className={styles.floatingGroup}>
+                  <input
+                    type="text"
+                    className={`${styles.control}${errorField === 'lastName' ? ` ${styles.error}` : ''}`}
+                    placeholder=" "
+                    autoComplete="family-name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                  />
+                  <label className={styles.floatingLabel}>Last Name</label>
+                </div>
+              </div>
+
               <div className={styles.floatingGroup}>
-                <input
-                  type="text"
-                  className={`${styles.control}${errorField === 'displayName' ? ` ${styles.error}` : ''}`}
-                  placeholder=" "
-                  autoComplete="name"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                />
-                <label className={styles.floatingLabel}>Display Name</label>
+                <div className={styles.dateWrapper}>
+                  <input
+                    type="date"
+                    className={`${styles.control} ${styles.dateControl}${errorField === 'dob' ? ` ${styles.error}` : ''}`}
+                    autoComplete="bday"
+                    value={dob}
+                    max={maxDob || undefined}
+                    onChange={(e) => setDob(e.target.value)}
+                  />
+                  <label className={styles.floatingLabel}>Date of Birth</label>
+                  <span className={styles.dateIcon} aria-hidden="true">
+                    <CalendarIcon />
+                  </span>
+                </div>
               </div>
 
               <div className={styles.floatingGroup}>
@@ -201,18 +262,19 @@ export default function SignUpPage() {
               </button>
             </form>
 
-            <div className={styles.footer}>
-              <p className={styles.copyright}>
-                &copy; {new Date().getFullYear()} JubileeVerse.com |{' '}
-                <a href="#" onClick={(e) => (e.preventDefault(), setLegal('terms'))}>
-                  Terms of Use
-                </a>{' '}
-                |{' '}
-                <a href="#" onClick={(e) => (e.preventDefault(), setLegal('privacy'))}>
-                  Privacy Policy
-                </a>
-              </p>
-            </div>
+          </div>
+
+          <div className={`${styles.footer} ${styles.footerBottom}`}>
+            <p className={styles.copyright}>
+              &copy; {new Date().getFullYear()} JubileeVerse.com |{' '}
+              <a href="#" onClick={(e) => (e.preventDefault(), setLegal('terms'))}>
+                Terms of Use
+              </a>{' '}
+              |{' '}
+              <a href="#" onClick={(e) => (e.preventDefault(), setLegal('privacy'))}>
+                Privacy Policy
+              </a>
+            </p>
           </div>
         </div>
 

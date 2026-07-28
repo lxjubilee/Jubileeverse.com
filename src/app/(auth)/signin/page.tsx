@@ -51,6 +51,31 @@ const EyeIcon = ({ open }: { open: boolean }) =>
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 /**
+ * "Remember me" persists only the email address so it prefills on the next
+ * visit. The session token itself is always stored under
+ * localStorage["jubileeVerseAuth"] by the shared auth layer (and by the backend
+ * OIDC callback), so the checkbox deliberately does not change session lifetime.
+ */
+const REMEMBERED_EMAIL_KEY = 'jubileeVerseRememberedEmail';
+
+function readRememberedEmail(): string {
+  try {
+    return window.localStorage.getItem(REMEMBERED_EMAIL_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function writeRememberedEmail(value: string | null): void {
+  try {
+    if (value) window.localStorage.setItem(REMEMBERED_EMAIL_KEY, value);
+    else window.localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+  } catch {
+    /* storage unavailable (private mode / blocked) — not fatal */
+  }
+}
+
+/**
  * Resolve a safe post-login destination from ?redirect= / ?next=. Only same-site
  * relative paths are honored (must start with a single "/" and not "//"), to
  * avoid open-redirect to an external origin. Falls back to "/".
@@ -67,6 +92,7 @@ export default function SignInPage() {
   const [password, setPassword] = useState('');
   const [totp, setTotp] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +107,12 @@ export default function SignInPage() {
     }
     const params = new URLSearchParams(window.location.search);
     if (params.get('registered') === 'true') setRegistered(true);
+
+    const remembered = readRememberedEmail();
+    if (remembered) {
+      setEmail(remembered);
+      setRememberMe(true);
+    }
   }, []);
 
   const submit = async (e: React.FormEvent) => {
@@ -121,6 +153,7 @@ export default function SignInPage() {
         return;
       }
 
+      writeRememberedEmail(rememberMe ? email.trim() : null);
       setStoredAuth({ authenticated: true, user: data.user, token: data.token });
 
       if (data.force_password_reset) {
@@ -143,7 +176,7 @@ export default function SignInPage() {
     <>
       <div className={styles.waveBar} />
       <div className={styles.row}>
-        <div className={styles.formPanel}>
+        <div className={`${styles.formPanel} ${styles.formPanelStack}`}>
           <div className={styles.formContent}>
             <div className={styles.logo}>
               <Link href="/">
@@ -157,7 +190,7 @@ export default function SignInPage() {
 
             <div className={styles.welcome}>
               <p>
-                New here? <Link href="/signup">Create account</Link>.
+                Don&apos;t have an account? <Link href="/signup">Sign Up</Link>.
               </p>
             </div>
 
@@ -231,7 +264,11 @@ export default function SignInPage() {
                 </>
               ) : null}
 
-              <button type="submit" className={styles.submit} disabled={submitting}>
+              <button
+                type="submit"
+                className={`${styles.submit} ${styles.submitBold}`}
+                disabled={submitting}
+              >
                 {submitting ? (
                   <>
                     <span className={styles.spinner} /> Signing In...
@@ -243,28 +280,29 @@ export default function SignInPage() {
             </form>
 
             <div className={styles.secondaryRow}>
+              <label className={styles.rememberMe}>
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+                <span>Keep me signed in on this device</span>
+              </label>
               <Link href="/forgot-password">Forgot password?</Link>
-              <Link href="/signup">Create account</Link>
             </div>
+          </div>
 
-            <div className={styles.ssoLink}>
-              {/* Full navigation: /auth/login is a backend OIDC route (proxied), not a Next page. */}
-              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-              <a href="/auth/login">Use single sign-on instead</a>
-            </div>
-
-            <div className={styles.footer}>
-              <p className={styles.copyright}>
-                &copy; {new Date().getFullYear()} JubileeVerse.com |{' '}
-                <a href="#" onClick={(e) => (e.preventDefault(), setLegal('terms'))}>
-                  Terms of Use
-                </a>{' '}
-                |{' '}
-                <a href="#" onClick={(e) => (e.preventDefault(), setLegal('privacy'))}>
-                  Privacy Policy
-                </a>
-              </p>
-            </div>
+          <div className={`${styles.footer} ${styles.footerBottom}`}>
+            <p className={styles.copyright}>
+              &copy; {new Date().getFullYear()} JubileeVerse.com |{' '}
+              <a href="#" onClick={(e) => (e.preventDefault(), setLegal('terms'))}>
+                Terms of Use
+              </a>{' '}
+              |{' '}
+              <a href="#" onClick={(e) => (e.preventDefault(), setLegal('privacy'))}>
+                Privacy Policy
+              </a>
+            </p>
           </div>
         </div>
 

@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
     <>
       <div className={styles.waveBar} />
       <div className={styles.row}>
-        <div className={styles.formPanel}>
+        <div className={`${styles.formPanel} ${styles.formPanelStack}`}>
           <div className={styles.formContent}>
             <div className={styles.logo}>
               <Link href="/">
@@ -127,18 +127,19 @@ export default function ForgotPasswordPage() {
               </div>
             )}
 
-            <div className={styles.footer}>
-              <p className={styles.copyright}>
-                &copy; {new Date().getFullYear()} JubileeVerse.com |{' '}
-                <a href="#" onClick={(e) => (e.preventDefault(), setLegal('terms'))}>
-                  Terms of Use
-                </a>{' '}
-                |{' '}
-                <a href="#" onClick={(e) => (e.preventDefault(), setLegal('privacy'))}>
-                  Privacy Policy
-                </a>
-              </p>
-            </div>
+          </div>
+
+          <div className={`${styles.footer} ${styles.footerBottom}`}>
+            <p className={styles.copyright}>
+              &copy; {new Date().getFullYear()} JubileeVerse.com |{' '}
+              <a href="#" onClick={(e) => (e.preventDefault(), setLegal('terms'))}>
+                Terms of Use
+              </a>{' '}
+              |{' '}
+              <a href="#" onClick={(e) => (e.preventDefault(), setLegal('privacy'))}>
+                Privacy Policy
+              </a>
+            </p>
           </div>
         </div>
 

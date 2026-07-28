@@ -76,7 +76,7 @@
 
 .logoText {
   font-family: var(--font-orbitron), 'Orbitron', sans-serif;
-  font-size: 36px;
+  font-size: 30px;
   font-weight: bold;
   color: #ffffff;
 }
@@ -159,6 +159,54 @@
   border-color: #f87171;
 }
 
+/* Two fields side by side (First / Last name), stacking on narrow panels.
+   Children keep their own `.floatingGroup` bottom margin, so the row needs no
+   vertical spacing of its own. */
+.fieldRow {
+  display: flex;
+  gap: 14px;
+}
+
+.fieldRow > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Date field: the browser's own calendar glyph can only be tinted with filters,
+   so it is made fully transparent and stretched over the right edge of the
+   field, while our amber SVG paints underneath it. Clicks land on the invisible
+   native indicator and open the picker — no scripting or showPicker() needed. */
+.dateWrapper {
+  position: relative;
+}
+
+.dateControl {
+  color-scheme: dark; /* dark native picker popup */
+  padding-right: 48px; /* keep the value clear of the icon */
+}
+
+.dateControl::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 48px;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dateIcon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  color: #f0ad4e;
+  pointer-events: none; /* clicks fall through to the native indicator */
+}
+
 .passwordWrapper {
   position: relative;
 }
@@ -235,6 +283,11 @@
   box-shadow: 0 4px 12px rgba(240, 173, 78, 0.3);
 }
 
+/* Sign-in call to action: bold rather than the shared semibold weight. */
+.submitBold {
+  font-weight: 700;
+}
+
 .submit:hover:not(:disabled) {
   background: linear-gradient(135deg, #ec971f 0%, #d58512 100%);
   transform: translateY(-1px);
@@ -294,6 +347,92 @@
 }
 
 .copyright a:hover {
+  color: #ffffff;
+}
+
+/* Sign-in panel variant: the form stays optically centred while the legal
+   footer is pinned to the bottom of the panel. `.formContent` takes the auto
+   vertical margins, so all remaining space is split above/below it and the
+   footer is left flush against the panel's bottom padding — no absolute
+   positioning, so it never overlaps the form on short viewports. */
+.formPanelStack {
+  flex-direction: column;
+  justify-content: flex-start;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: clamp(24px, 4%, 48px);
+  padding-bottom: clamp(16px, 3%, 36px);
+}
+
+.formPanelStack .formContent {
+  margin: auto 0;
+}
+
+.footerBottom {
+  width: 100%;
+  max-width: 380px;
+  margin-top: 0;
+  padding-top: clamp(16px, 4%, 40px);
+}
+
+/* "Remember me" — inline checkbox sitting on the left of `.secondaryRow`. */
+.rememberMe {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #cccccc;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Custom box: `accent-color` alone only tints the checked fill, leaving the
+   browser's default light border when unchecked — so the control is rebuilt to
+   match the amber border used by the text inputs. */
+.rememberMe input {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  position: relative;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 2px solid #f0ad4e;
+  border-radius: 4px;
+  background-color: rgba(80, 80, 80, 0.7);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.rememberMe input:hover {
+  border-color: #ffcc00;
+}
+
+.rememberMe input:checked {
+  background-color: #f0ad4e;
+  border-color: #f0ad4e;
+}
+
+/* Tick drawn as a rotated L, centred in the box. */
+.rememberMe input:checked::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 4px;
+  height: 8px;
+  border: solid #1a1a1a;
+  border-width: 0 2px 2px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.rememberMe input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(240, 173, 78, 0.35);
+}
+
+.rememberMe:hover {
   color: #ffffff;
 }
 
@@ -473,22 +612,6 @@
   text-decoration: underline;
 }
 
-.ssoLink {
-  text-align: center;
-  margin-top: 18px;
-}
-
-.ssoLink a {
-  color: #c0c0c0;
-  font-size: 13px;
-  text-decoration: none;
-}
-
-.ssoLink a:hover {
-  color: #ffbd59;
-  text-decoration: underline;
-}
-
 /* Reset-password centered status states (invalid link / loading / done) */
 .stateContent {
   text-align: center;
@@ -519,7 +642,19 @@
     padding: 40px 20px;
   }
 
+  /* Keep the responsive vertical padding; only the side padding tightens. */
+  .formPanelStack {
+    padding: clamp(24px, 4%, 48px) 20px clamp(16px, 3%, 36px);
+  }
+
   .bgPanel {
     display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  /* Below this the two name fields get too cramped side by side. */
+  .fieldRow {
+    display: block;
   }
 }
