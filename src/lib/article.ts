@@ -69,12 +69,20 @@ function getSessionId(): string {
   return sid;
 }
 
-/** Fire-and-forget article view/click tracking (matches /api/track/view). */
+/**
+ * Fire-and-forget article view/click tracking (matches /api/track/view).
+ *
+ * `article_views.article_id` is an INTEGER column, but taxonomy-portal articles
+ * come from `jv_content_objects` and carry UUID ids. Posting one makes Postgres
+ * raise 22P02 inside an unguarded `await` in the route, which takes the whole
+ * Express process down — so skip tracking for ids the table cannot store.
+ */
 export function trackView(
   articleId: string | number,
   eventType: 'click' | 'view' = 'click',
   articleType = 'current_event',
 ): void {
+  if (!/^\d+$/.test(String(articleId))) return;
   try {
     fetch('/api/track/view', {
       method: 'POST',

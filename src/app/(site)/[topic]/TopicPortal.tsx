@@ -92,11 +92,15 @@ export default function TopicPortal({ subcategories }: { subcategories: NavSubca
           });
           const node = (tax.nodes || []).find((n) => n.slug === topic);
           if (node) {
-            const data = await api.get<{ results?: RawArticle[]; articles?: RawArticle[] }>(
-              `/api/search?taxonomy_node_id=${node.id}&limit=150&order=random&type=article`,
-              { auth: false },
-            );
-            articles = data.results || data.articles || [];
+            const data = await api.get<{
+              items?: RawArticle[];
+              results?: RawArticle[];
+              articles?: RawArticle[];
+            }>(`/api/search?taxonomy_node_id=${node.id}&limit=150&order=random&type=article`, {
+              auth: false,
+            });
+            // /api/search responds { items, total, limit, offset, facets }.
+            articles = data.items || data.results || data.articles || [];
           }
         }
 
