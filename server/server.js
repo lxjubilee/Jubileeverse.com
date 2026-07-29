@@ -26,6 +26,7 @@ const { buildMaterializedPath, getDescendantIds, validateNodeConfig, cascadePath
 const { logAuditEvent }                                                                   = require('./lib/audit');
 const { createRevision, applyRollback, computeDiff }                                      = require('./lib/content-objects');
 const { buildKey, getPublicUrl, getPresignedUploadUrl }                                   = require('./lib/storage');
+const { publishCurrentEventArticle }                                                      = require('./lib/r2-content');
 const { initializeQdrant, getQdrant }                                                      = require('./lib/qdrant-init');
 const GovernanceIntegration                                                                = require('./lib/governance-integration');
 const { detectConnectionMethod, initializeSSHTunnel, closeTunnel, getStatus: getSSHTunnelStatus, isTunnelInUse } = require('./lib/ssh-tunnel');
@@ -3115,6 +3116,7 @@ async function ingestTopicStories(topic) {
             ingested++;
 
             // 6. Download image and save as /images/JubileeVerse.com/current_events/YYYY/MM/DD/{id}.jpg
+            let cachedImagePath = null;
             if (resolvedImageUrl) {
                 try {
                     const localPath = path.join(dateDir, `${newId}.jpg`);
@@ -3125,10 +3127,36 @@ async function ingestTopicStories(topic) {
                         `UPDATE current_events SET cached_image_path = $1 WHERE id = $2`,
                         [webPath, newId]
                     );
+                    cachedImagePath = webPath;
                     console.log(`[TopicPipeline] Image saved: ${webPath}`);
                 } catch (imgErr) {
                     console.warn(`[TopicPipeline] Image download failed for id=${newId}: ${imgErr.message}`);
                 }
+            }
+
+            // 6b. Mirror the generated article to R2 as Markdown, under
+            //     articles/current-events/YYYY/MM/DD/{id}-{slug}.md.
+            //     Dual-write phase: Postgres is still the store of record and the
+            //     homepage reads from it, so a failed upload is logged and skipped
+            //     rather than aborting ingestion. Once the feed reads from R2 and
+            //     the INSERT above is removed, this must throw instead.
+            try {
+                const published = await publishCurrentEventArticle({
+                    id: newId,
+                    headline: article.title || '',
+                    excerpt: (article.description || '').slice(0, 500),
+                    full_article: fullArticle,
+                    faith_reflection: faithReflection,
+                    topic,
+                    source_name: article.sourceName || '',
+                    source_url: article.link || '',
+                    pub_date: article.pubDate ? new Date(article.pubDate) : now,
+                    image_url: resolvedImageUrl || null,
+                    cached_image_path: cachedImagePath,
+                });
+                console.log(`[TopicPipeline] R2 article saved: ${published.url} (${published.bytes} bytes)`);
+            } catch (r2Err) {
+                console.error(`[TopicPipeline] R2 upload failed for id=${newId}: ${r2Err.message}`);
             }
 
             // 7. Approve if quality gate passes (≥300 words + image)
