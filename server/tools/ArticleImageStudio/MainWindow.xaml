@@ -1,0 +1,82 @@
+<Window x:Class="ArticleImageStudio.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Image Studio — JubileeVerse" Height="900" Width="1500"
+        Background="#1b1e28">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="380" />
+        </Grid.ColumnDefinitions>
+
+        <!-- The real browser -->
+        <wv2:WebView2 x:Name="Wv" Grid.Column="0" />
+
+        <!-- Control panel -->
+        <DockPanel Grid.Column="1" Background="#232733" LastChildFill="True">
+            <TextBlock DockPanel.Dock="Top" Text="Image Studio" Foreground="#E6AC00"
+                       FontSize="18" FontWeight="Bold" Margin="14,14,14,2" />
+            <TextBlock DockPanel.Dock="Top" Text="Log in to ChatGPT in the browser, then generate."
+                       Foreground="#9aa0ad" FontSize="12" Margin="14,0,14,10" TextWrapping="Wrap" />
+
+            <!-- JubileeVerse API connection (replaces JubiLujah's articles.json) -->
+            <StackPanel DockPanel.Dock="Top" Margin="14,0,14,8">
+                <TextBlock Text="JubileeVerse API — the image queue lives in Postgres, reached over the Express API"
+                           Foreground="#9aa0ad" FontSize="11" Margin="0,0,0,3" TextWrapping="Wrap" />
+                <TextBox x:Name="ApiBase" Text="http://localhost:3107" Height="26" Margin="0,0,0,4"
+                         VerticalContentAlignment="Center"
+                         ToolTip="Base URL of the JubileeVerse Express server." />
+                <PasswordBox x:Name="ApiToken" Height="26" Margin="0,0,0,4"
+                             VerticalContentAlignment="Center"
+                             ToolTip="Bearer JWT for a privileged account holding the image:generate permission." />
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Button x:Name="BtnConnect" Grid.Column="0" Content="Connect" Height="28" Click="BtnConnect_Click" />
+                    <Button x:Name="BtnSaveCfg" Grid.Column="2" Content="Save settings" Height="28" Click="BtnSaveCfg_Click"
+                            ToolTip="Writes studio.config.json next to the tool (git-ignored)." />
+                </Grid>
+            </StackPanel>
+
+            <StackPanel DockPanel.Dock="Top" Margin="14,0,14,8">
+                <TextBlock Text="Generation location — open your Images project in the browser, then click below"
+                           Foreground="#9aa0ad" FontSize="11" Margin="0,4,0,2" TextWrapping="Wrap" />
+                <TextBox x:Name="LocationUrl" Text="https://chatgpt.com/" Height="26" Margin="0,0,0,4"
+                         VerticalContentAlignment="Center" />
+                <Button x:Name="BtnUseLocation" Content="Use current page as location" Height="28" Click="BtnUseLocation_Click" />
+            </StackPanel>
+
+            <TextBlock DockPanel.Dock="Top" Text="Jobs needing an image" Foreground="#c9cede"
+                       FontWeight="SemiBold" Margin="14,6,14,4" />
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="14,0,14,6">
+                <Button x:Name="BtnReload" Content="Refresh list" Height="28" Width="100" Click="BtnReload_Click" />
+                <CheckBox x:Name="ChkShowAll" Content="Show all" Foreground="#c9cede" VerticalAlignment="Center" Margin="10,0,0,0" Click="BtnReload_Click"
+                          ToolTip="Also list jobs that already have an image (in_review / approved)." />
+            </StackPanel>
+
+            <!-- Bottom action + log -->
+            <StackPanel DockPanel.Dock="Bottom" Margin="14,6,14,12">
+                <CheckBox x:Name="ChkAutoAll" Content="Generate All Images (auto — no clicking)"
+                          Foreground="#E6AC00" FontWeight="SemiBold" Margin="0,2,0,8"
+                          Click="ChkAutoAll_Click"
+                          ToolTip="Check to generate every remaining image back-to-back with no clicking. Uncheck to stop." />
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Button x:Name="BtnGenNext" Grid.Column="0" Content="Generate Next" Height="34" Click="BtnGenNext_Click" />
+                    <Button x:Name="BtnGenAll" Grid.Column="2" Content="Generate all pending" Height="34" Click="BtnGenAll_Click" />
+                </Grid>
+                <Button x:Name="BtnDownload" Content="⬇ Download current image (manual)" Height="30" Margin="0,0,0,6"
+                        Click="BtnDownload_Click"
+                        ToolTip="Grab the image currently shown in the chat and submit it — wired to the selected job, or the next pending one." />
+                <Button x:Name="BtnStop" Content="Stop" Height="28" Margin="0,0,0,8" Click="BtnStop_Click" IsEnabled="False" />
+                <TextBlock Text="Log" Foreground="#9aa0ad" FontSize="11" />
+                <TextBox x:Name="LogBox" Height="150" Margin="0,2,0,0" IsReadOnly="True"
+                         Background="#12141c" Foreground="#a8f0c0" FontFamily="Consolas" FontSize="11"
+                         TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
+            </StackPanel>
+
+            <ListBox x:Name="PendingList" Margin="14,0,14,8" Background="#12141c" Foreground="#dfe4ee"
+                     BorderThickness="0" />
+        </DockPanel>
+    </Grid>
+</Window>

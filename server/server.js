@@ -8486,6 +8486,129 @@ app.get('/api/v1/images/queue/:status', async (req, res) => {
     }
 });
 
+// ── Article Image Studio (tools/ArticleImageStudio) ──────────────────────────
+// Two endpoints backing the WPF/WebView2 desktop tool, ported from
+// JubiLujah.com alongside the app itself. That site stores articles as files
+// (articles.json + markdown frontmatter) and the tool wrote to them directly;
+// JubileeVerse stores them in Postgres, so the tool reads its worklist from here
+// and hands finished bytes back here instead of touching any article file.
+//
+// The file write and the status transition both live server-side, so the desktop
+// app never needs DB credentials and cannot skip the review gate: an ingested
+// image lands in `in_review`, exactly where the MidJourney path leaves one.
+// Nothing here approves an image.
+
+// Identify the format from magic bytes rather than trusting a client-supplied
+// content type — this decides the extension we write to disk.
+function _sniffImageExt(buf) {
+    if (buf.length >= 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'webp';
+    if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) return 'png';
+    if (buf.length >= 3 && buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) return 'jpg';
+    return null;
+}
+
+// GET /api/v1/images/studio/worklist — jobs the studio can generate for (image:generate)
+app.get('/api/v1/images/studio/worklist', async (req, res) => {
+    const actor = await requirePrivileged(req, res); if (!actor) return;
+    if (!hasPermission(actor.role, 'image:generate')) return res.status(403).json({ error: 'Forbidden' });
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    const status = String(req.query.status || 'pending');
+    if (!['pending', 'all'].includes(status)) return res.status(400).json({ error: 'Invalid status — use pending or all' });
+    try {
+        const { rows } = await pgPool.query(
+            `SELECT ij.id, ij.content_object_id, ij.prompt_context, ij.aspect_ratio,
+                    ij.image_url, ij.image_status, co.title AS content_title
+             FROM image_generation_jobs ij
+             LEFT JOIN jv_content_objects co ON co.id = ij.content_object_id
+             WHERE ij.image_status ${status === 'pending' ? `IN ('pending','generating')` : `<> 'archived'`}
+             ORDER BY ij.created_at DESC
+             LIMIT 200`
+        );
+        return res.json(rows.map(r => ({
+            id: r.id,
+            content_object_id: r.content_object_id,
+            title: r.content_title || '(untitled)',
+            prompt: r.prompt_context || '',
+            aspect_ratio: r.aspect_ratio,
+            image_url: r.image_url,
+            image_status: r.image_status,
+            has_image: !!r.image_url,
+        })));
+    } catch (e) {
+        console.error('[images:studio:worklist]', e.message);
+        return res.status(500).json({ error: 'Database error' });
+    }
+});
+
+// POST /api/v1/images/studio/:jobId/ingest — store a studio-generated image (image:generate)
+//
+// Takes the raw bytes as application/octet-stream, not base64 JSON: the global
+// express.json() cap is 100kb, well under a hero image, and raw bytes also skip
+// base64's 33% overhead. The larger cap stays scoped to this one route.
+app.post('/api/v1/images/studio/:jobId/ingest',
+    express.raw({ type: 'application/octet-stream', limit: '25mb' }),
+    async (req, res) => {
+        const actor = await requirePrivileged(req, res); if (!actor) return;
+        if (!hasPermission(actor.role, 'image:generate')) return res.status(403).json({ error: 'Forbidden' });
+        const { jobId } = req.params;
+
+        const buf = Buffer.isBuffer(req.body) ? req.body : null;
+        if (!buf || buf.length === 0) {
+            return res.status(400).json({ error: 'Empty body — POST raw image bytes as application/octet-stream' });
+        }
+        // Same blank-render guard the local GPU worker uses (gen_image_worker.py).
+        if (buf.length < 10 * 1024) {
+            return res.status(400).json({ error: `Image too small (${buf.length} bytes) — likely a blank or partial render` });
+        }
+        const ext = _sniffImageExt(buf);
+        if (!ext) return res.status(415).json({ error: 'Unrecognised image data (expected webp, png or jpeg)' });
+
+        try {
+            const { rows: [job] } = await pgPool.query(
+                `SELECT id, content_object_id, image_status FROM image_generation_jobs WHERE id=$1`, [jobId]
+            );
+            if (!job) return res.status(404).json({ error: 'Job not found' });
+            if (job.image_status === 'approved') {
+                return res.status(409).json({ error: 'Job is already approved — requeue it before replacing the image' });
+            }
+
+            const slug = String(job.content_object_id || jobId).replace(/-/g, '').slice(0, 12);
+            const filename = `studio-${slug}-${Date.now()}.${ext}`;
+            const publicPath = `/images/generated/${filename}`;
+            const destDir = path.join(__dirname, 'public', 'images', 'generated');
+            fs.mkdirSync(destDir, { recursive: true });
+            fs.writeFileSync(path.join(destDir, filename), buf);
+
+            await pgPool.query(
+                `UPDATE image_generation_jobs SET
+                   gpu_job_status='completed', image_url=$2, image_status='in_review',
+                   gpu_response=$3, updated_at=NOW()
+                 WHERE id=$1`,
+                [jobId, publicPath, JSON.stringify({
+                    source: 'article-image-studio', operator: actor.email, bytes: buf.length, format: ext,
+                })]
+            );
+
+            console.log(`[images:studio:ingest] ${jobId} → ${publicPath} (${buf.length} bytes, by ${actor.email})`);
+            logAuditEvent(pgPool, {
+                event_type: 'image.generation_completed',
+                actor_id: actor.email,
+                target_type: 'image_generation_jobs',
+                target_id: jobId,
+                details: { job_id: jobId, model: 'article-image-studio', image_path: publicPath, bytes: buf.length },
+                ip_address: req.ip,
+                user_agent: req.get('user-agent'),
+            });
+
+            return res.status(201).json({
+                id: jobId, image_url: publicPath, bytes: buf.length, format: ext, image_status: 'in_review',
+            });
+        } catch (e) {
+            console.error('[images:studio:ingest]', e.message);
+            return res.status(500).json({ error: 'Could not store the image' });
+        }
+    });
+
 /**
  * Analyze article using Mistral-7B to extract 9 visual dimensions.
  * Returns: { sentiment, metaphors, thesis, climactic_moment, human_action, environment, era_tone, biblical_scene, biblical_character }

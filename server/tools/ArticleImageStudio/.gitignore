@@ -1,0 +1,5 @@
+bin/
+obj/
+.webview2/
+cookies.json
+studio.config.json
