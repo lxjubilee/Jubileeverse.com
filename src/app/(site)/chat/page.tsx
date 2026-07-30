@@ -171,7 +171,7 @@ export default function ChatPage() {
       <div className={styles.chatBar}>
         <div className={styles.barLeft}>
           <div className={styles.barTitle}>
-            <img src="/images/JubileeLogo.png" alt="JubileeVerse" />
+            <img src="/brand/jubilee-logo.png" alt="JubileeVerse" />
             Jubilee<span className={styles.verse}>Verse</span> AI
           </div>
           <div className={styles.statusIndicator}>

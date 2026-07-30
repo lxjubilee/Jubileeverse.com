@@ -14,7 +14,13 @@ export default function SiteHeader() {
     <header className="header">
       <div className="header-inner">
         <Link href="/" className="logo">
-          <img src="/images/JubileeLogo.png" alt="Jubilee" className="logo-icon" />
+          {/*
+            Served from Next's own public/ — deliberately NOT under /images, which
+            rewrites to Express. The original there is a 1091px, 801 KB PNG for a
+            32px icon, and streaming it through the dev proxy reset often enough to
+            leave the header logo broken. This copy is 256px and needs no proxy hop.
+          */}
+          <img src="/brand/jubilee-logo.png" alt="Jubilee" className="logo-icon" />
           <div className="logo-text">
             Jubilee<span className="logo-verse">Verse</span>
             <span className="logo-dotcom">.com</span>

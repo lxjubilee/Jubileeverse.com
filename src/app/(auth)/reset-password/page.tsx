@@ -120,7 +120,7 @@ function ResetPasswordInner() {
           <div className={styles.formContent}>
             <div className={styles.logo}>
               <Link href="/">
-                <img src="/images/JubileeLogo.png" alt="JubileeVerse" className={styles.logoImg} />
+                <img src="/brand/jubilee-logo.png" alt="JubileeVerse" className={styles.logoImg} />
                 <div className={styles.logoText}>
                   Jubilee<span className={styles.verse}>Verse</span>
                   <span>.com</span>

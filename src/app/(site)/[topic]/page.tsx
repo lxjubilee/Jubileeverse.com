@@ -1,13 +1,15 @@
 import TopicPortal from './TopicPortal';
-import { fetchCategoryLabel, fetchSubcategories } from '@/lib/cdn';
+import { fetchCategoryArticles, fetchCategoryLabel, fetchSubcategories } from '@/lib/cdn';
 
 /**
- * Server shell for the category portal. Resolves the category's subcategories
- * from the CDN articles catalog and hands them to the client portal, which
- * still loads its articles from the Express API on the client as before.
+ * Server shell for the category portal. Resolves the category's subcategories,
+ * label and articles from the CDN articles catalog and hands them to the client
+ * portal, which renders them directly — no client-side article fetch.
  *
- * The catalog is ~2.6 MB and served without CORS headers, so this fetch must
- * stay on the server; only the handful of slug/label pairs cross to the browser.
+ * The catalog is ~2.5 MB and served without CORS headers, so all three fetches
+ * must stay on the server; only the fields the cards need cross to the browser.
+ * All three read one memoised copy of the catalog, so rendering this page costs
+ * a single CDN download rather than one per helper.
  */
 export default async function TopicPortalPage({
   params,
@@ -15,10 +17,17 @@ export default async function TopicPortalPage({
   params: Promise<{ topic: string }>;
 }) {
   const { topic } = await params;
-  const [subcategories, categoryLabel] = await Promise.all([
+  const [subcategories, categoryLabel, articles] = await Promise.all([
     fetchSubcategories(topic),
     fetchCategoryLabel(topic),
+    fetchCategoryArticles(topic),
   ]);
 
-  return <TopicPortal subcategories={subcategories} categoryLabel={categoryLabel} />;
+  return (
+    <TopicPortal
+      subcategories={subcategories}
+      categoryLabel={categoryLabel}
+      articles={articles}
+    />
+  );
 }

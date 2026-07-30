@@ -13482,9 +13482,48 @@ app.get('/api/pulse-tasks/:id', async (req, res) => {
 
 const Anthropic = require('@anthropic-ai/sdk');
 
-const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY_PRIMARY || process.env.CLAUDE_API_KEY
-});
+/**
+ * Build the shared Anthropic client.
+ *
+ * Two credential shapes live in .env and they authenticate differently:
+ *   sk-ant-oat*  — OAuth token  -> Authorization: Bearer  (SDK `authToken`)
+ *   sk-ant-api*  — API key      -> x-api-key              (SDK `apiKey`)
+ * Passing an OAuth token as `apiKey` fails with 401 "invalid x-api-key", so the
+ * credential type has to pick the field. Never set both — the SDK then sends
+ * both headers and the API rejects the request.
+ *
+ * Priority: CLAUDE_CODE first (the verified working credential), then the
+ * api-key chain so a restored api03 key takes over without a code change.
+ */
+function buildAnthropicClient() {
+    const candidates = [
+        process.env.ANTHROPIC_API_KEY_CLAUDE_CODE,
+        process.env.ANTHROPIC_API_KEY,
+        process.env.ANTHROPIC_API_KEY_PRIMARY,
+        process.env.ANTHROPIC_API_KEY_BACKUP,
+        process.env.CLAUDE_API_KEY,
+    ].filter(Boolean);
+
+    const credential = candidates[0];
+    if (!credential) {
+        console.warn('[Anthropic] No credential configured — Anthropic calls will fail over to OpenAI');
+        return new Anthropic({ apiKey: 'missing' });
+    }
+
+    if (credential.startsWith('sk-ant-oat')) {
+        console.log('[Anthropic] Using OAuth token (Authorization: Bearer)');
+        return new Anthropic({
+            apiKey: null,   // must stay null: apiKey + authToken together => 401
+            authToken: credential,
+            defaultHeaders: { 'anthropic-beta': 'oauth-2025-04-20' },
+        });
+    }
+
+    console.log('[Anthropic] Using API key (x-api-key)');
+    return new Anthropic({ apiKey: credential });
+}
+
+const anthropic = buildAnthropicClient();
 
 /**
  * Kimi (MoonshotAI) API helper — OpenAI-compatible endpoint.

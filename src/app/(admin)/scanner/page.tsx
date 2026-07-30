@@ -143,7 +143,7 @@ export default function ScannerPage() {
         <div className={styles.headerInner}>
           <Link href="/" className={styles.logo}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/JubileeLogo.png" alt="JubileeVerse" className={styles.logoIcon} />
+            <img src="/brand/jubilee-logo.png" alt="JubileeVerse" className={styles.logoIcon} />
             <div className={styles.logoText}>
               Jubilee<span>Verse</span> <span>Scanner</span>
             </div>

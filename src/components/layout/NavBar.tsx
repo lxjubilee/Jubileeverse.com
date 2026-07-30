@@ -33,7 +33,16 @@ export default function NavBar({
 }: Props) {
   const pathname = usePathname();
 
-  const isActive = (href: string) => pathname === href || pathname === href.replace(/\/$/, '');
+  /**
+   * Active on the link's own page and on anything nested beneath it, so a
+   * category stays highlighted while the reader drills into its subcategories
+   * (/covenant-identity/who-you-are-in-yeshua/sealed-by-the-ruach-hakodesh/…).
+   * Compared per path segment, so /prayer never lights up for /prayer-requests.
+   */
+  const isActive = (href: string) => {
+    const base = href.replace(/\/+$/, '');
+    return pathname === base || pathname.startsWith(`${base}/`);
+  };
 
   return (
     <div className="nav-bar">

@@ -9,13 +9,30 @@
    jv_taxonomy, so there is no portal route or article endpoint to link to. */
 .subcategories {
   margin-bottom: var(--space-xl);
+
+  /* Line the chip row up with the card grid below it.
+     .content-grid carries `margin-inline: auto` without `width: 100%`, so as a
+     flex item it shrinks to its content width and centres — leaving an inset of
+     (column - cards)/2, about 100px at a ~1440px window. This section stretches
+     to the full column instead, so it needs that inset added back.
+     The grid's inset is dynamic (it reaches 0 once the row fills the 1548px
+     column), so this gutter is a deliberate approximation: it tracks the cards
+     at common widths and stays sane on narrow screens. */
+  padding-inline: clamp(16px, 7%, 104px);
 }
 
 .subcategoriesTitle {
   font-size: var(--font-md);
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--accent-gold);
   margin-bottom: var(--space-md);
+}
+
+/* Matches .subcategoriesTitle above. Scoped here rather than changed on the
+   global .section-title, which the home page and every other portal share.
+   The page's CSS module loads after globals.css, so this override wins. */
+.sectionTitle {
+  color: var(--accent-gold);
 }
 
 .subcategoryList {
@@ -27,14 +44,56 @@
   padding: 0;
 }
 
+/* Ancestor trail, shown only on a drilled-down subcategory page. */
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--space-md);
+  padding-inline: clamp(16px, 7%, 104px);
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+}
+
+.breadcrumbLink {
+  color: var(--text-muted);
+}
+
+.breadcrumbLink:hover {
+  color: var(--accent-gold);
+}
+
+.breadcrumbSep {
+  margin-inline: 6px;
+  color: var(--text-muted);
+}
+
+.breadcrumbCurrent {
+  color: var(--text-primary);
+}
+
+/* The chip is an <a> so the whole thing is one click target. */
 .subcategoryChip {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  text-decoration: none;
+  color: inherit;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 999px;
+  /* Rectangular, sharing the card grid's corner radius rather than a pill. */
+  border-radius: var(--card-radius);
   padding: 8px 14px;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+/* Same hover treatment as .content-card, so a chip and a card highlight alike. */
+.subcategoryChip:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-gold);
 }
 
 .subcategoryName {
@@ -42,10 +101,9 @@
   color: var(--text-primary);
 }
 
-.subcategoryTier {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--accent-gold);
+/* Divider between the subcategory chips and the article grid. Sits inside the
+   section's padding so it starts and ends where the chips do. */
+.separator {
+  margin-top: var(--space-xl);
+  border-top: 1px solid var(--border-color);
 }

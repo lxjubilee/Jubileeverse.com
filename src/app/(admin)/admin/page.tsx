@@ -312,7 +312,7 @@ export default function AdminDashboardPage() {
           title="Open Jubilee Inspire"
         >
           <img
-            src="/images/JubileeLogo.png"
+            src="/brand/jubilee-logo.png"
             alt="Jubilee"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = 'none';

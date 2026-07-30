@@ -131,7 +131,7 @@ export default function SignUpPage() {
           <div className={styles.formContent}>
             <div className={styles.logo}>
               <Link href="/">
-                <img src="/images/JubileeLogo.png" alt="JubileeInspire" className={styles.logoImg} />
+                <img src="/brand/jubilee-logo.png" alt="JubileeInspire" className={styles.logoImg} />
                 <div className={styles.logoText}>
                   Jubilee<span className={styles.verse}>Inspire</span>
                   <span>.com</span>
