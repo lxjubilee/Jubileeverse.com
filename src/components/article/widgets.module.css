@@ -27,6 +27,33 @@
 }
 
 /* ---- Read Aloud ---- */
+
+/* Title row sits above a rule, with the speaker mark trailing rather than
+   leading — this widget's header differs from the other sidebar widgets. */
+.readAloudHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: var(--space-md);
+}
+
+.readAloudTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0;
+}
+
+.readAloudHeader svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
 .player {
   display: flex;
   flex-direction: column;
@@ -37,6 +64,62 @@
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+/* Voice picker is pushed to the trailing edge of the control row. */
+.voiceGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.voiceBtn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.voiceBtn svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.voiceBtn:hover {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.voiceBtn.active {
+  color: var(--accent-gold);
+}
+
+.timeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.timeElapsed {
+  color: var(--accent-gold);
+  font-weight: 600;
+}
+
+.timeTotal {
+  margin-left: auto;
 }
 
 .ttsBtn {
@@ -68,6 +151,13 @@
   background: var(--accent-gold);
   color: var(--bg-primary);
   border: none;
+  width: 48px;
+  height: 48px;
+}
+
+.ttsBtnPrimary svg {
+  width: 22px;
+  height: 22px;
 }
 
 .ttsBtnPrimary:hover {
@@ -75,9 +165,30 @@
   color: var(--bg-primary);
 }
 
-.progress {
-  height: 6px;
+/* Speed toggle reads as a pill next to the round transport buttons. */
+.speedBtn {
+  min-width: 46px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
   background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.speedBtn:hover {
+  color: var(--accent-gold);
+  border-color: var(--accent-gold);
+}
+
+/* --bg-tertiary matches --bg-card exactly, so the rail needs its own tint to be
+   visible against the widget it sits in. */
+.progress {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.14);
   border-radius: 3px;
   overflow: hidden;
   cursor: pointer;

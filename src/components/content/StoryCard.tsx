@@ -166,7 +166,17 @@ export default function StoryCard({
         </div>
       ) : null}
       <div className="content-card-image">
-        {img ? <img src={img} alt={title} loading="lazy" onError={handleImgError} /> : null}
+        {img ? (
+          <img src={img} alt={title} loading="lazy" onError={handleImgError} />
+        ) : (
+          <div className="content-card-image-placeholder" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="M21 15l-5-5L5 21" />
+            </svg>
+          </div>
+        )}
       </div>
       <div className="content-card-body">
         {label ? <span className="content-card-category">{label}</span> : null}

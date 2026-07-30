@@ -112,6 +112,19 @@ export async function fetchNavCategories(): Promise<NavCategory[]> {
 }
 
 /**
+ * The catalog's display name for one category, by its route slug — e.g.
+ * "Covenant & Identity" for "covenant-identity". Returns null for slugs the
+ * catalog doesn't publish, so callers can fall back to humanizing the slug.
+ */
+export async function fetchCategoryLabel(routeSlug: string): Promise<string | null> {
+  const categories = (await loadCatalog())?.categories;
+  if (!Array.isArray(categories)) return null;
+
+  const match = categories.find((c) => c?.slug && routeSlugFor(c.slug) === routeSlug);
+  return match?.name || null;
+}
+
+/**
  * Direct (level-1) subcategories of one category, by its route slug, ordered by
  * the catalog's `rank`. Returns [] for slugs the catalog doesn't publish — the
  * portal simply renders without a subcategory row.

@@ -30,6 +30,8 @@ interface RawArticle {
   category?: string;
   topic?: string;
   slug?: string;
+  /** /api/search rows carry the card image under extension_data. */
+  extension_data?: { hero_image_path?: string | null };
 }
 
 function toStory(a: RawArticle): Story {
@@ -38,7 +40,8 @@ function toStory(a: RawArticle): Story {
     headline: a.title || a.headline || '',
     title: a.title || a.headline || '',
     excerpt: a.summary || a.excerpt || '',
-    cached_image_path: a.cached_image_path || a.image || null,
+    cached_image_path:
+      a.cached_image_path || a.image || a.extension_data?.hero_image_path || null,
     image_url: a.image_url || null,
     category: a.category || a.topic || '',
     topic: a.topic || a.category || '',
@@ -66,10 +69,17 @@ interface TaxNode {
  * server component in page.tsx (the catalog is large and CORS-less, so it must
  * not be fetched from the browser).
  */
-export default function TopicPortal({ subcategories }: { subcategories: NavSubcategory[] }) {
+export default function TopicPortal({
+  subcategories,
+  categoryLabel,
+}: {
+  subcategories: NavSubcategory[];
+  categoryLabel?: string | null;
+}) {
   const { topic } = useParams<{ topic: string }>();
   const [stories, setStories] = useState<Story[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading');
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!topic) return;
@@ -118,16 +128,16 @@ export default function TopicPortal({ subcategories }: { subcategories: NavSubca
     };
   }, [topic]);
 
-  const title = humanize(topic || '');
+  // The catalog publishes the display name ("Covenant & Identity"); humanizing
+  // the slug is only a fallback for categories it doesn't carry.
+  const title = categoryLabel || humanize(topic || '');
+  const visible = stories.filter((s) => !hidden.has(String(s.id)));
+
+  const hideStory = (id: string | number) =>
+    setHidden((prev) => new Set(prev).add(String(id)));
 
   return (
     <>
-      <div className={styles.hero}>
-        <div className={styles.eyebrow}>JubileeVerse · Faith Portal</div>
-        <h1 className={styles.title}>{title}</h1>
-        <p className={styles.subtitle}>Stories and encouragement from the {title} collection.</p>
-      </div>
-
       <main className="main-content">
         {subcategories.length > 0 ? (
           <section className={styles.subcategories} aria-label={`${title} subcategories`}>
@@ -153,11 +163,23 @@ export default function TopicPortal({ subcategories }: { subcategories: NavSubca
         ) : status === 'empty' ? (
           <div className={styles.state}>No articles found in this category.</div>
         ) : (
-          <div className="content-grid">
-            {stories.map((story) => (
-              <StoryCard key={String(story.id)} story={story} />
-            ))}
-          </div>
+          <section>
+            <div className="section-header">
+              <h2 className="section-title">{title}</h2>
+            </div>
+            <div className="content-grid">
+              {visible.map((story) => (
+                <StoryCard
+                  key={String(story.id)}
+                  story={story}
+                  category={title}
+                  articleType="article"
+                  showActions
+                  onHide={hideStory}
+                />
+              ))}
+            </div>
+          </section>
         )}
       </main>
     </>

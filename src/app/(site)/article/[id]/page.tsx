@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ReactionBar from '@/components/content/ReactionBar';
@@ -160,6 +160,9 @@ export default function ArticlePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [article?.id]);
 
+  // Article body container — Read Aloud highlights blocks inside it as it reads.
+  const proseRef = useRef<HTMLElement | null>(null);
+
   // What to display (translation/override take precedence over the original).
   const displayTitle = tTitle ?? article?.title ?? '';
   const rawContent = overrideContent ?? tContent ?? article?.content ?? '';
@@ -207,7 +210,9 @@ export default function ArticlePage() {
   const categoryLabel = TOPIC_LABELS[article.category] || article.category;
 
   return (
-    <main className="main-content">
+    <>
+      {/* Outside .main-content so the hero spans the full window width rather
+          than being inset by that container's max-width gutters. */}
       <section className={styles.hero}>
         <img
           src={article.image || FALLBACK_IMG}
@@ -257,68 +262,70 @@ export default function ArticlePage() {
         </div>
       </section>
 
-      <div className={styles.layout}>
-        <div className={styles.main}>
-          <article className={styles.prose}>
-            {isHtmlContent ? (
-              // Legacy/editorial articles are stored as raw HTML; render as-is
-              // (mirrors the original formatArticleContent passthrough).
-              <div dangerouslySetInnerHTML={{ __html: body }} />
-            ) : (
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{body}</ReactMarkdown>
-            )}
-          </article>
+      <main className="main-content">
+        <div className={styles.layout}>
+          <div className={styles.main}>
+            <article className={styles.prose} ref={proseRef}>
+              {isHtmlContent ? (
+                // Legacy/editorial articles are stored as raw HTML; render as-is
+                // (mirrors the original formatArticleContent passthrough).
+                <div dangerouslySetInnerHTML={{ __html: body }} />
+              ) : (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{body}</ReactMarkdown>
+              )}
+            </article>
 
-          <div className={styles.hopeCallout}>
-            {article.faithCommentary ? (
-              <>
-                <strong>A Christian Perspective</strong>
-                <p>{article.faithCommentary}</p>
-              </>
-            ) : (
-              <>
-                <strong>A Word of Encouragement</strong>
-                <p>
-                  &ldquo;For I know the plans I have for you,&rdquo; declares the Lord, &ldquo;plans to
-                  prosper you and not to harm you, plans to give you hope and a future.&rdquo;
-                </p>
-              </>
-            )}
+            <div className={styles.hopeCallout}>
+              {article.faithCommentary ? (
+                <>
+                  <strong>A Christian Perspective</strong>
+                  <p>{article.faithCommentary}</p>
+                </>
+              ) : (
+                <>
+                  <strong>A Word of Encouragement</strong>
+                  <p>
+                    &ldquo;For I know the plans I have for you,&rdquo; declares the Lord, &ldquo;plans to
+                    prosper you and not to harm you, plans to give you hope and a future.&rdquo;
+                  </p>
+                </>
+              )}
+            </div>
+
+            <ReactionBar articleId={article.id} articleType={articleType} />
+
+            {article.sourceUrl ? (
+              <a className={styles.sourceLink} href={article.sourceUrl} target="_blank" rel="noopener noreferrer">
+                Read the original source →
+              </a>
+            ) : null}
           </div>
 
-          <ReactionBar articleId={article.id} articleType={articleType} />
-
-          {article.sourceUrl ? (
-            <a className={styles.sourceLink} href={article.sourceUrl} target="_blank" rel="noopener noreferrer">
-              Read the original source →
-            </a>
-          ) : null}
+          <aside className={styles.sidebar}>
+            <ReadAloud text={rawContent} contentRef={proseRef} />
+            <TranslateArticle
+              articleId={article.id}
+              fallbackTitle={article.title}
+              fallbackContent={article.content}
+              onTranslated={(title, content) => {
+                setTTitle(title);
+                setTContent(content);
+              }}
+              onRestore={() => {
+                setTTitle(null);
+                setTContent(null);
+              }}
+            />
+            <ShareStory title={displayTitle} />
+            <DailyVerseWidget />
+            <RelatedStories currentId={article.id} category={article.category} />
+          </aside>
         </div>
 
-        <aside className={styles.sidebar}>
-          <ReadAloud text={rawContent} />
-          <TranslateArticle
-            articleId={article.id}
-            fallbackTitle={article.title}
-            fallbackContent={article.content}
-            onTranslated={(title, content) => {
-              setTTitle(title);
-              setTContent(content);
-            }}
-            onRestore={() => {
-              setTTitle(null);
-              setTContent(null);
-            }}
-          />
-          <ShareStory title={displayTitle} />
-          <DailyVerseWidget />
-          <RelatedStories currentId={article.id} category={article.category} />
-        </aside>
-      </div>
-
-      <div className={styles.container} style={{ maxWidth: 'var(--max-width)' }}>
-        <RelatedArticlesGrid currentId={article.id} category={article.category} />
-      </div>
-    </main>
+        <div className={styles.container} style={{ maxWidth: 'var(--max-width)' }}>
+          <RelatedArticlesGrid currentId={article.id} category={article.category} />
+        </div>
+      </main>
+    </>
   );
 }

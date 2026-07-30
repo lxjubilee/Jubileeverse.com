@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import LanguagePanel from './LanguagePanel';
 import NavBar from './NavBar';
@@ -27,6 +28,10 @@ export default function SiteShell({ children, navCategories }: Props) {
   const [lang, setLang] = useState('en-US');
   const [translating, setTranslating] = useState(false);
   const didTranslate = useRef(false);
+  const pathname = usePathname();
+  // Article pages read as a focused surface: the category nav row is dropped so
+  // the hero leads the page.
+  const showNav = !pathname?.startsWith('/article/');
 
   // Hydrate the saved language, run the initial translation pass, then keep
   // translating as content loads (feed/hero render async).
@@ -57,14 +62,16 @@ export default function SiteShell({ children, navCategories }: Props) {
       <div className={`translate-bar${translating ? ' active' : ''}`} />
 
       <SiteHeader />
-      <NavBar
-        categories={navCategories}
-        mobileMenuOpen={mobileMenuOpen}
-        currentLang={lang}
-        onToggleMobileMenu={toggleMobileMenu}
-        onOpenLang={() => setLangOpen(true)}
-        onOpenPersonalize={() => setPersonalizeOpen(true)}
-      />
+      {showNav ? (
+        <NavBar
+          categories={navCategories}
+          mobileMenuOpen={mobileMenuOpen}
+          currentLang={lang}
+          onToggleMobileMenu={toggleMobileMenu}
+          onOpenLang={() => setLangOpen(true)}
+          onOpenPersonalize={() => setPersonalizeOpen(true)}
+        />
+      ) : null}
 
       <div
         className={`nav-overlay${mobileMenuOpen ? ' active' : ''}`}

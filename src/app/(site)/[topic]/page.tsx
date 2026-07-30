@@ -1,5 +1,5 @@
 import TopicPortal from './TopicPortal';
-import { fetchSubcategories } from '@/lib/cdn';
+import { fetchCategoryLabel, fetchSubcategories } from '@/lib/cdn';
 
 /**
  * Server shell for the category portal. Resolves the category's subcategories
@@ -15,7 +15,10 @@ export default async function TopicPortalPage({
   params: Promise<{ topic: string }>;
 }) {
   const { topic } = await params;
-  const subcategories = await fetchSubcategories(topic);
+  const [subcategories, categoryLabel] = await Promise.all([
+    fetchSubcategories(topic),
+    fetchCategoryLabel(topic),
+  ]);
 
-  return <TopicPortal subcategories={subcategories} />;
+  return <TopicPortal subcategories={subcategories} categoryLabel={categoryLabel} />;
 }
