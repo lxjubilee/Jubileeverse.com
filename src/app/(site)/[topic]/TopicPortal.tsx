@@ -1,19 +1,18 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import StoryCard from '@/components/content/StoryCard';
 import { api } from '@/lib/api';
-import type { CatalogArticle, NavSubcategory } from '@/lib/cdn';
+import type { SiteArticle } from '@/lib/articles';
 import type { Story } from '@/lib/types';
 import styles from './topic.module.css';
 
 /**
  * jubileeinspire.com portals, which have dedicated backend endpoints
- * (/api/portal/:slug) and are not published in the CDN articles catalog. Their
- * responses are small (~100 KB) and carry no article bodies, so these still
- * load on the client.
+ * (/api/portal/:slug) and are not published as article bundles. Their responses
+ * are small (~100 KB) and carry no article bodies, so these still load on the
+ * client.
  */
 const PORTAL_SLUGS = new Set([
   'encouragement',
@@ -39,17 +38,23 @@ interface PortalArticle {
   slug?: string;
 }
 
-/** Catalog article -> the Story shape StoryCard renders. */
-function toStory(a: CatalogArticle): Story {
+/** Published article -> the Story shape StoryCard renders. */
+function toStory(a: SiteArticle): Story {
   return {
     id: a.id,
     headline: a.title,
     title: a.title,
     cached_image_path: a.image,
     image_url: null,
-    category: a.pillar,
-    topic: a.pillar,
+    category: a.category,
+    topic: a.category,
+    source_name: a.author,
     published_at: a.created,
+    // Must be explicit: storeSelectedArticle() defaults a missing value to
+    // true, which would tag these as current events, put "JubileeVerse" in the
+    // byline badge instead of the author, and file reactions under the wrong
+    // namespace.
+    isCurrentEvent: false,
   };
 }
 
@@ -78,27 +83,19 @@ function humanize(slug: string): string {
  * Category portal page. Two sources, by category:
  *
  *  - **Five-fold categories** (covenant-identity, teshuvah-restoration, …) are
- *    authored as markdown on the CDN and are not rows in the Express content
- *    tables. Their cards come from the CDN articles catalog, resolved by the
- *    server component in page.tsx and server-rendered from `articles` — no
- *    client-side fetch, and nothing large crossing to the browser.
+ *    authored as markdown and published as article bundles. Their cards are
+ *    resolved by the server component in page.tsx and server-rendered from
+ *    `articles` — no client-side fetch, and nothing large crossing to the
+ *    browser. These bundles are flat, so the portal has no subcategory level.
  *  - **Named jubileeinspire portals** keep their existing /api/portal/:slug
- *    fetch, which the catalog does not cover.
+ *    fetch, which the bundles do not cover.
  */
 export default function TopicPortal({
-  subcategories,
   categoryLabel,
   articles,
-  /** Slug path below the category, when rendering a drilled-down node. */
-  subPath = [],
-  /** Ancestor links shown above the chips; empty at the category root. */
-  trail = [],
 }: {
-  subcategories: NavSubcategory[];
   categoryLabel?: string | null;
-  articles: CatalogArticle[];
-  subPath?: string[];
-  trail?: { label: string; href: string }[];
+  articles: SiteArticle[];
 }) {
   const { topic } = useParams<{ topic: string }>();
   const [hidden, setHidden] = useState<Set<string>>(new Set());
@@ -131,8 +128,8 @@ export default function TopicPortal({
     };
   }, [topic]);
 
-  // The catalog publishes the display name ("Covenant & Identity"); humanizing
-  // the slug is only a fallback for categories it doesn't carry.
+  // The bundle publishes the display name ("Covenant & Identity"); humanizing
+  // the slug is only a fallback for categories that have no bundle.
   const title = categoryLabel || humanize(topic || '');
   const stories = isNamedPortal ? portalStories : articles.map(toStory);
   const visible = (stories || []).filter((s) => !hidden.has(String(s.id)));
@@ -143,41 +140,6 @@ export default function TopicPortal({
   return (
     <>
       <main className="main-content">
-        {trail.length > 0 ? (
-          <nav className={styles.breadcrumb} aria-label="Breadcrumb">
-            {trail.map((step) => (
-              <span key={step.href}>
-                <Link href={step.href} className={styles.breadcrumbLink}>
-                  {step.label}
-                </Link>
-                <span className={styles.breadcrumbSep} aria-hidden="true">
-                  ›
-                </span>
-              </span>
-            ))}
-            <span className={styles.breadcrumbCurrent}>{title}</span>
-          </nav>
-        ) : null}
-
-        {subcategories.length > 0 ? (
-          <section className={styles.subcategories} aria-label={`${title} subcategories`}>
-            <h2 className={styles.subcategoriesTitle}>Explore {title}</h2>
-            <ul className={styles.subcategoryList}>
-              {subcategories.map((sub) => (
-                <li key={sub.slug}>
-                  <Link
-                    href={`/${topic}/${[...subPath, sub.slug].join('/')}`}
-                    className={styles.subcategoryChip}
-                  >
-                    <span className={styles.subcategoryName}>{sub.label}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            <div className={styles.separator} aria-hidden="true" />
-          </section>
-        ) : null}
-
         {stories === null ? (
           <div className={styles.state}>
             <div className="spinner" style={{ margin: '0 auto 16px' }} />
@@ -190,7 +152,9 @@ export default function TopicPortal({
             <div className="section-header">
               <h2 className={`section-title ${styles.sectionTitle}`}>{title}</h2>
             </div>
-            <div className="content-grid">
+            {/* Published category cards run 10% shorter than the global card;
+                the named jubileeinspire portals keep the standard height. */}
+            <div className={`content-grid${isNamedPortal ? '' : ` ${styles.compactGrid}`}`}>
               {visible.map((story) => (
                 <StoryCard
                   key={String(story.id)}

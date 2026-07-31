@@ -1,11 +1,10 @@
 using System.IO;
-using System.Net.Http;
-using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Windows;
-using System.Windows.Threading;
+using System.Windows.Controls;
 using Microsoft.Web.WebView2.Core;
 
 namespace ArticleImageStudio;
@@ -14,22 +13,25 @@ namespace ArticleImageStudio;
 // ChatGPT by hand in the embedded browser — a genuine browser, so Cloudflare's
 // human-check passes normally — and the session cookies persist in the app's
 // own data folder. The app then drives YOUR authenticated session with injected
-// JavaScript to submit each job's image prompt, waits for the image, and posts
-// it back to JubileeVerse.
+// JavaScript to submit each article's image prompt, waits for the image, and
+// writes it back beside the article.
 //
 // Ported from JubiLujah.com/tools/ArticleImageStudio. The browser-automation
-// half is unchanged; the DATA half is different, because the two sites store
-// articles differently:
+// half is unchanged. The DATA half has now moved twice:
 //
 //   JubiLujah    — app/web/public/articles/articles.json + core/articles/*.md
-//   JubileeVerse — Postgres (image_generation_jobs), reached over the Express API
+//   (was here)   — Postgres image_generation_jobs over the Express API
+//   JubileeVerse — the five category folders of .md articles on the article drive
 //
-// So this build never touches article files. It pulls the worklist from
-// GET  /api/v1/images/studio/worklist and hands each finished image to
-// POST /api/v1/images/studio/{jobId}/ingest, which writes the file into
-// server/public/images/generated/ and moves the job to `in_review` — leaving the
-// cockpit's existing approve/reject gate exactly where it was. Nothing this app
-// does auto-approves an image.
+// The five categories each get a tab. A tab lists the articles in its folder
+// whose `image_file` frontmatter field is still empty, generates from that
+// article's own `image_prompt`, writes <slug>.jpg into the category's images/
+// folder, and fills `image_file` in. No database, no server, no API token.
+//
+// NOTE on the approval gate: the previous API build posted images into the
+// cockpit's `in_review` queue, so nothing it produced went live unreviewed.
+// This build writes straight to the article drive, so the review step is now
+// yours — look at the images before the articles publish.
 //
 // NOTE: this automates the ChatGPT web UI, which may conflict with OpenAI's
 // Terms of Use. It runs against your own logged-in session at your direction.
@@ -37,51 +39,74 @@ namespace ArticleImageStudio;
 // in server.js and the local ComfyUI/FLUX path in scripts/generate-article-images.js.
 public partial class MainWindow : Window
 {
+    // The five JubileeVerse channels. Slugs are the live directory names on the
+    // article drive and are not guessable — celebration-mishpakhah carries "kh",
+    // and torah-hebraic does not carry the word "insights".
+    private static readonly (string Slug, string Display, string Office)[] Categories =
+    {
+        ("covenant-identity",      "Covenant & Identity",      "Apostolic"),
+        ("teshuvah-restoration",   "Teshuvah & Restoration",   "Prophetic"),
+        ("shalom-salvation",       "Shalom & Salvation",       "Evangelistic"),
+        ("celebration-mishpakhah", "Celebration & Mishpakhah", "Shepherd"),
+        ("torah-hebraic",          "Torah & Hebraic Insights", "Teaching"),
+    };
+
+    // The tracking index that lives at the root of every category folder. The
+    // article drive is the only tracker: this file is the worklist, and the .md
+    // frontmatter beside it is the source it is rebuilt from.
+    private const string IndexFileName = "articles.json";
+
+    private const string DefaultArticlesRoot = @"J:\jubileeverse.com\articles";
+
     private string _root = "";
     private string _toolDir = "";
     private string _configFile = "";
     private string _userDataFolder = "";
-
-    private string _apiBase = "http://localhost:3107";
-    private string _apiToken = "";
-
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(120) };
+    private string _articlesRoot = DefaultArticlesRoot;
 
     private bool _ready;
-    private bool _connected;
     private bool _running;
     private bool _homeRetried;
     private CancellationTokenSource? _cts;
     private TaskCompletionSource<string>? _imageMsg;
 
-    // Durable "already generated" tracking is the job's own image_status on the
-    // server (it leaves `pending` once an image is ingested, and survives
-    // restarts). This session set is a second guard so a run never loops on the
-    // same job even if a post hiccups.
-    private readonly HashSet<string> _completedIds = new();
+    // Second guard so a run never loops on the same article even if a write
+    // hiccups. The durable record is the article's own image_file field.
+    private readonly HashSet<string> _completedPaths = new(StringComparer.OrdinalIgnoreCase);
+
+    // Per-category article lists, keyed by slug.
+    private readonly Dictionary<string, List<Article>> _byCategory = new();
 
     private const string CHATGPT = "https://chatgpt.com/";
 
-    // Appended to every prompt so ChatGPT renders a wide hero image, not a square.
+    // Appended to every prompt so ChatGPT renders a wide hero image, not a
+    // square. The frontmatter prompt already ends with "16:9"; this restates it
+    // as an instruction, which the web UI honours far more reliably.
+    //
+    // ONE LINE, deliberately. This used to start with "\n\n" and that was a bug:
+    // the composer is a ProseMirror contenteditable, execCommand('insertText')
+    // splits on the blank line into separate paragraphs, and only the LAST
+    // paragraph survived to be sent. The article's prompt was silently dropped
+    // and ChatGPT received nothing but the aspect-ratio instruction, which is
+    // not a request for anything and failed the turn. Never reintroduce a
+    // newline here, and see SubmitScript for the guard that now catches it.
     private const string AspectSuffix =
-        "\n\nIMPORTANT: Produce this image in a 16:9 widescreen landscape aspect ratio " +
-        "(wide horizontal orientation — not square, not portrait).";
+        " IMPORTANT: produce this image in a 16:9 widescreen landscape aspect ratio, " +
+        "wide horizontal orientation, not square and not portrait.";
 
     public MainWindow()
     {
         InitializeComponent();
         ResolvePaths();
         LoadConfig();
+        ArticlesRoot.Text = _articlesRoot;
         Loaded += async (_, _) => await InitAsync();
     }
 
     // ---- paths -------------------------------------------------------------
     // Walks up from the binary looking for THIS repo's marker (server/server.js).
-    //
-    // The JubiLujah original fell back to a hardcoded `W:\JubiLujah.com` when it
-    // found nothing, which would have made a stray copy write into that repo.
-    // Here an unresolved root is a hard stop instead — it disables generation and
-    // says so, rather than guessing at a path.
+    // An unresolved root is not fatal any more: the article drive is a separate
+    // volume, so the repo is only needed for the config file's home.
     private void ResolvePaths()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -99,17 +124,15 @@ public partial class MainWindow : Window
         Directory.CreateDirectory(_userDataFolder);
     }
 
-    // ---- config (git-ignored; holds the API base + bearer token) ------------
+    // ---- config (git-ignored) ----------------------------------------------
     private void LoadConfig()
     {
         try
         {
             if (!File.Exists(_configFile)) return;
             var cfg = JsonNode.Parse(File.ReadAllText(_configFile));
-            var b = cfg?["apiBase"]?.GetValue<string>();
-            var t = cfg?["token"]?.GetValue<string>();
-            if (!string.IsNullOrWhiteSpace(b)) { _apiBase = b.TrimEnd('/'); ApiBase.Text = _apiBase; }
-            if (!string.IsNullOrWhiteSpace(t)) { _apiToken = t; ApiToken.Password = t; }
+            var a = cfg?["articlesRoot"]?.GetValue<string>();
+            if (!string.IsNullOrWhiteSpace(a)) _articlesRoot = a.TrimEnd('\\', '/');
         }
         catch { /* a malformed config just means "start from defaults" */ }
     }
@@ -118,78 +141,15 @@ public partial class MainWindow : Window
     {
         try
         {
-            ReadApiFieldsFromUi();
-            var cfg = new JsonObject { ["apiBase"] = _apiBase, ["token"] = _apiToken };
+            ReadRootFromUi();
+            var cfg = new JsonObject { ["articlesRoot"] = _articlesRoot };
             File.WriteAllText(_configFile, cfg.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             Log("Settings saved → studio.config.json (git-ignored).");
         }
         catch (Exception ex) { Log("Could not save settings: " + ex.Message); }
     }
 
-    private void ReadApiFieldsFromUi()
-    {
-        _apiBase = (ApiBase.Text ?? "").Trim().TrimEnd('/');
-        _apiToken = ApiToken.Password ?? "";
-    }
-
-    private async void BtnConnect_Click(object sender, RoutedEventArgs e) => await ConnectAsync();
-
-    // Verifies the token and permission up front, so a failure shows here rather
-    // than midway through a batch.
-    private async Task<bool> ConnectAsync()
-    {
-        ReadApiFieldsFromUi();
-        if (_apiToken.Length == 0) { Log("Paste a bearer token first (a privileged account with image:generate)."); return false; }
-        try
-        {
-            var body = await ApiGet("/api/v1/images/counts");
-            var counts = JsonNode.Parse(body);
-            _connected = true;
-            Log($"Connected to {_apiBase} — pending {counts?["pending"]?.GetValue<int>() ?? 0}, " +
-                $"in_review {counts?["in_review"]?.GetValue<int>() ?? 0}, " +
-                $"approved {counts?["approved"]?.GetValue<int>() ?? 0}.");
-            await LoadPendingAsync();
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _connected = false;
-            Log("Connect failed: " + ex.Message);
-            return false;
-        }
-    }
-
-    // ---- http helpers ------------------------------------------------------
-    private HttpRequestMessage Req(HttpMethod m, string path)
-    {
-        var r = new HttpRequestMessage(m, _apiBase + path);
-        r.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiToken);
-        return r;
-    }
-
-    private async Task<string> ApiGet(string path)
-    {
-        using var res = await _http.SendAsync(Req(HttpMethod.Get, path));
-        var text = await res.Content.ReadAsStringAsync();
-        if (!res.IsSuccessStatusCode) throw new Exception($"{(int)res.StatusCode} {res.ReasonPhrase} — {Trim(text)}");
-        return text;
-    }
-
-    // Raw bytes, not base64 JSON — the server's global express.json() cap is
-    // 100kb, and the ingest route parses application/octet-stream instead.
-    private async Task<string> ApiPostBytes(string path, byte[] bytes, CancellationToken ct)
-    {
-        using var req = Req(HttpMethod.Post, path);
-        var content = new ByteArrayContent(bytes);
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        req.Content = content;
-        using var res = await _http.SendAsync(req, ct);
-        var text = await res.Content.ReadAsStringAsync(ct);
-        if (!res.IsSuccessStatusCode) throw new Exception($"{(int)res.StatusCode} {res.ReasonPhrase} — {Trim(text)}");
-        return text;
-    }
-
-    private static string Trim(string s) => s.Length > 240 ? s.Substring(0, 240) + "…" : s;
+    private void ReadRootFromUi() => _articlesRoot = (ArticlesRoot.Text ?? "").Trim().TrimEnd('\\', '/');
 
     // ---- init WebView2 with a persistent profile (this is the cookie store) -
     private async Task InitAsync()
@@ -216,17 +176,9 @@ public partial class MainWindow : Window
             Wv.CoreWebView2.Navigate(CHATGPT);
             _ready = true;
 
-            if (_root.Length == 0)
-                Log("⚠ Could not locate the JubileeVerse repo (no server/server.js above this binary). " +
-                    "Generation is disabled — run the app from inside the repo.");
-            else
-                Log($"Ready. Repo: {_root}");
-
-            Log("Images are posted to the API and land in server/public/images/generated/.");
-            Log("Log in to ChatGPT in the browser, then Connect and generate.");
-
-            if (_apiToken.Length > 0) await ConnectAsync();
-            else Log("No saved token — paste one and click Connect.");
+            Log("Images are written into <category>/images/ and linked from each article's image_file.");
+            Log("Log in to ChatGPT in the browser, then pick a category tab and generate.");
+            ScanAll();
         }
         catch (Exception ex)
         {
@@ -238,38 +190,247 @@ public partial class MainWindow : Window
         }
     }
 
-    // ---- pending list ------------------------------------------------------
-    private List<JobItem> _items = new();
-
-    private async Task LoadPendingAsync()
+    // ---- scanning the five category folders --------------------------------
+    private ListBox ListFor(string slug) => slug switch
     {
-        _items.Clear();
-        PendingList.Items.Clear();
-        if (!_connected) { Log("Not connected — click Connect."); return; }
+        "covenant-identity"      => LstCovenant,
+        "teshuvah-restoration"   => LstTeshuvah,
+        "shalom-salvation"       => LstShalom,
+        "celebration-mishpakhah" => LstCelebration,
+        _                        => LstTorah,
+    };
+
+    // Not FirstOrDefault(...).Display: the tuple elements are declared
+    // non-nullable, so a miss would hand back a null the compiler believes
+    // cannot be null. An explicit loop keeps this honest under <Nullable>enable.
+    private static string DisplayFor(string slug)
+    {
+        foreach (var c in Categories) if (c.Slug == slug) return c.Display;
+        return slug;
+    }
+
+    private static string OfficeFor(string slug)
+    {
+        foreach (var c in Categories) if (c.Slug == slug) return c.Office;
+        return "";
+    }
+
+    private string SelectedSlug()
+    {
+        if (Tabs.SelectedItem is TabItem t && t.Tag is string s) return s;
+        return Categories[0].Slug;
+    }
+
+    private void BtnScan_Click(object sender, RoutedEventArgs e) { ReadRootFromUi(); ScanAll(); }
+    private void BtnReload_Click(object sender, RoutedEventArgs e) => ScanAll();
+
+    private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // Only react to the TabControl itself, not to selection inside a ListBox.
+        if (!ReferenceEquals(e.OriginalSource, Tabs)) return;
+        if (!_ready) return;
+        var slug = SelectedSlug();
+        var n = _byCategory.TryGetValue(slug, out var list) ? list.Count(a => !a.HasImage) : 0;
+        Log($"— {DisplayFor(slug)}: {n} article(s) pending.");
+    }
+
+    private void ScanAll()
+    {
+        ReadRootFromUi();
+        if (!Directory.Exists(_articlesRoot))
+        {
+            Log($"⚠ Articles root not found: {_articlesRoot}");
+            Log("  Set the correct path above and click Scan categories.");
+            foreach (var c in Categories) { _byCategory[c.Slug] = new(); ListFor(c.Slug).Items.Clear(); }
+            return;
+        }
+
+        int totalPending = 0, totalDone = 0, missingDirs = 0;
+        foreach (var (slug, display, _) in Categories)
+        {
+            var dir = Path.Combine(_articlesRoot, slug);
+            var list = new List<Article>();
+
+            if (!Directory.Exists(dir))
+            {
+                missingDirs++;
+                Log($"  ⚠ {display}: folder missing ({slug})");
+            }
+            else
+            {
+                // Recursive, because the article drive uses two layouts: flat
+                // .md files at the top of a category, and nested taxonomy
+                // folders whose _meta.json declares "fileName": "article.md".
+                // The images/ folder is skipped so generated output is never
+                // mistaken for source.
+                foreach (var file in Directory.EnumerateFiles(dir, "*.md", SearchOption.AllDirectories).OrderBy(f => f))
+                {
+                    var rel = Path.GetRelativePath(dir, file);
+                    if (rel.StartsWith("images" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
+                    var art = ReadArticle(file, slug, dir);
+                    if (art != null) list.Add(art);
+                }
+            }
+
+            _byCategory[slug] = list;
+            totalPending += list.Count(a => !a.HasImage);
+            totalDone += list.Count(a => a.HasImage);
+            RenderList(slug);
+            // Reconcile the tracking index with what is actually on disk.
+            WriteIndex(slug);
+        }
+
+        Log($"Scanned {_articlesRoot} — {totalPending} pending, {totalDone} already imaged" +
+            (missingDirs > 0 ? $", {missingDirs} folder(s) missing." : ".") +
+            $" {IndexFileName} refreshed in each category.");
+    }
+
+    private void RenderList(string slug)
+    {
+        var box = ListFor(slug);
+        box.Items.Clear();
+        if (!_byCategory.TryGetValue(slug, out var list)) return;
+        var showAll = ChkShowAll.IsChecked == true;
+        foreach (var a in list)
+        {
+            if (a.HasImage && !showAll) continue;
+            box.Items.Add((a.HasImage ? "✓ " : "• ") + a.Title);
+        }
+        if (box.Items.Count == 0)
+            box.Items.Add(list.Count == 0 ? "(no articles in this folder)" : "(all articles have an image)");
+    }
+
+    // Articles currently shown in a category's list box, in display order, so a
+    // selection index maps back to the right article.
+    private List<Article> VisibleIn(string slug)
+    {
+        if (!_byCategory.TryGetValue(slug, out var list)) return new();
+        var showAll = ChkShowAll.IsChecked == true;
+        return list.Where(a => showAll || !a.HasImage).ToList();
+    }
+
+    // ---- frontmatter -------------------------------------------------------
+    // Deliberately line-based rather than a YAML dependency: the frontmatter is
+    // machine-written by the article pipeline, one `key: "value"` per line.
+    private static readonly Regex FieldRx =
+        new(@"^(?<key>[a-z_]+):\s*""(?<val>.*)""\s*$", RegexOptions.Compiled);
+
+    private static Article? ReadArticle(string path, string slug, string categoryDir)
+    {
         try
         {
-            var status = ChkShowAll.IsChecked == true ? "all" : "pending";
-            var body = await ApiGet("/api/v1/images/studio/worklist?status=" + status);
-            var arr = JsonNode.Parse(body) as JsonArray;
-            if (arr == null) return;
-            foreach (var n in arr)
+            var text = File.ReadAllText(path);
+            if (!text.StartsWith("---")) return null;
+            var end = text.IndexOf("\n---", 3, StringComparison.Ordinal);
+            if (end < 0) return null;
+
+            var f = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var line in text.Substring(0, end).Split('\n'))
             {
-                if (n == null) continue;
-                var item = new JobItem
-                {
-                    Id = n["id"]?.GetValue<string>() ?? "",
-                    Title = n["title"]?.GetValue<string>() ?? "(untitled)",
-                    Prompt = n["prompt"]?.GetValue<string>() ?? "",
-                    HasImage = n["has_image"]?.GetValue<bool>() ?? false,
-                };
-                // A job with no prompt has nothing to send to ChatGPT.
-                if (item.Id.Length == 0 || string.IsNullOrWhiteSpace(item.Prompt)) continue;
-                _items.Add(item);
-                PendingList.Items.Add((item.HasImage ? "✓ " : "• ") + item.Title);
+                var m = FieldRx.Match(line.TrimEnd('\r'));
+                if (m.Success) f[m.Groups["key"].Value] = m.Groups["val"].Value;
             }
-            Log($"{_items.Count} job(s) listed.");
+            string Get(string k) => f.TryGetValue(k, out var v) ? v : "";
+
+            // Nested articles are all called article.md, so the filename alone
+            // would name every generated image article.jpg and collide. In that
+            // layout the containing folder is the slug, which is what the
+            // _meta.json beside it uses.
+            var baseName = Path.GetFileNameWithoutExtension(path);
+            var articleSlug = baseName.Equals("article", StringComparison.OrdinalIgnoreCase)
+                ? (new DirectoryInfo(Path.GetDirectoryName(path)!).Name)
+                : baseName;
+            if (Get("slug").Length > 0) articleSlug = Get("slug");
+
+            return new Article
+            {
+                Path = path,
+                RelFile = Path.GetRelativePath(categoryDir, path).Replace('\\', '/'),
+                Slug = articleSlug,
+                Category = slug,
+                Title = Get("title").Length > 0 ? Get("title") : articleSlug,
+                Author = Get("author"),
+                Office = Get("office"),
+                DateUpdated = Get("date_updated"),
+                VelocityTier = Get("velocity_tier"),
+                Status = Get("status"),
+                Prompt = Get("image_prompt"),
+                ImageFile = Get("image_file"),
+            };
         }
-        catch (Exception ex) { Log("Could not load the worklist: " + ex.Message); }
+        catch { return null; }
+    }
+
+    // ---- the articles.json tracking index ----------------------------------
+    // Written at the root of each category folder. Rebuilt from the .md files on
+    // every scan so the two can never drift, and rewritten after each generated
+    // image so the pending count is always current on disk.
+    private void WriteIndex(string slug)
+    {
+        if (!_byCategory.TryGetValue(slug, out var list)) return;
+        var dir = Path.Combine(_articlesRoot, slug);
+        if (!Directory.Exists(dir)) return;
+
+        var arr = new JsonArray();
+        foreach (var a in list)
+        {
+            arr.Add(new JsonObject
+            {
+                ["slug"] = a.Slug,
+                ["title"] = a.Title,
+                ["file"] = a.RelFile,
+                ["author"] = a.Author,
+                ["office"] = a.Office,
+                ["date_updated"] = a.DateUpdated,
+                ["velocity_tier"] = a.VelocityTier,
+                ["status"] = a.Status,
+                ["image_prompt"] = a.Prompt,
+                ["image_file"] = a.ImageFile,
+                ["image_status"] = a.HasImage ? "generated" : "pending",
+            });
+        }
+
+        var doc = new JsonObject
+        {
+            ["category"] = DisplayFor(slug),
+            ["category_slug"] = slug,
+            ["office"] = OfficeFor(slug),
+            ["updated"] = DateTime.Now.ToString("yyyy-MM-dd"),
+            ["counts"] = new JsonObject
+            {
+                ["total"] = list.Count,
+                ["generated"] = list.Count(a => a.HasImage),
+                ["pending"] = list.Count(a => !a.HasImage),
+            },
+            ["articles"] = arr,
+        };
+
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, IndexFileName),
+                doc.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n",
+                new UTF8Encoding(false));
+        }
+        catch (Exception ex) { Log($"  ⚠ Could not write {slug}/{IndexFileName}: {ex.Message}"); }
+    }
+
+    // Writes the rendered filename into image_file, leaving every other byte of
+    // the article alone. The key always exists in a spec-conformant article, so
+    // a missing key means the file is not one of ours and is left untouched.
+    private static bool WriteImageFile(string path, string fileName)
+    {
+        var text = File.ReadAllText(path);
+        var end = text.IndexOf("\n---", 3, StringComparison.Ordinal);
+        if (end < 0) return false;
+
+        var head = text.Substring(0, end);
+        var tail = text.Substring(end);
+        var rx = new Regex(@"^image_file:\s*"".*""\s*$", RegexOptions.Multiline);
+        if (!rx.IsMatch(head)) return false;
+
+        head = rx.Replace(head, $"image_file: \"{fileName}\"", 1);
+        File.WriteAllText(path, head + tail, new UTF8Encoding(false));
+        return true;
     }
 
     // ---- buttons -----------------------------------------------------------
@@ -290,24 +451,45 @@ public partial class MainWindow : Window
         if (!string.IsNullOrWhiteSpace(src)) { LocationUrl.Text = src; Log("Generation location set → " + src); }
     }
 
-    private async void BtnReload_Click(object sender, RoutedEventArgs e) => await LoadPendingAsync();
-
     private async void BtnGenNext_Click(object sender, RoutedEventArgs e)
     {
         if (!EnsureReady()) return;
-        // The next job still missing an image.
-        var next = _items.FirstOrDefault(x => !x.HasImage);
-        if (next == null) { Log("Nothing left to generate — every job has an image."); return; }
+        var slug = SelectedSlug();
+        var visible = VisibleIn(slug);
+        var i = ListFor(slug).SelectedIndex;
+
+        Article? next = (i >= 0 && i < visible.Count && !visible[i].HasImage)
+            ? visible[i]
+            : _byCategory[slug].FirstOrDefault(a => !a.HasImage && a.Prompt.Length > 0);
+
+        if (next == null) { Log($"Nothing pending in {DisplayFor(slug)}."); return; }
         await RunBatch(new() { next });
     }
 
-    private async void BtnGenAll_Click(object sender, RoutedEventArgs e)
+    private async void BtnGenCategory_Click(object sender, RoutedEventArgs e)
     {
         if (!EnsureReady()) return;
-        var pending = _items.Where(x => !x.HasImage).ToList();
-        if (pending.Count == 0) { Log("Nothing pending. (Tick 'Show all' + select to regenerate one.)"); return; }
+        var slug = SelectedSlug();
+        var pending = Pending(slug);
+        if (pending.Count == 0) { Log($"Nothing pending in {DisplayFor(slug)}."); return; }
+        Log($"\n=== {DisplayFor(slug)} — {pending.Count} image(s) ===");
         await RunBatch(pending);
     }
+
+    private async void BtnGenAllCats_Click(object sender, RoutedEventArgs e)
+    {
+        if (!EnsureReady()) return;
+        var all = new List<Article>();
+        foreach (var c in Categories) all.AddRange(Pending(c.Slug));
+        if (all.Count == 0) { Log("Nothing pending in any category."); return; }
+        Log($"\n=== All five categories — {all.Count} image(s) ===");
+        await RunBatch(all);
+    }
+
+    private List<Article> Pending(string slug) =>
+        _byCategory.TryGetValue(slug, out var list)
+            ? list.Where(a => !a.HasImage && a.Prompt.Length > 0 && !_completedPaths.Contains(a.Path)).ToList()
+            : new();
 
     private void BtnStop_Click(object sender, RoutedEventArgs e)
     {
@@ -316,26 +498,77 @@ public partial class MainWindow : Window
         Log("Stopping after the current image…");
     }
 
-    // Checked → generate every remaining image back-to-back, no clicking.
-    // Unchecked while running → stop.
+    // What an auto run covers: every category when "All Tabs" is ticked,
+    // otherwise just the tab in front of the user. Categories are walked in
+    // declaration order, so the sweep is predictable rather than starting from
+    // whichever tab happened to be selected.
+    private List<Article> AutoScope(out string label)
+    {
+        if (ChkAllTabs.IsChecked == true)
+        {
+            var all = new List<Article>();
+            foreach (var c in Categories) all.AddRange(Pending(c.Slug));
+            label = $"all {Categories.Length} tabs";
+            return all;
+        }
+
+        var slug = SelectedSlug();
+        label = DisplayFor(slug);
+        return Pending(slug);
+    }
+
+    // Shared by both checkboxes so the two can never disagree about scope.
+    // Clears both boxes when it finishes, whether that was completion or a stop.
+    private async Task StartAuto()
+    {
+        if (_running) return;
+        if (!EnsureReady()) { ClearAutoBoxes(); return; }
+
+        var pending = AutoScope(out var label);
+        if (pending.Count == 0)
+        {
+            Log($"Nothing pending in {label}.");
+            ClearAutoBoxes();
+            return;
+        }
+
+        Log($"Auto mode ON — {label}, {pending.Count} image(s), no clicking…");
+        await RunBatch(pending);
+        ClearAutoBoxes();
+    }
+
+    // Assigning IsChecked raises Checked/Unchecked, not Click, so resetting the
+    // boxes here never re-enters the handlers below.
+    private void ClearAutoBoxes()
+    {
+        ChkAutoAll.IsChecked = false;
+        ChkAllTabs.IsChecked = false;
+    }
+
+    // Checked → generate every pending image in scope back-to-back, no
+    // clicking. Unchecked while running → stop.
     private async void ChkAutoAll_Click(object sender, RoutedEventArgs e)
     {
-        if (ChkAutoAll.IsChecked == true)
+        if (ChkAutoAll.IsChecked == true) await StartAuto();
+        else _cts?.Cancel(); // unchecking stops the run
+    }
+
+    // "All Tabs" is the scope switch for the auto run, and starts it as well:
+    // ticking one box to sweep the whole library is the point of the control.
+    // Scope is fixed once a run is under way, so mid-run ticks are refused
+    // rather than silently ignored.
+    private async void ChkAllTabs_Click(object sender, RoutedEventArgs e)
+    {
+        if (ChkAllTabs.IsChecked == true)
         {
-            if (_running) return;
-            if (!EnsureReady()) { ChkAutoAll.IsChecked = false; return; }
-            var pending = _items
-                .Where(x => !x.HasImage && !_completedIds.Contains(x.Id))
-                .ToList();
-            if (pending.Count == 0)
+            if (_running)
             {
-                Log("Nothing pending — every job already has an image.");
-                ChkAutoAll.IsChecked = false;
+                Log("A run is already under way — stop it first to change scope.");
+                ChkAllTabs.IsChecked = false;
                 return;
             }
-            Log($"Auto mode ON — generating {pending.Count} pending image(s) with no clicking…");
-            await RunBatch(pending);
-            ChkAutoAll.IsChecked = false; // finished or stopped
+            ChkAutoAll.IsChecked = true; // keep the pair reading true together
+            await StartAuto();
         }
         else
         {
@@ -344,7 +577,7 @@ public partial class MainWindow : Window
     }
 
     // Manual fallback: grab whatever generated image is showing right now and
-    // submit it — wired to the selected job, or the next pending one.
+    // attach it — to the selected article, or the next pending one in this tab.
     private async void BtnDownload_Click(object sender, RoutedEventArgs e)
     {
         if (!EnsureReady()) return;
@@ -353,52 +586,62 @@ public partial class MainWindow : Window
         {
             var all = await GetImageList();
             var src = all.LastOrDefault();
-            if (src == null) { Log("No finished image found on the page to download."); return; }
+            if (src == null) { Log("No finished image found on the page."); return; }
 
-            JobItem? target = null;
-            var i = PendingList.SelectedIndex;
-            if (i >= 0 && i < _items.Count) target = _items[i];
-            else target = _items.FirstOrDefault(x => !x.HasImage);
+            var slug = SelectedSlug();
+            var visible = VisibleIn(slug);
+            var i = ListFor(slug).SelectedIndex;
+            var target = (i >= 0 && i < visible.Count)
+                ? visible[i]
+                : _byCategory[slug].FirstOrDefault(a => !a.HasImage);
 
-            if (target == null) { Log("No job to attach this image to."); return; }
+            if (target == null) { Log("No article to attach this image to."); return; }
 
-            Log($"Manual download → {target.Title}");
-            var ok = await SaveImage(src, target, CancellationToken.None);
-            if (ok) await LoadPendingAsync();
+            Log($"Manual attach → {target.Title}");
+            if (await SaveImage(src, target, CancellationToken.None)) ScanAll();
         }
-        catch (Exception ex) { Log("Manual download failed: " + ex.Message); }
+        catch (Exception ex) { Log("Manual attach failed: " + ex.Message); }
         finally { BtnDownload.IsEnabled = true; }
     }
 
     private bool EnsureReady()
     {
         if (!_ready) { Log("Browser not ready yet."); return false; }
-        if (_root.Length == 0) { Log("Repo root unresolved — refusing to run."); return false; }
-        if (!_connected) { Log("Not connected to the API — click Connect first."); return false; }
+        ReadRootFromUi();
+        if (!Directory.Exists(_articlesRoot)) { Log($"Articles root not found: {_articlesRoot}"); return false; }
         return true;
     }
 
     // ---- batch driver ------------------------------------------------------
-    private async Task RunBatch(List<JobItem> jobs)
+    private async Task RunBatch(List<Article> jobs)
     {
         if (_running) { Log("Already running — Stop (or uncheck Auto) first."); return; }
         _running = true;
         _cts = new CancellationTokenSource();
         SetBusy(true);
-        int done = 0, skipped = 0, inThread = 0;
+        int done = 0, skipped = 0, failed = 0, inThread = 0, consecutiveFailures = 0;
+        string lastCat = "";
         try
         {
             for (int i = 0; i < jobs.Count; i++)
             {
                 _cts.Token.ThrowIfCancellationRequested();
                 var job = jobs[i];
+
+                if (job.Category != lastCat)
+                {
+                    lastCat = job.Category;
+                    Log($"\n--- {DisplayFor(job.Category)} ---");
+                }
+
                 // Never regenerate one already done (this session or a prior run).
-                if (_completedIds.Contains(job.Id) || job.HasImage)
+                if (_completedPaths.Contains(job.Path) || job.HasImage)
                 {
                     Log($"[{i + 1}/{jobs.Count}] {job.Title} — already has an image, skipping.");
                     skipped++;
                     continue;
                 }
+
                 // Start a new conversation for the first image, and a fresh one
                 // after every 10 images in the current thread.
                 bool newThread = inThread == 0;
@@ -407,19 +650,39 @@ public partial class MainWindow : Window
                 if (ok)
                 {
                     done++;
-                    _completedIds.Add(job.Id);
+                    consecutiveFailures = 0;
+                    _completedPaths.Add(job.Path);
                     if (++inThread >= 10)
                     {
                         Log("  Reached 10 images in this conversation — the next one starts a new thread.");
                         inThread = 0;
                     }
-                    // Pause before the next image.
                     if (i < jobs.Count - 1)
                     {
-                        var wait = _rng.Next(1000, 10001);
+                        // Image generation is far heavier than a text turn, and
+                        // hammering it is what earns a "Something went wrong".
+                        var wait = _rng.Next(20000, 45001);
                         Log($"  Pausing {wait / 1000.0:0.0}s before the next image…");
                         await Task.Delay(wait, _cts.Token);
                     }
+                }
+                else
+                {
+                    failed++;
+                    // Three failures in a row is not bad luck. It is almost always
+                    // a quota or a capacity problem, and grinding through the
+                    // remaining articles would just burn them all against the same
+                    // wall and mark none of them done.
+                    if (++consecutiveFailures >= 3)
+                    {
+                        Log("\n  ✗ Three failures in a row — stopping the run.");
+                        Log("    This is usually an image quota or a temporary ChatGPT capacity problem.");
+                        Log("    Nothing was lost: every article that failed is still marked pending.");
+                        break;
+                    }
+                    var cool = 60000;
+                    Log($"  Cooling down {cool / 1000}s after a failure before trying the next one…");
+                    await Task.Delay(cool, _cts.Token);
                 }
             }
         }
@@ -429,14 +692,18 @@ public partial class MainWindow : Window
         {
             _running = false;
             SetBusy(false);
-            await LoadPendingAsync();
-            Log($"\nFinished. {done} generated" + (skipped > 0 ? $", {skipped} skipped (already done)" : "") + ".");
-            if (done > 0) Log("They are in the cockpit's in_review queue — approve or reject them there.");
+            ScanAll();
+            Log($"\nFinished. {done} generated"
+                + (failed > 0 ? $", {failed} failed" : "")
+                + (skipped > 0 ? $", {skipped} skipped (already done)" : "") + ".");
+            if (done > 0) Log("Nothing here is reviewed automatically — look at the images before these publish.");
         }
     }
 
-    private async Task<bool> GenerateOne(JobItem job, bool newThread, CancellationToken ct)
+    private async Task<bool> GenerateOne(Article job, bool newThread, CancellationToken ct)
     {
+        if (job.Prompt.Length == 0) { Log("  ✗ No image_prompt in the frontmatter — skipping."); return false; }
+
         if (newThread)
         {
             var loc = string.IsNullOrWhiteSpace(LocationUrl.Text) ? CHATGPT : LocationUrl.Text.Trim();
@@ -453,10 +720,20 @@ public partial class MainWindow : Window
         var baseline = new HashSet<string>(await GetImageList());
         Log($"  Sending prompt… ({baseline.Count} image(s) already on the page)");
 
-        // Submit (with the 16:9 landscape directive appended).
-        var submit = Json(await Wv.CoreWebView2.ExecuteScriptAsync(SubmitScript(job.Prompt + AspectSuffix)));
+        // Flatten to a single line before sending. The composer treats a newline
+        // as a paragraph break and only the last paragraph survives, so any
+        // multi-line prompt would arrive truncated.
+        var oneLine = Regex.Replace(job.Prompt, @"\s+", " ").Trim();
+        var submit = Json(await Wv.CoreWebView2.ExecuteScriptAsync(SubmitScript(oneLine + AspectSuffix)));
         Log($"  submit result: {submit}");
         if (submit == "no-composer") { Log("  ✗ Could not find the chat box to type into."); return false; }
+        if (submit.StartsWith("mismatch", StringComparison.Ordinal))
+        {
+            // Nothing was sent. Sending a fragment is worse than sending nothing:
+            // it burns a turn and produces an image for the wrong description.
+            Log("  ✗ The composer did not receive the full prompt, so nothing was sent.");
+            return false;
+        }
 
         Log("  Waiting for the image to finish generating…");
         var src = await WaitForNewImage(baseline, ct);
@@ -469,14 +746,22 @@ public partial class MainWindow : Window
     // Waits for a generated image that (a) was not already present before we
     // submitted, and (b) holds the same URL across two consecutive polls — i.e.
     // generation has settled, not a streaming/placeholder frame.
+    //
+    // It also watches for ChatGPT's own failure state. When a turn dies with
+    // "Something went wrong. Please try again." no image is ever coming, and the
+    // old code could not tell that apart from a slow render: it sat out the full
+    // six-minute deadline on a turn that had already failed, then reported a
+    // generic timeout. Now the failure is detected within a poll, retried once
+    // on the page's own Retry button, and surfaced honestly if it fails again.
     private async Task<string?> WaitForNewImage(HashSet<string> baseline, CancellationToken ct)
     {
         var deadline = DateTime.UtcNow.AddMinutes(6);
         string? last = null;
-        int stable = 0, polls = 0;
+        int stable = 0, polls = 0, retries = 0;
         while (DateTime.UtcNow < deadline)
         {
             ct.ThrowIfCancellationRequested();
+
             var current = await GetImageList();
             var newest = current.LastOrDefault(s => !baseline.Contains(s));
             if (newest != null)
@@ -485,10 +770,28 @@ public partial class MainWindow : Window
                 else { last = newest; stable = 1; }
                 if (stable >= 2) return newest; // unchanged across two checks → done
             }
+
+            // Only look for the failure banner while no image has appeared: once
+            // one is rendering, a stale banner further up the thread is irrelevant.
+            if (newest == null && Json(await Wv.CoreWebView2.ExecuteScriptAsync(ErrorPresentScript())) == "yes")
+            {
+                if (retries == 0)
+                {
+                    retries++;
+                    Log("    ChatGPT reported \"Something went wrong\" — pressing its Retry once…");
+                    await Wv.CoreWebView2.ExecuteScriptAsync(ClickRetryScript());
+                    await Task.Delay(6000, ct);
+                    continue;
+                }
+                Log("    ✗ ChatGPT failed this turn again after a retry.");
+                return null;
+            }
+
             if (++polls % 5 == 0)
                 Log($"    …still waiting ({current.Count} image(s) on page, ~{(int)(deadline - DateTime.UtcNow).TotalSeconds}s left)");
             await Task.Delay(3000, ct);
         }
+        Log("    ✗ Timed out waiting for the image.");
         return null;
     }
 
@@ -504,9 +807,9 @@ public partial class MainWindow : Window
     }
 
     // Fetch the image bytes inside the page (keeps the auth session), receive
-    // them via a web message, and hand them to the API — which writes the file
-    // and moves the job to `in_review`.
-    private async Task<bool> SaveImage(string src, JobItem job, CancellationToken ct)
+    // them via a web message, write <slug>.jpg into the category's images/
+    // folder, and record the filename in the article's image_file field.
+    private async Task<bool> SaveImage(string src, Article job, CancellationToken ct)
     {
         _imageMsg = new TaskCompletionSource<string>();
         await Wv.CoreWebView2.ExecuteScriptAsync(FetchScript(src));
@@ -516,17 +819,30 @@ public partial class MainWindow : Window
         try
         {
             var bytes = Convert.FromBase64String(b64);
-            var body = await ApiPostBytes($"/api/v1/images/studio/{job.Id}/ingest", bytes, ct);
-            var res = JsonNode.Parse(body);
-            var savedPath = res?["image_url"]?.GetValue<string>() ?? "(unknown path)";
-            var savedBytes = res?["bytes"]?.GetValue<int>() ?? bytes.Length;
-            Log($"  Saved {savedPath}  ({savedBytes:N0} bytes) → {job.Title}");
-            Log("  Job moved to in_review — approve it in the cockpit.");
+            var imagesDir = Path.Combine(_articlesRoot, job.Category, "images");
+            Directory.CreateDirectory(imagesDir);
+
+            var fileName = job.Slug + ".jpg";
+            var dest = Path.Combine(imagesDir, fileName);
+            await File.WriteAllBytesAsync(dest, bytes, ct);
+
+            if (!WriteImageFile(job.Path, fileName))
+            {
+                Log($"  ⚠ Wrote {dest} but could not find an image_file field to update in {job.Slug}.md");
+                return false;
+            }
+
+            job.ImageFile = fileName;
+            // Keep the on-disk tracker current after every single image, so a
+            // run that is stopped or crashes still leaves an accurate index.
+            WriteIndex(job.Category);
+            Log($"  Saved images/{fileName}  ({bytes.Length:N0} bytes)");
+            Log($"  image_file recorded in {Path.GetFileName(job.Path)} and {job.Category}/{IndexFileName}");
             return true;
         }
         catch (Exception ex)
         {
-            Log("  ✗ API rejected the image: " + ex.Message);
+            Log("  ✗ Could not save the image: " + ex.Message);
             return false;
         }
     }
@@ -534,7 +850,7 @@ public partial class MainWindow : Window
     // ---- navigation + messaging helpers ------------------------------------
     // Best-effort navigation: waits for the "completed" event but never hangs on
     // it — after the timeout it proceeds, and WaitForComposer confirms the page
-    // is actually usable. (A hang here was what left the app stuck/disabled.)
+    // is actually usable.
     private async Task NavigateAndWait(string url, CancellationToken ct)
     {
         var tcs = new TaskCompletionSource<bool>();
@@ -592,19 +908,47 @@ public partial class MainWindow : Window
     // ---- injected scripts --------------------------------------------------
     private static string J(string s) => JsonSerializer.Serialize(s);
 
+    // True when the newest turn carries ChatGPT's failure banner. Anchored to a
+    // visible Retry button rather than to the phrase alone, so an old failure
+    // scrolled further up the conversation cannot trigger a false positive.
+    private static string ErrorPresentScript() =>
+        "(function(){var b=document.querySelectorAll('button');" +
+        "for(var i=b.length-1;i>=0;i--){var t=(b[i].innerText||'').trim();" +
+        "if(/^retry$/i.test(t)){var r=b[i].getBoundingClientRect();" +
+        "if(r.width>0&&r.height>0)return 'yes';}}" +
+        "return 'no';})();";
+
+    private static string ClickRetryScript() =>
+        "(function(){var b=document.querySelectorAll('button');" +
+        "for(var i=b.length-1;i>=0;i--){var t=(b[i].innerText||'').trim();" +
+        "if(/^retry$/i.test(t)){b[i].click();return 'clicked';}}" +
+        "return 'none';})();";
+
     private static string ComposerPresentScript() =>
         "(function(){var b=document.querySelector('#prompt-textarea')||document.querySelector('div[contenteditable=\"true\"]');return b?'yes':'no';})();";
 
+    // Types the prompt into the composer and sends it, but only after reading the
+    // composer back and confirming it actually holds what we meant to send.
+    //
+    // The read-back is the important part. Without it, a composer that silently
+    // dropped or mangled the text still got Enter pressed, and ChatGPT received
+    // a fragment. That failure was invisible: the old script returned the string
+    // 'submitted' whether or not the text had survived. It now refuses to press
+    // send on a mismatch and hands the actual composer contents back for the log.
     private static string SubmitScript(string prompt) =>
         "(function(){var P=" + J(prompt) + ";" +
         "var box=document.querySelector('#prompt-textarea')||document.querySelector('div[contenteditable=\"true\"]');" +
         "if(!box)return 'no-composer';box.focus();" +
         "try{document.execCommand('selectAll',false,null);document.execCommand('insertText',false,P);}catch(e){}" +
-        "if(!box.textContent||box.textContent.trim()===''){box.textContent=P;}" +
+        "var read=function(){return (box.innerText||box.textContent||'').replace(/\\s+/g,' ').trim();};" +
+        "var got=read();" +
+        "if(got.length===0){try{box.textContent=P;got=read();}catch(e){}}" +
         "box.dispatchEvent(new Event('input',{bubbles:true}));" +
+        "var head=P.slice(0,40).replace(/\\s+/g,' ').trim();" +
+        "if(got.indexOf(head)!==0)return 'mismatch|want:'+head+'|got:'+got.slice(0,90);" +
         "setTimeout(function(){var btn=document.querySelector('button[data-testid=\"send-button\"]')||document.querySelector('button[aria-label=\"Send prompt\"]');" +
         "if(btn){btn.click();}else{box.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));}},450);" +
-        "return 'submitted';})();";
+        "return 'submitted|'+got.length+' chars';})();";
 
     // Returns every finished, LARGE image on the page, in DOM order (last =
     // most recent). We detect by size rather than URL: ChatGPT serves generated
@@ -638,9 +982,13 @@ public partial class MainWindow : Window
     private void SetBusy(bool busy)
     {
         BtnGenNext.IsEnabled = !busy;
-        BtnGenAll.IsEnabled = !busy;
+        BtnGenCategory.IsEnabled = !busy;
+        BtnGenAllCats.IsEnabled = !busy;
         BtnDownload.IsEnabled = !busy;
+        BtnScan.IsEnabled = !busy;
         BtnStop.IsEnabled = busy;
+        // Both auto boxes stay live while busy: unticking either is how the
+        // user stops a run, so disabling them would trap it.
     }
 
     private void Log(string msg)
@@ -650,11 +998,20 @@ public partial class MainWindow : Window
         LogBox.ScrollToEnd();
     }
 
-    private class JobItem
+    private class Article
     {
-        public string Id = "";
+        public string Path = "";          // absolute path to the .md
+        public string RelFile = "";       // path relative to the category folder
+        public string Slug = "";
+        public string Category = "";
         public string Title = "";
+        public string Author = "";
+        public string Office = "";
+        public string DateUpdated = "";
+        public string VelocityTier = "";
+        public string Status = "";
         public string Prompt = "";
-        public bool HasImage;
+        public string ImageFile = "";
+        public bool HasImage => ImageFile.Length > 0;
     }
 }

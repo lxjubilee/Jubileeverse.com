@@ -40,3 +40,8 @@ yarn-error.log*
 /server/data/*.db
 /server/data/*.db-shm
 /server/data/*.db-wal
+
+# Persona activation cache (SessionStart hook). Fetched from the personas API,
+# ~125 KB per persona, refreshed every 24h. Never commit: it is generated, and
+# it is the API's copy, not ours.
+/.claude/cache/

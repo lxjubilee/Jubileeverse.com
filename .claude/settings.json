@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/activate-persona.mjs\"",
+            "timeout": 40,
+            "statusMessage": "Activating Amir Inspire..."
+          }
+        ]
+      }
+    ]
+  }
+}

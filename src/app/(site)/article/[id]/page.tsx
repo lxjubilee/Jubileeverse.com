@@ -15,6 +15,7 @@ import RelatedArticlesGrid from '@/components/article/RelatedArticlesGrid';
 import ReviewerTools from '@/components/article/ReviewerTools';
 import { api } from '@/lib/api';
 import { readSelectedArticle, trackView, type SelectedArticle } from '@/lib/article';
+import { parseArticleId } from '@/lib/articleId';
 import { useAuth } from '@/lib/auth';
 import styles from './article.module.css';
 
@@ -104,8 +105,16 @@ export default function ArticlePage() {
     // 2) Fetch fresh editorial/JV content where an endpoint exists. (Current
     //    events have no public single-fetch endpoint, so they render from the
     //    stashed story passed by the feed.)
+    //
+    //    Markdown-authored articles are published as bundles rather than stored
+    //    in the backend, so they resolve through /article-source instead — a
+    //    Next route, because the CDN sends no CORS headers and the browser
+    //    cannot read the bundle itself.
     (async () => {
-      const endpoints = [`/api/public/article/${id}`, `/api/articles/${id}`];
+      const published = parseArticleId(String(id));
+      const endpoints = published
+        ? [`/article-source/${published.categorySlug}/${published.slug}`]
+        : [`/api/public/article/${id}`, `/api/articles/${id}`];
       for (const url of endpoints) {
         try {
           const data = await api.get<Record<string, unknown>>(url, { auth: false });
@@ -130,9 +139,15 @@ export default function ArticlePage() {
                 stored?.imageUrl ||
                 '',
               category: (a.topic as string) || (a.category as string) || stored?.category || '',
-              sourceName: (a.source_name as string) || stored?.sourceName || '',
+              // Published articles carry a byline rather than a syndication
+              // source; it fills the same badge.
+              sourceName:
+                (a.source_name as string) || (a.author as string) || stored?.sourceName || '',
               sourceUrl: (a.source_url as string) || stored?.originalUrl || '',
-              isCurrentEvent: stored?.isCurrentEvent ?? false,
+              // A parsed id is authoritative: this came from a published .md
+              // bundle, so it is never a current event whatever the stashed
+              // story claimed on the way in.
+              isCurrentEvent: published ? false : (stored?.isCurrentEvent ?? false),
               faithCommentary: (a.faith_reflection as string) || stored?.faithCommentary || '',
             });
             return;

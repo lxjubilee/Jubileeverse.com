@@ -5,7 +5,7 @@
  * with the Jubilee Inspire prophetic-pastoral voice.
  */
 
-const Anthropic = require('@anthropic-ai/sdk');
+const { clientFor, credentialChain } = require('./anthropic-client');
 
 const JUBILEE_INSPIRE_SYSTEM_PROMPT = `You are Jubilee Inspire — an evangelist–prophet voice rooted in the original Hebrew and Greek Scriptures as understood by the early church in the Book of Acts. You write in a style that reflects the cadence and reasoning pattern of the Scriptures themselves, especially the apostolic tone of Paul: clear argument, layered reasoning, rhetorical questions, exhortation, and a strong concluding charge. However, your writing must remain at an eighth-grade reading level — clear, accessible, relatable, and emotionally engaging. You must teach the commandments of God and the teachings of Jesus through the essence of love, never from legalism, never from rigid rule enforcement, but as the natural outflow of covenant devotion. Every teaching must be directly supported by the Word of God or clearly grounded in the essence and subtext of Scripture. If a doctrine, tradition, or Christian custom cannot be directly supported by Scripture, do not include it. Teach only what is written or clearly derived from what is written.
 
@@ -53,15 +53,12 @@ const TONE_VARIATIONS = [
 
 class JubileeInspireGenerator {
     constructor(apiKey) {
-        // Key priority chain: Claude Code OAuth → Primary → Backup
-        this._apiKeys = [
-            apiKey,
-            process.env.ANTHROPIC_API_KEY_CLAUDE_CODE,
-            process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY_PRIMARY,
-            process.env.ANTHROPIC_API_KEY_BACKUP,
-        ].filter(Boolean);
+        // Priority chain: caller-supplied → Claude Code OAuth → Primary → Backup.
+        // clientFor() routes each credential to the right auth header — an OAuth
+        // token sent as x-api-key 401s, which is what used to skip it entirely.
+        this._apiKeys = credentialChain(apiKey);
         this._keyIndex = 0;
-        this.anthropic = new Anthropic({ apiKey: this._apiKeys[0] });
+        this.anthropic = clientFor(this._apiKeys[0]);
     }
 
     /** Rotate API key on credit exhaustion or auth errors, then fall back to Kimi */
@@ -71,8 +68,8 @@ class JubileeInspireGenerator {
         for (let i = this._keyIndex; i < this._apiKeys.length; i++) {
             if (i > this._keyIndex) {
                 this._keyIndex = i;
-                this.anthropic = new Anthropic({ apiKey: this._apiKeys[i] });
-                console.log(`[KEY ROTATE] Switching to Anthropic key index ${i}`);
+                this.anthropic = clientFor(this._apiKeys[i]);
+                console.log(`[KEY ROTATE] Switching to Anthropic credential index ${i}`);
             }
             try {
                 return await this.anthropic.messages.create(params);

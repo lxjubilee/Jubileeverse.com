@@ -7,7 +7,7 @@
  * recipe execution → Claude API → post-processing → safety validation
  */
 
-const Anthropic = require('@anthropic-ai/sdk');
+const { clientFor, credentialChain } = require('./anthropic-client');
 const { logAuditEvent } = require('./audit');
 const { createRevision } = require('./content-objects');
 
@@ -26,16 +26,12 @@ const SCRIPTURE_CITE_RE = /\b[A-Z][a-z]+ \d+:\d+/g;
 class GenerationService {
     constructor(pgPool) {
         this._pgPool = pgPool;
-        // Key rotation chain: CLAUDE_CODE → PRIMARY → BACKUP
-        this._apiKeys = [
-            process.env.ANTHROPIC_API_KEY_CLAUDE_CODE,
-            process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY_PRIMARY,
-            process.env.ANTHROPIC_API_KEY_BACKUP,
-        ].filter(Boolean);
+        // Rotation chain: CLAUDE_CODE → PRIMARY → BACKUP. Each credential is
+        // wrapped by clientFor(), which routes an OAuth token to Bearer auth
+        // and an API key to x-api-key — passing either to the wrong field 401s.
+        this._apiKeys = credentialChain();
         this._keyIndex = 0;
-        this._anthropic = this._apiKeys.length
-            ? new Anthropic({ apiKey: this._apiKeys[0] })
-            : null;
+        this._anthropic = this._apiKeys.length ? clientFor(this._apiKeys[0]) : null;
         // Rate limit in-memory state
         this._userHourly  = new Map();  // userId → { count, windowStart }
         this._systemDaily = { count: 0, dayStart: this._getPstMidnightMs() };
@@ -48,8 +44,8 @@ class GenerationService {
         for (let i = this._keyIndex; i < this._apiKeys.length; i++) {
             if (i > this._keyIndex) {
                 this._keyIndex = i;
-                this._anthropic = new Anthropic({ apiKey: this._apiKeys[i] });
-                console.log(`[GenerationService] Rotating to Anthropic key index ${i}`);
+                this._anthropic = clientFor(this._apiKeys[i]);
+                console.log(`[GenerationService] Rotating to Anthropic credential index ${i}`);
             }
             try {
                 return await this._anthropic.messages.create(params);
@@ -211,8 +207,10 @@ class GenerationService {
 
         let r;
         if (userApiKey) {
-            // Use caller-supplied API key (OAuth / user identity) — bypasses key rotation
-            const userClient = new Anthropic({ apiKey: userApiKey });
+            // Use caller-supplied credential (OAuth / user identity) — bypasses
+            // key rotation. clientFor() picks the auth header from its shape, so
+            // an OAuth token here authenticates instead of 401ing.
+            const userClient = clientFor(userApiKey);
             r = await userClient.messages.create(params);
         } else {
             r = await this._create(params);

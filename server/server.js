@@ -13480,48 +13480,9 @@ app.get('/api/pulse-tasks/:id', async (req, res) => {
 // JUBILEE CHAT API
 // =============================================================================
 
-const Anthropic = require('@anthropic-ai/sdk');
-
-/**
- * Build the shared Anthropic client.
- *
- * Two credential shapes live in .env and they authenticate differently:
- *   sk-ant-oat*  — OAuth token  -> Authorization: Bearer  (SDK `authToken`)
- *   sk-ant-api*  — API key      -> x-api-key              (SDK `apiKey`)
- * Passing an OAuth token as `apiKey` fails with 401 "invalid x-api-key", so the
- * credential type has to pick the field. Never set both — the SDK then sends
- * both headers and the API rejects the request.
- *
- * Priority: CLAUDE_CODE first (the verified working credential), then the
- * api-key chain so a restored api03 key takes over without a code change.
- */
-function buildAnthropicClient() {
-    const candidates = [
-        process.env.ANTHROPIC_API_KEY_CLAUDE_CODE,
-        process.env.ANTHROPIC_API_KEY,
-        process.env.ANTHROPIC_API_KEY_PRIMARY,
-        process.env.ANTHROPIC_API_KEY_BACKUP,
-        process.env.CLAUDE_API_KEY,
-    ].filter(Boolean);
-
-    const credential = candidates[0];
-    if (!credential) {
-        console.warn('[Anthropic] No credential configured — Anthropic calls will fail over to OpenAI');
-        return new Anthropic({ apiKey: 'missing' });
-    }
-
-    if (credential.startsWith('sk-ant-oat')) {
-        console.log('[Anthropic] Using OAuth token (Authorization: Bearer)');
-        return new Anthropic({
-            apiKey: null,   // must stay null: apiKey + authToken together => 401
-            authToken: credential,
-            defaultHeaders: { 'anthropic-beta': 'oauth-2025-04-20' },
-        });
-    }
-
-    console.log('[Anthropic] Using API key (x-api-key)');
-    return new Anthropic({ apiKey: credential });
-}
+// Credential-shape-aware client construction lives in lib/anthropic-client.js,
+// shared with generation-service, persona-router and the inspire generator.
+const { buildAnthropicClient, clientFor, credentialChain } = require('./lib/anthropic-client');
 
 const anthropic = buildAnthropicClient();
 
@@ -21183,23 +21144,20 @@ if (require.main === module) {
                                         originalPromptLength: prompt.length
                                     });
 
-                                    // Use Claude to rewrite the prompt incorporating the themes
-                                    // Try multiple API keys if one fails
-                                    const Anthropic = require('@anthropic-ai/sdk');
-                                    const apiKeys = [
-                                        process.env.ANTHROPIC_API_KEY_PRIMARY,
-                                        process.env.ANTHROPIC_API_KEY_BACKUP,
-                                        process.env.ANTHROPIC_API_KEY_CLAUDE_CODE
-                                    ].filter(k => k);
+                                    // Use Claude to rewrite the prompt incorporating the themes.
+                                    // Shared credential chain, so an OAuth token is sent as a
+                                    // Bearer token rather than as x-api-key (which 401s).
+                                    const apiKeys = credentialChain();
 
                                     let rewriteResponse = null;
                                     let lastError = null;
 
                                     for (let i = 0; i < apiKeys.length; i++) {
                                         try {
-                                            const anthropic = new Anthropic({ apiKey: apiKeys[i] });
+                                            const anthropic = clientFor(apiKeys[i]);
                                             rewriteResponse = await anthropic.messages.create({
-                                                model: 'claude-3-5-haiku-20241022',
+                                                // claude-3-5-haiku-20241022 was retired 2026-02-19.
+                                                model: 'claude-haiku-4-5',
                                                 max_tokens: 800,
                                                 messages: [{
                                                     role: 'user',

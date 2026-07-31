@@ -1,0 +1,4 @@
+Alright - please craft 60 new articles across all 5 categories on the JubileeVerse.com website. That is 
+12 articles for the first category, 12 for the second category, 12 for the third category, 12 for the fourth category, and 12 for the fifth category - for a total of 60 articles. Where each of the 12 articles within each category are written by each of the Inspire Family members. In other words, each of the Inspire family personas will write a total of 5 articles - one for each of the five categories across the website. 
+
+Make sure that each article written is throught-provoking, exciting, dramatic, suspenseful, entertaining, life-changing in it's lessons to learn, and highly emotionally compelling and impactful as well. Do all 60 articles - release 12 workers where each worker will do five articles each - where each worker will represent one of the Inspire Family member and will written in their own unique style and voice. 

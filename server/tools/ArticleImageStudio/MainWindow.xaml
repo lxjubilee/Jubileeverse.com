@@ -2,43 +2,85 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
-        Title="Image Studio — JubileeVerse" Height="900" Width="1500"
+        Title="Image Studio — JubileeVerse" Height="900" Width="1560"
         Background="#1b1e28">
+    <Window.Resources>
+        <!-- Tab chrome that reads on the dark panel. WPF's default tab headers
+             are light grey on light grey and vanish against #232733. -->
+        <Style TargetType="TabItem">
+            <Setter Property="Foreground" Value="#9aa0ad" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="9,5" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Chrome" Background="#12141c" BorderBrush="#2c3040"
+                                BorderThickness="1,1,1,0" CornerRadius="3,3,0,0" Margin="0,0,2,0">
+                            <ContentPresenter ContentSource="Header" Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#2b3040" />
+                                <Setter Property="Foreground" Value="#E6AC00" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#1f2331" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="ListBox" x:Key="JobList">
+            <Setter Property="Background" Value="#12141c" />
+            <Setter Property="Foreground" Value="#dfe4ee" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+    </Window.Resources>
+
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="380" />
+            <ColumnDefinition Width="430" />
         </Grid.ColumnDefinitions>
 
         <!-- The real browser -->
         <wv2:WebView2 x:Name="Wv" Grid.Column="0" />
 
-        <!-- Control panel -->
-        <DockPanel Grid.Column="1" Background="#232733" LastChildFill="True">
-            <TextBlock DockPanel.Dock="Top" Text="Image Studio" Foreground="#E6AC00"
+        <!-- Control panel.
+             Scrollable, and every section sized rather than stretched. Two
+             earlier attempts failed on a 1080p screen: a DockPanel gave the tab
+             control only leftovers and collapsed it to zero height, and a Grid
+             with star rows still overflowed, because the header and the button
+             stack together are simply taller than the screen. Proportional
+             layout cannot fix content that does not fit. A ScrollViewer can:
+             nothing is ever pushed somewhere the user cannot reach it. -->
+        <ScrollViewer Grid.Column="1" Background="#232733"
+                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+            <TextBlock Text="Image Studio" Foreground="#E6AC00"
                        FontSize="18" FontWeight="Bold" Margin="14,14,14,2" />
-            <TextBlock DockPanel.Dock="Top" Text="Log in to ChatGPT in the browser, then generate."
+            <TextBlock Text="Log in to ChatGPT in the browser, pick a category, then generate."
                        Foreground="#9aa0ad" FontSize="12" Margin="14,0,14,10" TextWrapping="Wrap" />
 
-            <!-- JubileeVerse API connection (replaces JubiLujah's articles.json) -->
-            <StackPanel DockPanel.Dock="Top" Margin="14,0,14,8">
-                <TextBlock Text="JubileeVerse API — the image queue lives in Postgres, reached over the Express API"
+            <!-- Articles root: the five category folders live under here -->
+            <StackPanel Margin="14,0,14,8">
+                <TextBlock Text="Articles root — the five category folders live under this path"
                            Foreground="#9aa0ad" FontSize="11" Margin="0,0,0,3" TextWrapping="Wrap" />
-                <TextBox x:Name="ApiBase" Text="http://localhost:3107" Height="26" Margin="0,0,0,4"
+                <TextBox x:Name="ArticlesRoot" Height="26" Margin="0,0,0,4"
                          VerticalContentAlignment="Center"
-                         ToolTip="Base URL of the JubileeVerse Express server." />
-                <PasswordBox x:Name="ApiToken" Height="26" Margin="0,0,0,4"
-                             VerticalContentAlignment="Center"
-                             ToolTip="Bearer JWT for a privileged account holding the image:generate permission." />
+                         ToolTip="Folder containing covenant-identity, teshuvah-restoration, shalom-salvation, celebration-mishpakhah and torah-hebraic." />
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                    <Button x:Name="BtnConnect" Grid.Column="0" Content="Connect" Height="28" Click="BtnConnect_Click" />
+                    <Button x:Name="BtnScan" Grid.Column="0" Content="Scan categories" Height="28" Click="BtnScan_Click" />
                     <Button x:Name="BtnSaveCfg" Grid.Column="2" Content="Save settings" Height="28" Click="BtnSaveCfg_Click"
                             ToolTip="Writes studio.config.json next to the tool (git-ignored)." />
                 </Grid>
             </StackPanel>
 
-            <StackPanel DockPanel.Dock="Top" Margin="14,0,14,8">
+            <StackPanel Margin="14,0,14,8">
                 <TextBlock Text="Generation location — open your Images project in the browser, then click below"
                            Foreground="#9aa0ad" FontSize="11" Margin="0,4,0,2" TextWrapping="Wrap" />
                 <TextBox x:Name="LocationUrl" Text="https://chatgpt.com/" Height="26" Margin="0,0,0,4"
@@ -46,37 +88,75 @@
                 <Button x:Name="BtnUseLocation" Content="Use current page as location" Height="28" Click="BtnUseLocation_Click" />
             </StackPanel>
 
-            <TextBlock DockPanel.Dock="Top" Text="Jobs needing an image" Foreground="#c9cede"
-                       FontWeight="SemiBold" Margin="14,6,14,4" />
-            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="14,0,14,6">
-                <Button x:Name="BtnReload" Content="Refresh list" Height="28" Width="100" Click="BtnReload_Click" />
-                <CheckBox x:Name="ChkShowAll" Content="Show all" Foreground="#c9cede" VerticalAlignment="Center" Margin="10,0,0,0" Click="BtnReload_Click"
-                          ToolTip="Also list jobs that already have an image (in_review / approved)." />
+            <StackPanel Orientation="Horizontal" Margin="14,6,14,6">
+                <Button x:Name="BtnReload" Content="Refresh" Height="28" Width="86" Click="BtnReload_Click" />
+                <CheckBox x:Name="ChkShowAll" Content="Show articles that already have an image"
+                          Foreground="#c9cede" FontSize="11" VerticalAlignment="Center" Margin="10,0,0,0"
+                          Click="BtnReload_Click" />
             </StackPanel>
 
-            <!-- Bottom action + log -->
-            <StackPanel DockPanel.Dock="Bottom" Margin="14,6,14,12">
+            <!-- One tab per category. Tag carries the folder slug; the ListBox
+                 inside each tab holds that category's articles. A set height,
+                 not a stretch: inside a scrolling stack there is no "leftover"
+                 space to stretch into. -->
+            <TabControl x:Name="Tabs" Height="230" Margin="14,0,14,8" Background="#2b3040" BorderBrush="#2c3040"
+                        BorderThickness="1" SelectionChanged="Tabs_SelectionChanged">
+                <TabItem Header="Covenant" Tag="covenant-identity" ToolTip="Covenant &amp; Identity">
+                    <ListBox x:Name="LstCovenant" Style="{StaticResource JobList}" />
+                </TabItem>
+                <TabItem Header="Teshuvah" Tag="teshuvah-restoration" ToolTip="Teshuvah &amp; Restoration">
+                    <ListBox x:Name="LstTeshuvah" Style="{StaticResource JobList}" />
+                </TabItem>
+                <TabItem Header="Shalom" Tag="shalom-salvation" ToolTip="Shalom &amp; Salvation">
+                    <ListBox x:Name="LstShalom" Style="{StaticResource JobList}" />
+                </TabItem>
+                <TabItem Header="Celebration" Tag="celebration-mishpakhah" ToolTip="Celebration &amp; Mishpakhah">
+                    <ListBox x:Name="LstCelebration" Style="{StaticResource JobList}" />
+                </TabItem>
+                <TabItem Header="Torah" Tag="torah-hebraic" ToolTip="Torah &amp; Hebraic Insights">
+                    <ListBox x:Name="LstTorah" Style="{StaticResource JobList}" />
+                </TabItem>
+            </TabControl>
+
+            <!-- Action buttons -->
+            <StackPanel Margin="14,0,14,6">
                 <CheckBox x:Name="ChkAutoAll" Content="Generate All Images (auto — no clicking)"
-                          Foreground="#E6AC00" FontWeight="SemiBold" Margin="0,2,0,8"
+                          Foreground="#E6AC00" FontWeight="SemiBold" Margin="0,2,0,4"
                           Click="ChkAutoAll_Click"
-                          ToolTip="Check to generate every remaining image back-to-back with no clicking. Uncheck to stop." />
-                <Grid Margin="0,0,0,8">
+                          ToolTip="Generates every pending image back-to-back. Scope is this category, or every tab when All Tabs is ticked. Uncheck to stop." />
+                <!-- Scope switch for the auto run above. Ticking it also starts
+                     the run, so a full sweep is one click rather than two. -->
+                <CheckBox x:Name="ChkAllTabs" Content="All Tabs — every category, not just this one"
+                          Foreground="#E6AC00" FontWeight="SemiBold" Margin="18,0,0,8"
+                          Click="ChkAllTabs_Click"
+                          ToolTip="Walks all five categories in order and generates every article still missing an image. Uncheck to stop." />
+                <Grid Margin="0,0,0,6">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                    <Button x:Name="BtnGenNext" Grid.Column="0" Content="Generate Next" Height="34" Click="BtnGenNext_Click" />
-                    <Button x:Name="BtnGenAll" Grid.Column="2" Content="Generate all pending" Height="34" Click="BtnGenAll_Click" />
+                    <Button x:Name="BtnGenNext" Grid.Column="0" Content="Generate Next" Height="34" Click="BtnGenNext_Click"
+                            ToolTip="The selected article, or the next one in this category still missing an image." />
+                    <Button x:Name="BtnGenCategory" Grid.Column="2" Content="Generate this category" Height="34" Click="BtnGenCategory_Click" />
                 </Grid>
-                <Button x:Name="BtnDownload" Content="⬇ Download current image (manual)" Height="30" Margin="0,0,0,6"
+                <Button x:Name="BtnGenAllCats" Content="Generate all five categories" Height="30" Margin="0,0,0,6"
+                        Click="BtnGenAllCats_Click"
+                        ToolTip="Walks every category in order and generates each article still missing an image." />
+                <Button x:Name="BtnDownload" Content="⬇ Attach current image to selected article (manual)" Height="30" Margin="0,0,0,6"
                         Click="BtnDownload_Click"
-                        ToolTip="Grab the image currently shown in the chat and submit it — wired to the selected job, or the next pending one." />
-                <Button x:Name="BtnStop" Content="Stop" Height="28" Margin="0,0,0,8" Click="BtnStop_Click" IsEnabled="False" />
+                        ToolTip="Grab the image showing in the chat and attach it to the selected article, or the next pending one." />
+                <Button x:Name="BtnStop" Content="Stop" Height="28" Margin="0,0,0,2" Click="BtnStop_Click" IsEnabled="False" />
+            </StackPanel>
+
+            <!-- The log. A set height for the same reason as the tabs: it is the
+                 last thing in a scrolling stack, and it used to be the first
+                 thing pushed off the bottom of the screen, which made the app
+                 impossible to diagnose from. -->
+            <StackPanel Margin="14,0,14,12">
                 <TextBlock Text="Log" Foreground="#9aa0ad" FontSize="11" />
                 <TextBox x:Name="LogBox" Height="150" Margin="0,2,0,0" IsReadOnly="True"
                          Background="#12141c" Foreground="#a8f0c0" FontFamily="Consolas" FontSize="11"
                          TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
             </StackPanel>
 
-            <ListBox x:Name="PendingList" Margin="14,0,14,8" Background="#12141c" Foreground="#dfe4ee"
-                     BorderThickness="0" />
-        </DockPanel>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </Window>

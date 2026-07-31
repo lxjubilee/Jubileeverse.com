@@ -26,7 +26,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const Anthropic = require('@anthropic-ai/sdk');
+const { buildAnthropicClient } = require('./anthropic-client');
 const https = require('https');
 
 const PERSONAS_DIR = path.join(__dirname, '..', '.personas');
@@ -98,10 +98,12 @@ const PERSONA_CONFIG = {
 class PersonaRouter {
     constructor() {
         // Anthropic client (Jubilee secondary, Melody secondary, Zariah secondary, Elias secondary, Zev secondary, Nova secondary, Tahoma secondary)
-        const anthropicKey = process.env.ANTHROPIC_API_KEY_PRIMARY
-            || process.env.ANTHROPIC_API_KEY
-            || process.env.ANTHROPIC_API_KEY_CLAUDE_CODE;
-        this._anthropic = anthropicKey ? new Anthropic({ apiKey: anthropicKey }) : null;
+        //
+        // Shares the standard credential chain, so CLAUDE_CODE now leads where
+        // this used to prefer PRIMARY — and, more to the point, an OAuth token
+        // is sent as a Bearer token instead of as x-api-key, which 401s.
+        // Null when nothing is configured; callers already guard on that.
+        this._anthropic = buildAnthropicClient();
 
         // Deepseek API key (Zariah primary)
         // NOTE: DEEPSEEK_EMAIL / DEEPSEEK_PASSWORD are web login credentials only.
