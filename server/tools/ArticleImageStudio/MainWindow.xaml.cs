@@ -25,7 +25,7 @@ namespace ArticleImageStudio;
 //
 // The five categories each get a tab. A tab lists the articles in its folder
 // whose `image_file` frontmatter field is still empty, generates from that
-// article's own `image_prompt`, writes <slug>.jpg into the category's images/
+// article's own `image_prompt`, converts to WebP and writes <slug>.webp into
 // folder, and fills `image_file` in. No database, no server, no API token.
 //
 // NOTE on the approval gate: the previous API build posted images into the
@@ -120,8 +120,42 @@ public partial class MainWindow : Window
             ? Path.Combine(_root, "server", "tools", "ArticleImageStudio")
             : AppContext.BaseDirectory;
         _configFile = Path.Combine(_toolDir, "studio.config.json");
-        _userDataFolder = Path.Combine(_toolDir, ".webview2");
+
+        // The WebView2 profile must live on a LOCAL disk. The tool directory is
+        // normally on a mapped network share (W: -> \\HDC-INSPIRESERVER\Websites),
+        // and Chromium does not support a user data folder on a network path: the
+        // browser process faults with STATUS_IN_PAGE_ERROR (0xc0000006) the moment
+        // the share goes stale, which kills the pane and then the app. Keep the
+        // cookie store next to the user's other local app data instead.
+        _userDataFolder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "JubileeVerse", "ArticleImageStudio", "webview2");
         Directory.CreateDirectory(_userDataFolder);
+
+        // One-time migration so an existing ChatGPT login survives the move.
+        try
+        {
+            var legacy = Path.Combine(_toolDir, ".webview2", "EBWebView");
+            var moved = Path.Combine(_userDataFolder, "EBWebView");
+            if (Directory.Exists(legacy) && !Directory.Exists(moved))
+                CopyTree(legacy, moved);
+        }
+        catch { /* a fresh login is an acceptable fallback */ }
+    }
+
+    // Recursive directory copy. Used only for the one-time profile migration off
+    // the network share; files the browser has locked are skipped rather than
+    // failing the whole copy.
+    private static void CopyTree(string from, string to)
+    {
+        Directory.CreateDirectory(to);
+        foreach (var file in Directory.GetFiles(from))
+        {
+            try { File.Copy(file, Path.Combine(to, Path.GetFileName(file)), overwrite: true); }
+            catch { }
+        }
+        foreach (var sub in Directory.GetDirectories(from))
+            CopyTree(sub, Path.Combine(to, Path.GetFileName(sub)));
     }
 
     // ---- config (git-ignored) ----------------------------------------------
@@ -333,7 +367,7 @@ public partial class MainWindow : Window
             string Get(string k) => f.TryGetValue(k, out var v) ? v : "";
 
             // Nested articles are all called article.md, so the filename alone
-            // would name every generated image article.jpg and collide. In that
+            // would name every generated image article.webp and collide. In that
             // layout the containing folder is the slug, which is what the
             // _meta.json beside it uses.
             var baseName = Path.GetFileNameWithoutExtension(path);
@@ -807,8 +841,9 @@ public partial class MainWindow : Window
     }
 
     // Fetch the image bytes inside the page (keeps the auth session), receive
-    // them via a web message, write <slug>.jpg into the category's images/
-    // folder, and record the filename in the article's image_file field.
+    // them via a web message, re-encode to WebP, write <slug>.webp into the
+    // category's images/ folder, and record the filename in the article's
+    // image_file field.
     private async Task<bool> SaveImage(string src, Article job, CancellationToken ct)
     {
         _imageMsg = new TaskCompletionSource<string>();
@@ -818,13 +853,28 @@ public partial class MainWindow : Window
 
         try
         {
-            var bytes = Convert.FromBase64String(b64);
+            var original = Convert.FromBase64String(b64);
             var imagesDir = Path.Combine(_articlesRoot, job.Category, "images");
             Directory.CreateDirectory(imagesDir);
 
-            var fileName = job.Slug + ".jpg";
+            // Convert as soon as it lands. ChatGPT hands back multi-megabyte
+            // PNG/JPEG; WebP is a fraction of that for the same picture, and
+            // storing one format keeps every consumer from having to care which
+            // extension a given article happens to use.
+            var (bytes, ext) = ToWebp(original, out var note);
+            if (note.Length > 0) Log("  " + note);
+
+            var fileName = job.Slug + ext;
             var dest = Path.Combine(imagesDir, fileName);
             await File.WriteAllBytesAsync(dest, bytes, ct);
+
+            // Remove a previous render of this article in another format, or
+            // the folder accumulates an orphan .jpg beside every new .webp.
+            foreach (var stale in StaleSiblings(imagesDir, job.Slug, fileName))
+            {
+                try { File.Delete(stale); Log($"  Removed superseded {Path.GetFileName(stale)}"); }
+                catch { /* not worth failing the save over */ }
+            }
 
             if (!WriteImageFile(job.Path, fileName))
             {
@@ -836,7 +886,9 @@ public partial class MainWindow : Window
             // Keep the on-disk tracker current after every single image, so a
             // run that is stopped or crashes still leaves an accurate index.
             WriteIndex(job.Category);
-            Log($"  Saved images/{fileName}  ({bytes.Length:N0} bytes)");
+            var saved = original.Length > 0 ? 100 - (int)(bytes.LongLength * 100 / original.LongLength) : 0;
+            Log($"  Saved images/{fileName}  ({bytes.Length:N0} bytes"
+                + (ext == WebpExt ? $", {saved}% smaller than the {original.Length:N0} byte original)" : ")"));
             Log($"  image_file recorded in {Path.GetFileName(job.Path)} and {job.Category}/{IndexFileName}");
             return true;
         }
@@ -844,6 +896,83 @@ public partial class MainWindow : Window
         {
             Log("  ✗ Could not save the image: " + ex.Message);
             return false;
+        }
+    }
+
+    // ---- image conversion --------------------------------------------------
+
+    private const string WebpExt = ".webp";
+
+    /// <summary>
+    /// WebP quality for saved article images. 82 is visually indistinguishable
+    /// from the source on photographic content and lands around a tenth of the
+    /// bytes; higher buys nothing a reader can see.
+    /// </summary>
+    private const int WebpQuality = 82;
+
+    /// <summary>
+    /// Re-encode a downloaded image as WebP.
+    ///
+    /// Falls back to the original bytes, under their true extension, if the
+    /// encode fails or comes out no smaller. Losing a generated image to a
+    /// conversion problem would cost a GPU render and silently drop the article
+    /// out of the queue, so the original always wins over nothing.
+    /// </summary>
+    /// <returns>The bytes to write and the extension to write them under.</returns>
+    private static (byte[] Bytes, string Ext) ToWebp(byte[] source, out string note)
+    {
+        note = "";
+        try
+        {
+            using var image = SixLabors.ImageSharp.Image.Load(source);
+            using var ms = new MemoryStream();
+            image.Save(ms, new SixLabors.ImageSharp.Formats.Webp.WebpEncoder
+            {
+                Quality = WebpQuality,
+                FileFormat = SixLabors.ImageSharp.Formats.Webp.WebpFileFormatType.Lossy,
+            });
+            var webp = ms.ToArray();
+
+            if (webp.Length == 0 || webp.Length >= source.Length)
+            {
+                note = $"WebP came out {webp.Length:N0} bytes vs {source.Length:N0} original; keeping the original.";
+                return (source, SniffExtension(source));
+            }
+            return (webp, WebpExt);
+        }
+        catch (Exception ex)
+        {
+            note = "WebP conversion failed (" + ex.Message + "); saving the original instead.";
+            return (source, SniffExtension(source));
+        }
+    }
+
+    /// <summary>
+    /// The real extension for a byte buffer, from its magic number. Never trust
+    /// the URL: ChatGPT serves these from blob/CDN paths that carry no format.
+    /// </summary>
+    private static string SniffExtension(byte[] b)
+    {
+        if (b.Length >= 8 && b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47) return ".png";
+        if (b.Length >= 3 && b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) return ".jpg";
+        if (b.Length >= 12
+            && b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F'
+            && b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P') return WebpExt;
+        return ".jpg";
+    }
+
+    /// <summary>
+    /// Other renders of the same article sitting beside the one just written —
+    /// a `.jpg` left over from before the WebP switch, for instance.
+    /// </summary>
+    private static IEnumerable<string> StaleSiblings(string imagesDir, string slug, string keep)
+    {
+        foreach (var ext in new[] { ".jpg", ".jpeg", ".png", WebpExt })
+        {
+            var name = slug + ext;
+            if (string.Equals(name, keep, StringComparison.OrdinalIgnoreCase)) continue;
+            var path = Path.Combine(imagesDir, name);
+            if (File.Exists(path)) yield return path;
         }
     }
 

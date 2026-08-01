@@ -1,54 +1,37 @@
 /**
  * Published-articles source for the five-fold category portals.
  *
- * Articles are authored as markdown and published as a per-category bundle:
+ * Articles are authored as markdown and published as a per-category bundle,
+ * read from the CDN and nowhere else:
  *
- *   <root>/<category>/articles.json       manifest — the authoritative list
- *   <root>/<category>/<slug>.md           article source: frontmatter + body
- *   <root>/<category>/images/<file>.jpg   generated hero image
+ *   <CDN_BASE_URL>/articles/<category>/articles.json     manifest — the list
+ *   <CDN_BASE_URL>/articles/<category>/<slug>.md         frontmatter + body
+ *   <CDN_BASE_URL>/articles/<category>/images/<file>     hero image
  *
- * `<root>` is the working folder while developing and the CDN once published:
- *
- *   local      ARTICLES_LOCAL_ROOT   default J:/jubileeverse.com/articles
- *   deployed   <CDN_BASE_URL>/articles
- *
- * The local root is used when it exists and the CDN otherwise, so a checkout
- * without the drive mounted still renders published content. Pin it explicitly
- * with ARTICLES_SOURCE=local|cdn.
+ * One source, everywhere: localhost renders exactly what production renders,
+ * so nothing depends on a working drive being mounted and no environment can
+ * quietly serve different content. Authoring still happens in a working folder
+ * and reaches the site by being published to the CDN.
  *
  * The manifest is the source of truth: a category with `"articles": []` renders
  * as empty even if stray files sit beside it. Anything not listed there — and
  * anything still in the old CDN articles catalog — is not published.
  *
  * **Server-side only.** The CDN is served without CORS headers, so the browser
- * can never read these files itself: the portals are server components, and the
- * reader goes through the /article-source route.
+ * can never read these files itself: the portals are server components, images
+ * are linked straight to the CDN, and the reader goes through /article-source.
  */
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import { makeArticleId } from './articleId';
-import { CDN_BASE_URL } from './cdn';
+import { CDN_BASE_URL, type NavCategory } from './cdn';
 
-/** Where the article bundles live while developing. */
-export const ARTICLES_LOCAL_ROOT = (
-  process.env.ARTICLES_LOCAL_ROOT || 'J:/jubileeverse.com/articles'
-).replace(/[\\/]+$/, '');
-
-/** Where they live once published. */
+/** Where the published article bundles live. */
 export const ARTICLES_CDN_ROOT = `${CDN_BASE_URL}/articles`;
 
 /** Give up rather than hanging a page render on a slow CDN. */
 const FETCH_TIMEOUT_MS = 8000;
 
-/** How long a CDN-fetched manifest stays fresh. Local reads are never cached. */
+/** How long a fetched manifest stays fresh. */
 const MANIFEST_TTL_MS = 5 * 60 * 1000;
-
-type Source = 'local' | 'cdn';
-
-const PINNED_SOURCE: Source | null = (() => {
-  const value = (process.env.ARTICLES_SOURCE || '').trim().toLowerCase();
-  return value === 'local' || value === 'cdn' ? value : null;
-})();
 
 /**
  * Route slug -> published folder name, where the two differ. The nav links to
@@ -122,41 +105,17 @@ export interface SiteArticleDetail extends SiteArticle {
   content: string;
 }
 
-/**
- * Which source is in play. Memoised: the answer cannot change within a process,
- * and this is called on every portal render.
- */
-let sourcePromise: Promise<Source> | null = null;
-export function articlesSource(): Promise<Source> {
-  if (PINNED_SOURCE) return Promise.resolve(PINNED_SOURCE);
-  if (!sourcePromise) {
-    sourcePromise = fs
-      .access(ARTICLES_LOCAL_ROOT)
-      .then(() => 'local' as const)
-      .catch(() => 'cdn' as const);
-  }
-  return sourcePromise;
-}
-
-/** Strip leading slashes so a relative path can be joined onto either root. */
+/** Strip leading slashes so a relative path can be joined onto the root. */
 const clean = (relPath: string) => relPath.replace(/^[\\/]+/, '');
 
 /** Absolute CDN URL for a path relative to the articles root. */
 export const articlesCdnUrl = (relPath: string) => `${ARTICLES_CDN_ROOT}/${clean(relPath)}`;
 
 /**
- * Read one file from whichever source is active. Returns null when it is
- * missing — callers degrade to an empty portal rather than throwing.
+ * Read one file from the published bundle. Returns null when it is missing —
+ * callers degrade to an empty portal rather than throwing.
  */
 export async function readArticleFile(relPath: string): Promise<string | null> {
-  if ((await articlesSource()) === 'local') {
-    try {
-      return await fs.readFile(path.join(ARTICLES_LOCAL_ROOT, clean(relPath)), 'utf8');
-    } catch {
-      return null;
-    }
-  }
-
   const url = articlesCdnUrl(relPath);
   try {
     const res = await fetch(url, {
@@ -178,15 +137,10 @@ export async function readArticleFile(relPath: string): Promise<string | null> {
 /**
  * The URL a browser should use for a published asset (hero images).
  *
- * Published assets are served straight off the CDN so they keep edge caching;
- * local ones go through /article-files, since the working folder sits outside
- * the Next public directory and cannot be served statically.
+ * Straight to the CDN, so images keep edge caching and never round-trip
+ * through this server.
  */
-export async function articleAssetUrl(relPath: string): Promise<string> {
-  return (await articlesSource()) === 'local'
-    ? `/article-files/${clean(relPath)}`
-    : articlesCdnUrl(relPath);
-}
+export const articleAssetUrl = articlesCdnUrl;
 
 const manifestCache = new Map<string, { at: number; manifest: Manifest | null }>();
 
@@ -208,20 +162,20 @@ async function readManifest(folder: string): Promise<Manifest | null> {
     }
   }
 
-  // Local files are re-read every time so edits show up without a restart.
-  if ((await articlesSource()) === 'cdn') {
-    manifestCache.set(folder, { at: Date.now(), manifest });
-  }
+  // Negative results are cached too: an unpublished category must not cost a
+  // CDN round trip on every render, and the root segment asks about every
+  // unknown slug that reaches it.
+  manifestCache.set(folder, { at: Date.now(), manifest });
   return manifest;
 }
 
 /** Manifest entry -> the shape the portals render. */
-async function toSiteArticle(
+function toSiteArticle(
   entry: ManifestArticle & { slug: string; title: string },
   routeSlug: string,
   folder: string,
   categoryLabel: string,
-): Promise<SiteArticle> {
+): SiteArticle {
   // An image is only linked once it has actually been generated; otherwise the
   // card renders its placeholder rather than a broken <img>.
   const hasImage = entry.image_status === 'generated' && !!entry.image_file;
@@ -232,7 +186,7 @@ async function toSiteArticle(
     title: entry.title,
     author: entry.author || '',
     category: categoryLabel,
-    image: hasImage ? await articleAssetUrl(`${folder}/images/${entry.image_file}`) : null,
+    image: hasImage ? articleAssetUrl(`${folder}/images/${entry.image_file}`) : null,
     created: entry.date_updated || '',
   };
 }
@@ -258,9 +212,7 @@ export async function fetchCategoryArticles(routeSlug: string): Promise<SiteArti
   if (!manifest) return [];
 
   const label = manifest.category || '';
-  return Promise.all(
-    publishedEntries(manifest).map((entry) => toSiteArticle(entry, routeSlug, folder, label)),
-  );
+  return publishedEntries(manifest).map((entry) => toSiteArticle(entry, routeSlug, folder, label));
 }
 
 /**
@@ -274,6 +226,51 @@ export async function fetchCategoryLabel(routeSlug: string): Promise<string | nu
 /** Whether a route slug is backed by a published article bundle. */
 export async function isPublishedCategory(routeSlug: string): Promise<boolean> {
   return (await readManifest(folderForRoute(routeSlug))) !== null;
+}
+
+/**
+ * Whether a slug is one of the five categories the nav links to.
+ *
+ * Answered from the configured structure alone, with no I/O: the root segment
+ * asks this about every slug that reaches it, article URLs included.
+ */
+export function isNavCategorySlug(slug: string): boolean {
+  return (CATEGORY_ROUTES as readonly string[]).includes(slug);
+}
+
+/** "torah-hebraic-insights" -> "Torah Hebraic Insights". */
+function humanize(slug: string): string {
+  return slug
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+/**
+ * The five nav categories, in reading order.
+ *
+ * Built from the category structure itself — `CATEGORY_ROUTES` names the five
+ * bundles, and each one's manifest supplies the display name ("Covenant &
+ * Identity"). Nothing is listed or discovered at the CDN root: object storage
+ * serves no directory index, so a folder can only be found by asking for a file
+ * inside it, which is exactly what reading the five manifests does.
+ *
+ * All five are always returned. The nav is structural — a slow CDN or a
+ * momentarily missing manifest must not make a category disappear from the site
+ * — so a category whose label cannot be read falls back to its humanised slug
+ * and still links to its portal.
+ *
+ * The manifests are the same ones the portals render from and are memoised for
+ * five minutes, so the nav usually costs no request at all.
+ */
+export async function fetchNavCategories(): Promise<NavCategory[]> {
+  const labels = await Promise.all(
+    CATEGORY_ROUTES.map((slug) => fetchCategoryLabel(slug).catch(() => null)),
+  );
+  return CATEGORY_ROUTES.map((slug, i) => ({
+    slug,
+    label: (labels[i] || humanize(slug)).toUpperCase(),
+  }));
 }
 
 /**
@@ -318,7 +315,7 @@ export async function fetchArticle(
   if (raw === null) return null;
 
   const { data, body } = splitFrontmatter(raw);
-  const base = await toSiteArticle(entry, routeSlug, folder, manifest.category || '');
+  const base = toSiteArticle(entry, routeSlug, folder, manifest.category || '');
   return {
     ...base,
     title: data.title || base.title,

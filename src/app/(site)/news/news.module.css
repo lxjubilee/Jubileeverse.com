@@ -1,0 +1,117 @@
+/* Daily news index. Tokens come from globals.css.
+   The reader at /news/[slug] is the shared <ArticleReader>, so it carries no
+   styles of its own here. */
+
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 5rem;
+}
+
+.header {
+  margin-bottom: 2.5rem;
+}
+
+.title {
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.1;
+  margin: 0 0 0.4rem;
+}
+
+.tagline {
+  margin: 0;
+  opacity: 0.72;
+  font-size: 1.05rem;
+}
+
+.day {
+  margin-bottom: 3rem;
+}
+
+.dayHeading {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.68;
+  margin: 0 0 1.1rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid currentColor;
+  border-color: color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.dayCount {
+  font-size: 0.8rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: 1.5rem;
+}
+
+.card {
+  border-radius: 12px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 4%, transparent);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.16);
+}
+
+.cardLink {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+
+.thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+}
+
+.cardBody {
+  padding: 1rem 1.1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.topic {
+  align-self: flex-start;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.66;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 1.12rem;
+  line-height: 1.32;
+}
+
+.summary {
+  margin: 0;
+  font-size: 0.93rem;
+  line-height: 1.5;
+  opacity: 0.78;
+}
+
+.source {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.58;
+}

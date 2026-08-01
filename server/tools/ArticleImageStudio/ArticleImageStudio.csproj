@@ -14,6 +14,16 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.*" />
+    <!--
+      WebP encoding for downloaded images. Windows Imaging Component ships a
+      WebP *decoder* but no encoder, so this cannot be done with the built-in
+      WPF imaging types.
+
+      Pinned to 2.1.x deliberately: ImageSharp 3.0 moved to the Six Labors Split
+      License, which requires a paid licence above a revenue threshold. The 2.x
+      line is Apache-2.0 and has the WebP encoder we need.
+    -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.*" />
   </ItemGroup>
 
 </Project>

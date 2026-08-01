@@ -273,6 +273,14 @@
   font-size: 14px;
 }
 
+/* Small print under the source link (e.g. the AI-assistance disclosure). */
+.footerNote {
+  margin-top: var(--space-md);
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .loading,
 .error {
   text-align: center;

@@ -45,3 +45,10 @@ yarn-error.log*
 # ~125 KB per persona, refreshed every 24h. Never commit: it is generated, and
 # it is the API's copy, not ours.
 /.claude/cache/
+
+# News pipeline lock + staging
+/server/.tmp/
+
+# Dev-server logs (next.log, api.log and their rotations). These reach tens of
+# megabytes within a session and are pure noise in history.
+/.tmp/

@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { handleImgError, resolveImageUrl } from '@/lib/api';
-import { storeSelectedArticle, trackView } from '@/lib/article';
+import { storeSelectedArticle, storyHref, trackingIdOf, trackView } from '@/lib/article';
 import type { Story } from '@/lib/types';
 import { getRelatedStories } from './relatedSource';
 import styles from './widgets.module.css';
@@ -25,10 +25,12 @@ export default function RelatedStories({
 
   if (stories.length === 0) return null;
 
+  // Same routing rules as StoryCard: CDN news is read at /<slug>, and its
+  // slug id is not something /article/[id] or the tracking tables can take.
   const open = (story: Story) => {
     storeSelectedArticle(story);
-    trackView(story.id);
-    router.push(`/article/${story.id}`);
+    trackView(trackingIdOf(story));
+    router.push(storyHref(story));
   };
 
   return (

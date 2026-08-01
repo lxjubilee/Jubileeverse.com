@@ -2,8 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import RegenerateImageButton from '@/components/admin/RegenerateImageButton';
 import { handleImgError, resolveImageUrl } from '@/lib/api';
-import { storeSelectedArticle, trackView } from '@/lib/article';
+import {
+  storeSelectedArticle,
+  trackView,
+  storyHref,
+  trackingIdOf,
+  regenTargetOf,
+} from '@/lib/article';
 import type { Story } from '@/lib/types';
 import styles from '@/app/(site)/home.module.css';
 
@@ -30,6 +37,9 @@ interface Props {
 export default function HeroCarousel({ stories, status, onRetry }: Props) {
   const router = useRouter();
   const [index, setIndex] = useState(0);
+  // Slides an admin has regenerated, by story id, so the new picture shows on
+  // the slide immediately rather than on the next feed load.
+  const [freshImages, setFreshImages] = useState<Record<string, string>>({});
 
   // Re-running on `index` restarts the timer after every slide change — so a
   // manual dot click also resets the countdown (matches the original).
@@ -41,8 +51,8 @@ export default function HeroCarousel({ stories, status, onRetry }: Props) {
 
   const open = (story: Story) => {
     storeSelectedArticle(story);
-    trackView(story.id);
-    router.push(`/article/${story.id}`);
+    trackView(trackingIdOf(story));
+    router.push(storyHref(story));
   };
 
   // Resolve the effective status. Without an explicit prop, fall back to the
@@ -84,7 +94,7 @@ export default function HeroCarousel({ stories, status, onRetry }: Props) {
   return (
     <>
       {stories.map((story, i) => {
-        const img = resolveImageUrl(story);
+        const img = freshImages[String(story.id)] ?? resolveImageUrl(story);
         const title = story.headline || story.title || '';
         const excerpt = story.excerpt ? `${story.excerpt.substring(0, 200)}...` : '';
         return (
@@ -94,6 +104,14 @@ export default function HeroCarousel({ stories, status, onRetry }: Props) {
             onClick={() => open(story)}
           >
             {img ? <img src={img} alt={title} onError={handleImgError} /> : null}
+            {/* Inactive slides carry pointer-events: none, so only the visible
+                slide's button can be clicked. */}
+            <RegenerateImageButton
+              target={regenTargetOf(story)}
+              onRegenerated={(url) =>
+                setFreshImages((prev) => ({ ...prev, [String(story.id)]: url }))
+              }
+            />
             <div className={styles.heroOverlay}>
               <span className={styles.heroRank}>#{i + 1}</span>
               <h2 className={styles.heroTitle}>{title}</h2>

@@ -1111,16 +1111,27 @@ app.use((req, res, next) => {
 // ── Robustness: global request timeout (30 s) ─────────────────────────────────
 // Prevents any hung DB query or external call from freezing a connection forever.
 // API requests get 30 s; static file requests are excluded (they respond instantly).
+//
+// A few routes legitimately outlive that. Image regeneration renders three
+// candidates on the GPU, scores each one, and asks a vision model to rank them,
+// escalating to a fresh set if none pass — a normal success takes one to three
+// minutes. At the shared 30 s it always timed out, and because the work carried
+// on and answered afterwards it took the process down with ERR_HTTP_HEADERS_SENT.
+const LONG_RUNNING_PATHS = new Map([
+    ['/api/admin/regenerate-image', 300_000],
+]);
+
 app.use((req, res, next) => {
     if (req.path.startsWith('/backoffice/assets/') || req.path.startsWith('/images/') || req.path.startsWith('/fonts/')) {
         return next(); // static assets — no timeout needed
     }
+    const limit = LONG_RUNNING_PATHS.get(req.path) || 30_000;
     const timeout = setTimeout(() => {
         if (!res.headersSent) {
-            console.error(`[Timeout] ${req.method} ${req.path} exceeded 30 s — responding 503`);
+            console.error(`[Timeout] ${req.method} ${req.path} exceeded ${Math.round(limit / 1000)} s — responding 503`);
             res.status(503).json({ error: 'Request timed out. Please try again.' });
         }
-    }, 30_000);
+    }, limit);
     res.on('finish', () => clearTimeout(timeout));
     res.on('close',  () => clearTimeout(timeout));
     next();
@@ -1448,119 +1459,22 @@ app.get('/api/daily-verse', async (req, res) => {
 // RSS FEED PROXY FOR SCANNER
 // =============================================================================
 
-// News source RSS feeds
-const RSS_FEEDS = {
-    cnn: 'http://rss.cnn.com/rss/cnn_topstories.rss',
-    nytimes: 'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml',
-    foxnews: 'https://moxie.foxnews.com/google-publisher/latest.xml',
-    bbc: 'https://feeds.bbci.co.uk/news/rss.xml',
-    jpost: 'https://www.jpost.com/rss/rssfeedsfrontpage.aspx',
-    yahoo: 'https://news.yahoo.com/rss',
-    msn: 'https://www.msn.com/en-us/news/feed'
-};
+// Feed catalog, fetching, parsing, and topic scoring now live in
+// lib/rss-feeds.js so the standalone daily-news job can share them without
+// booting Express. Re-exported into this scope so every call site below is
+// unchanged.
+const {
+    RSS_FEEDS,
+    TOPIC_FEEDS,
+    TOPIC_KEYWORDS,
+    decodeHtmlEntities,
+    stripHtmlTags,
+    fetchRssFeed,
+    parseRssFeed,
+    scoreTopicRelevance,
+} = require('./lib/rss-feeds');
 
-// Topic-focused RSS feeds for current events archival
-const TOPIC_FEEDS = {
-    'church-us': [
-        'https://feeds.christianpost.com/christian-post/homepage',
-        'https://religionnews.com/feed/',
-        'https://www.christianitytoday.com/feeds/all.rss.xml',
-        'https://baptistnews.com/feed/',
-        'https://www.patheos.com/blogs/feed/'
-    ],
-    'church-global': [
-        'https://www.mnnonline.org/feed/',
-        'https://www.imb.org/feed/',
-        'https://cruxnow.com/feed/',
-        'https://religionnews.com/feed/',
-        'https://www.christianheadlines.com/feed/',
-        // Holy Land / Middle East & world regional sources (keyword-filtered to faith relevance)
-        'https://www.jpost.com/rss/rssfeedsmiddleeastnews.aspx',  // Jerusalem Post — Middle East
-        'https://www.jpost.com/rss/rssfeedsisraelnews.aspx',      // Jerusalem Post — Israel
-        'https://www.timesofisrael.com/feed/',                    // Times of Israel
-        'https://www.aljazeera.com/xml/rss/all.xml',              // Al Jazeera (regional/world)
-        'http://rss.cnn.com/rss/cnn_world.rss'                    // CNN World
-    ],
-    'finance': [
-        'https://feeds.marketwatch.com/marketwatch/topstories/',
-        'https://www.cnbc.com/id/100003114/device/rss/rss.html',
-        'https://finance.yahoo.com/news/rssindex',
-        'https://feeds.a.dj.com/rss/RSSMarketsMain.xml',
-        'https://www.investor.gov/rss',
-        'http://rss.cnn.com/rss/money_latest.rss',           // CNN Money
-        'https://feeds.bbci.co.uk/news/business/rss.xml'     // BBC Business
-    ],
-    'technology': [
-        'https://feeds.feedburner.com/TechCrunch/',
-        'https://www.wired.com/feed/rss',
-        'https://www.theverge.com/rss/index.xml',
-        'https://arstechnica.com/feed/',
-        'https://feeds.feedburner.com/venturebeat/SZYF',
-        'http://rss.cnn.com/rss/cnn_tech.rss',                       // CNN Tech
-        'https://feeds.bbci.co.uk/news/technology/rss.xml',          // BBC Technology
-        'https://moxie.foxnews.com/google-publisher/science.xml'     // Fox Science/Tech
-    ],
-    'health': [
-        'https://rss.webmd.com/rss/rss.aspx?RSSSource=RSS_PUBLIC',
-        'https://www.medicalnewstoday.com/rss',
-        'https://consumer.healthday.com/rss/',
-        'https://www.who.int/rss-feeds/news-english.xml',
-        'https://www.nih.gov/news/health/rss',
-        'http://rss.cnn.com/rss/cnn_health.rss',             // CNN Health
-        'https://feeds.bbci.co.uk/news/health/rss.xml'       // BBC Health
-    ],
-    'social': [
-        'https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml',
-        'https://feeds.foxnews.com/foxnews/politics',
-        'https://www.politico.com/rss/politicopicks.xml',
-        'https://thehill.com/feed/',
-        'https://www.npr.org/rss/rss.php?id=1001',
-        // CNN / BBC / Fox / Jerusalem Post — general & world news
-        'http://rss.cnn.com/rss/cnn_allpolitics.rss',            // CNN Politics
-        'http://rss.cnn.com/rss/cnn_topstories.rss',             // CNN Top Stories
-        'https://feeds.bbci.co.uk/news/politics/rss.xml',        // BBC Politics
-        'https://feeds.bbci.co.uk/news/world/rss.xml',           // BBC World
-        'https://moxie.foxnews.com/google-publisher/us.xml',     // Fox US
-        'https://moxie.foxnews.com/google-publisher/world.xml',  // Fox World
-        'https://www.jpost.com/rss/rssfeedsfrontpage.aspx'       // Jerusalem Post front page
-    ],
-    'entertainment': [
-        'https://feeds.feedburner.com/thr/news',
-        'https://variety.com/feed/',
-        'https://deadline.com/feed/',
-        'https://ew.com/feed/',
-        'https://www.rollingstone.com/feed/',
-        'http://rss.cnn.com/rss/cnn_showbiz.rss',                        // CNN Entertainment
-        'https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml'   // BBC Entertainment & Arts
-    ],
-    'faith': [
-        'https://www.relevantmagazine.com/feed/',
-        'https://www.faithwire.com/feed/',
-        'https://billygraham.org/feed/',
-        'https://www.crosswalk.com/feeds/rss/daily-devotional.xml',
-        'https://feeds.christianpost.com/christian-post/church'
-    ],
-    'christian-watch-us': [
-        'https://feeds.christianpost.com/christian-post/us',
-        'https://www.christianheadlines.com/feed/',
-        'https://www.churchleaders.com/feed/',
-        'https://juicyecumenism.com/feed/',
-        'https://www.christianitytoday.com/feeds/all.rss.xml'
-    ]
-};
 
-// Keyword scoring maps for topic relevance
-const TOPIC_KEYWORDS = {
-    'church-us':     ['church', 'pastor', 'congregation', 'ministry', 'christian', 'diocese', 'evangelical', 'sermon', 'baptism', 'worship'],
-    'church-global': ['persecution', 'missionary', 'martyr', 'mission', 'gospel', 'believers', 'freedom of religion', 'church planting'],
-    'finance':       ['economy', 'market', 'inflation', 'interest rate', 'stock', 'recession', 'gdp', 'federal reserve', 'investment', 'trade'],
-    'technology':    ['ai', 'artificial intelligence', 'tech', 'software', 'startup', 'silicon valley', 'data', 'cybersecurity', 'quantum'],
-    'health':        ['health', 'medical', 'disease', 'vaccine', 'hospital', 'fda', 'mental health', 'cancer', 'study finds', 'treatment'],
-    'social':        ['congress', 'senate', 'president', 'legislation', 'policy', 'election', 'government', 'democrat', 'republican', 'bill'],
-    'entertainment': ['movie', 'music', 'award', 'celebrity', 'film', 'album', 'streaming', 'concert', 'oscar', 'grammy', 'box office'],
-    'faith':             ['faith', 'prayer', 'revival', 'spiritual', 'devotion', 'bible', 'god', 'jesus', 'holy spirit', 'blessing', 'miracle'],
-    'christian-watch-us': ['christian', 'church', 'pastor', 'ministry', 'evangelical', 'denomination', 'theology', 'religious freedom', 'faith community', 'congregation']
-};
 
 // =============================================================================
 // LIVE SPORTS DATA API
@@ -1613,160 +1527,6 @@ app.get('/api/scanner/rss/:source', async (req, res) => {
     }
 });
 
-// Helper to fetch RSS feed
-function fetchRssFeed(url) {
-    return new Promise((resolve, reject) => {
-        const protocol = url.startsWith('https') ? https : http;
-
-        const request = protocol.get(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'application/rss+xml, application/xml, text/xml, */*'
-            },
-            timeout: 15000
-        }, (response) => {
-            // Handle redirects
-            if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-                console.log(`[RSS] Following redirect to: ${response.headers.location}`);
-                fetchRssFeed(response.headers.location).then(resolve).catch(reject);
-                return;
-            }
-
-            if (response.statusCode !== 200) {
-                reject(new Error(`HTTP ${response.statusCode}`));
-                return;
-            }
-
-            let data = '';
-            response.on('data', chunk => data += chunk);
-            response.on('end', () => resolve(data));
-            response.on('error', reject);
-        });
-
-        request.on('error', reject);
-        request.on('timeout', () => {
-            request.destroy();
-            reject(new Error('Request timeout'));
-        });
-    });
-}
-
-// Parse RSS XML into articles
-function parseRssFeed(xmlData, source) {
-    const articles = [];
-
-    // Extract items using regex (simple XML parsing)
-    const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
-    let match;
-    let position = 1;
-
-    while ((match = itemRegex.exec(xmlData)) !== null && position <= 20) {
-        const itemXml = match[1];
-
-        // Extract title
-        const titleMatch = itemXml.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i);
-        const title = titleMatch ? decodeHtmlEntities(titleMatch[1].trim()) : '';
-
-        // Extract link
-        const linkMatch = itemXml.match(/<link>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/link>/i);
-        const link = linkMatch ? linkMatch[1].trim() : '';
-
-        // Extract description
-        const descMatch = itemXml.match(/<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/i);
-        const description = descMatch ? decodeHtmlEntities(stripHtmlTags(descMatch[1].trim())).substring(0, 300) : '';
-
-        // Extract publication date
-        const pubDateMatch = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/i);
-        const pubDate = pubDateMatch ? pubDateMatch[1].trim() : '';
-
-        // Extract image from various sources
-        let imageUrl = '';
-
-        // Try media:content
-        const mediaMatch = itemXml.match(/<media:content[^>]*url=["']([^"']+)["']/i);
-        if (mediaMatch) {
-            imageUrl = mediaMatch[1];
-        }
-
-        // Try media:thumbnail
-        if (!imageUrl) {
-            const thumbMatch = itemXml.match(/<media:thumbnail[^>]*url=["']([^"']+)["']/i);
-            if (thumbMatch) {
-                imageUrl = thumbMatch[1];
-            }
-        }
-
-        // Try enclosure
-        if (!imageUrl) {
-            const enclosureMatch = itemXml.match(/<enclosure[^>]*url=["']([^"']+)["'][^>]*type=["']image/i);
-            if (enclosureMatch) {
-                imageUrl = enclosureMatch[1];
-            }
-        }
-
-        // Try image tag in content:encoded
-        if (!imageUrl) {
-            const contentMatch = itemXml.match(/<content:encoded>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/content:encoded>/i);
-            if (contentMatch) {
-                const imgMatch = contentMatch[1].match(/<img[^>]*src=["']([^"']+)["']/i);
-                if (imgMatch) {
-                    imageUrl = imgMatch[1];
-                }
-            }
-        }
-
-        // Try image in description
-        if (!imageUrl && descMatch) {
-            const imgInDescMatch = descMatch[1].match(/<img[^>]*src=["']([^"']+)["']/i);
-            if (imgInDescMatch) {
-                imageUrl = imgInDescMatch[1];
-            }
-        }
-
-        if (title && link) {
-            articles.push({
-                title: title,
-                link: link,
-                description: description,
-                pubDate: pubDate,
-                imageUrl: imageUrl || null,
-                position: position,
-                hasImage: !!imageUrl
-            });
-            position++;
-        }
-    }
-
-    return articles;
-}
-
-// Helper to decode HTML entities
-function decodeHtmlEntities(str) {
-    const entities = {
-        '&amp;': '&',
-        '&lt;': '<',
-        '&gt;': '>',
-        '&quot;': '"',
-        '&#39;': "'",
-        '&apos;': "'",
-        '&#x27;': "'",
-        '&#x2F;': '/',
-        '&nbsp;': ' ',
-        '&#8217;': "'",
-        '&#8216;': "'",
-        '&#8220;': '"',
-        '&#8221;': '"',
-        '&#8211;': '-',
-        '&#8212;': '-'
-    };
-    return str.replace(/&[^;]+;/g, match => entities[match] || match);
-}
-
-// Helper to strip HTML tags
-function stripHtmlTags(str) {
-    return str.replace(/<[^>]*>/g, '').trim();
-}
-
 // Helper to generate SEO-friendly URL slug from title
 function generateSlug(title) {
     if (!title) return '';
@@ -1810,10 +1570,16 @@ if (!fs.existsSync(CE_IMAGE_DIR)) {
     fs.mkdirSync(CE_IMAGE_DIR, { recursive: true });
 }
 
-// Load article writing prompt templates from /prompts/
+// Prompt templates live in server/.prompts/ — dot-prefixed. This was 'prompts'
+// for a long time, which silently resolved to nothing: every loadPrompt()
+// returned null, generateCurrentEventArticle() bailed on its !systemPrompt
+// guard, and ingestTopicStories() skipped every story with no error anywhere.
+const PROMPT_DIR = '.prompts';
+
+// Load article writing prompt templates from /.prompts/ (dot-prefixed on disk)
 function loadPrompt(filename) {
     try {
-        return fs.readFileSync(path.join(__dirname, 'prompts', filename), 'utf8').trim();
+        return fs.readFileSync(path.join(__dirname, PROMPT_DIR, filename), 'utf8').trim();
     } catch (_) {
         return null;
     }
@@ -1822,6 +1588,29 @@ const PROMPT_CURRENT_EVENTS        = loadPrompt('current_events.md');
 const PROMPT_CURRENT_EVENTS_CHURCH = loadPrompt('current_events_church.md');
 const PROMPT_BREAKING_NEWS         = loadPrompt('current_breaking_news.md');
 const PROMPT_GENERAL_ARTICLES      = loadPrompt('general_articles.md');
+
+// Fail loudly at boot rather than silently generating nothing all night.
+// A missing current-events prompt stops article generation entirely; a missing
+// approval prompt is worse, because approveArticleForPublication() then returns
+// approved=true for everything.
+(function checkPromptsLoaded() {
+    const missing = [
+        ['current_events.md',         PROMPT_CURRENT_EVENTS],
+        ['current_events_church.md',  PROMPT_CURRENT_EVENTS_CHURCH],
+        ['current_breaking_news.md',  PROMPT_BREAKING_NEWS],
+        ['general_articles.md',       PROMPT_GENERAL_ARTICLES],
+        ['current_approved.md',       readApprovalPrompt()],
+    ].filter(([, value]) => !value).map(([name]) => name);
+
+    if (missing.length) {
+        console.error(
+            `[Prompts] MISSING from ${path.join(__dirname, PROMPT_DIR)}: ${missing.join(', ')}. ` +
+            `Article generation and/or the content approval gate are disabled.`
+        );
+    } else {
+        console.log(`[Prompts] Loaded 5 templates from ${PROMPT_DIR}/`);
+    }
+})();
 
 // Topics that use the church prompt
 const CHURCH_TOPICS = new Set(['church-us', 'church-global', 'faith', 'christian-watch-us']);
@@ -2113,40 +1902,6 @@ async function scrapeArticleImage(url, _redirectCount = 0) {
             req.on('timeout', () => { req.destroy(); resolve(null); });
         } catch (_) { resolve(null); }
     });
-}
-
-// Score article relevance to a given topic (5 dimensions, max 100)
-function scoreTopicRelevance(article, topic) {
-    const keywords = TOPIC_KEYWORDS[topic] || [];
-    const titleText = (article.title || '').toLowerCase();
-    const bodyText = (article.description || '').toLowerCase();
-    const fullText = titleText + ' ' + bodyText;
-
-    // 1. Keyword relevance (max 25) — title hits worth double
-    const titleHits = keywords.filter(kw => titleText.includes(kw)).length;
-    const bodyHits = keywords.filter(kw => bodyText.includes(kw)).length;
-    const keywordScore = Math.min(titleHits * 4 + bodyHits * 2, 25);
-
-    // 2. Recency (max 25)
-    let recencyScore = 5;
-    if (article.pubDate) {
-        const ageHrs = (Date.now() - new Date(article.pubDate).getTime()) / 3600000;
-        recencyScore = ageHrs < 6 ? 25 : ageHrs < 12 ? 20 : ageHrs < 24 ? 14 : ageHrs < 48 ? 7 : 2;
-    }
-
-    // 3. Image presence (max 20)
-    const imageScore = article.imageUrl ? 20 : 0;
-
-    // 4. Content completeness — has excerpt/description (max 15)
-    const excerptLen = (article.description || '').length;
-    const completenessScore = excerptLen > 200 ? 15 : excerptLen > 80 ? 10 : excerptLen > 20 ? 5 : 0;
-
-    // 5. Source authority signals — title length heuristic (max 15)
-    const titleLen = (article.title || '').length;
-    const authorityScore = titleLen > 20 && titleLen < 120 ? 15 : titleLen > 10 ? 8 : 0;
-
-    const total = keywordScore + recencyScore + imageScore + completenessScore + authorityScore;
-    return { keywordScore, recencyScore, imageScore, completenessScore, authorityScore, total };
 }
 
 /** Count prose words in a Markdown string (strips formatting tokens first). */
@@ -2498,12 +2253,12 @@ async function generateCurrentEventArticle(headline, excerpt, topic, isBreaking 
 
 // Ingest and archive topic stories from RSS feeds
 /**
- * Reads the approval guidelines from prompts/current_approved.md at runtime
+ * Reads the approval guidelines from .prompts/current_approved.md at runtime
  * so any edits to that file are picked up without a server restart.
  */
 function readApprovalPrompt() {
     try {
-        return fs.readFileSync(path.join(__dirname, 'prompts', 'current_approved.md'), 'utf8').trim();
+        return fs.readFileSync(path.join(__dirname, PROMPT_DIR, 'current_approved.md'), 'utf8').trim();
     } catch (e) {
         console.warn('[Approval] Could not read current_approved.md:', e.message);
         return null;
@@ -3845,6 +3600,42 @@ app.delete('/api/current-events/:id', async (req, res) => {
     } catch (err) {
         console.error('[ReviewerDelete] Error:', err.message);
         res.status(500).json({ error: 'Failed to delete article', message: err.message });
+    }
+});
+
+// POST /api/admin/regenerate-image — Admin-only: re-render a published article's
+// hero image through the news pipeline's renderer, screen it, and republish it.
+//
+// For the CDN-published articles the site actually serves — daily news and the
+// five category bundles — rather than the PostgreSQL rows the reviewer routes
+// below cover. The body names an article; prompts are rebuilt server-side from
+// that article's own title, summary, category and text, so this cannot be used
+// to render arbitrary prompts on the GPU.
+app.post('/api/admin/regenerate-image', async (req, res) => {
+    const actor = await requireRole(req, res, 'admin');
+    if (!actor) return;
+
+    const { kind, slug, categorySlug, date } = req.body || {};
+    const ImageRegen = require('./lib/image-regen');
+
+    try {
+        const result = await ImageRegen.regenerateArticleImage({ kind, slug, categorySlug, date });
+        console.log(`[AdminRegen] ${actor.email} regenerated ${kind}/${slug}`);
+        // The work outlives the connection often enough to matter: the client
+        // may have given up, or a proxy dropped it. The image is published
+        // either way — say so in the log and let the response go.
+        if (res.headersSent) return;
+        res.json({ success: true, ...result });
+    } catch (err) {
+        // A regeneration failure is routine — a busy GPU, a safety hold, an
+        // article that has since been unpublished. Report it as such rather
+        // than as a server fault, and never leak a stack to the browser.
+        const status = err.status || 500;
+        if (status >= 500) console.error('[AdminRegen] Error:', err.message);
+        // Answering twice throws inside this catch, where nothing can catch it,
+        // and an unhandled rejection ends the process. Never respond blind.
+        if (res.headersSent) return;
+        res.status(status).json({ error: err.kind || 'error', message: err.message });
     }
 });
 

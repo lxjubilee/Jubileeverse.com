@@ -96,10 +96,127 @@ function buildAnthropicClient(preferred) {
     return clientFor(credential);
 }
 
+// ── Credential rotation ──────────────────────────────────────────────────────
+
+/** 401/403: this credential will not work again this run. */
+function isAuthError(e) {
+    const status = e?.status ?? e?.$metadata?.httpStatusCode;
+    return status === 401 || status === 403;
+}
+
+/** 429/5xx: transient, so the credential stays in the pool. */
+function isRetryableApiError(e) {
+    const status = e?.status ?? e?.$metadata?.httpStatusCode;
+    return status === 429 || status === 529 || (status >= 500 && status < 600);
+}
+
+/**
+ * A rotating view over the credential chain.
+ *
+ * The chain usually holds an OAuth token plus one or two API keys, and they
+ * carry independent rate limits. A 429 on the first credential should move the
+ * work to the next one rather than end it — a night of image judging exhausts a
+ * small quota long before it runs out of articles, and this was not theoretical:
+ * the very first live judge call in development came back 429.
+ *
+ * Rate limits are transient, so a throttled credential stays in the pool and
+ * comes round again. An authentication failure is permanent for this run, so
+ * that credential is retired outright; otherwise one bad key in the middle of
+ * the chain fails everything after it.
+ *
+ * (article-composer.js carries its own copy of this logic, written first and
+ * proven on live runs. It is deliberately not refactored onto this one here —
+ * that is a change to the working composition path, not to image quality.)
+ */
+function createRotator({ label = 'anthropic', logger = console } = {}) {
+    let chain = null;
+    let index = 0;
+    const clients = new Map();
+    const dead = new Set();
+
+    const all = () => (chain || (chain = credentialChain()));
+    const usable = () => all().filter(c => !dead.has(c));
+
+    return {
+        size: () => usable().length,
+        /** The current credential's client, or null when the chain is exhausted. */
+        client() {
+            const pool = usable();
+            if (!pool.length) return null;
+            if (index >= pool.length) index = 0;
+            const credential = pool[index];
+            if (!clients.has(credential)) {
+                clients.set(credential, clientFor(credential));
+                logger.log(`[${label}] using credential ${index + 1}/${pool.length} — ${describeCredential(credential)}`);
+            }
+            return clients.get(credential);
+        },
+        /** Advance past the current credential. False when there is nowhere to go. */
+        rotate(reason, { permanent = false } = {}) {
+            const pool = usable();
+            const current = pool[Math.min(index, pool.length - 1)];
+
+            if (permanent && current) {
+                dead.add(current);
+                clients.delete(current);
+                logger.warn(`[${label}] ${reason} — retiring ${describeCredential(current)}`);
+                if (index >= usable().length) index = 0;
+                return usable().length > 0;
+            }
+
+            if (pool.length <= 1) return false;
+            index = (index + 1) % pool.length;
+            logger.warn(`[${label}] ${reason} — rotating to credential ${index + 1}/${pool.length}`);
+            return true;
+        },
+    };
+}
+
+// ── Vision ───────────────────────────────────────────────────────────────────
+
+/**
+ * Media type from the first bytes, rather than from a filename.
+ *
+ * Buffers reach this module straight from a renderer or an object store, where
+ * there is often no filename to trust and never an extension worth believing.
+ * A wrong media_type is rejected by the API, so sniffing is the reliable path.
+ */
+function sniffImageMediaType(buffer) {
+    if (!Buffer.isBuffer(buffer) || buffer.length < 12) return null;
+    if (buffer[0] === 0x89 && buffer.toString('latin1', 1, 4) === 'PNG') return 'image/png';
+    if (buffer[0] === 0xff && buffer[1] === 0xd8) return 'image/jpeg';
+    if (buffer.toString('latin1', 0, 4) === 'RIFF' && buffer.toString('latin1', 8, 12) === 'WEBP') {
+        return 'image/webp';
+    }
+    if (buffer.toString('latin1', 0, 3) === 'GIF') return 'image/gif';
+    return null;
+}
+
+/**
+ * One image content block for the Messages API.
+ *
+ * WebP is the format to send where there is a choice: these are 1344x768
+ * photographic renders, so WebP carries the same pixels at roughly a tenth of
+ * the base64 payload, and base64 is what the request body actually pays for.
+ */
+function imageBlock(buffer, { mediaType = null } = {}) {
+    const type = mediaType || sniffImageMediaType(buffer);
+    if (!type) throw new Error('imageBlock: unrecognised image format');
+    return {
+        type: 'image',
+        source: { type: 'base64', media_type: type, data: buffer.toString('base64') },
+    };
+}
+
 module.exports = {
     isOAuthToken,
     describeCredential,
     clientFor,
     credentialChain,
     buildAnthropicClient,
+    isAuthError,
+    isRetryableApiError,
+    createRotator,
+    sniffImageMediaType,
+    imageBlock,
 };

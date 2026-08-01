@@ -16,6 +16,16 @@ const nextConfig = {
     unoptimized: true,
   },
 
+  async redirects() {
+    return [
+      // Articles moved from /news/<slug> to the root, /<slug>. 301 rather than
+      // Next's default 308 so the permanence is the one search engines have
+      // indexed against for years, and so old links keep their ranking.
+      // `/news` itself still lists the day's coverage and is not matched here.
+      { source: '/news/:slug', destination: '/:slug', statusCode: 301 },
+    ];
+  },
+
   async rewrites() {
     return [
       // Express REST API — the single source of truth for all data.

@@ -1,0 +1,76 @@
+/* Admin overlay on an article's featured image. Absolute inside the image box,
+   so it adds nothing to the card's flow and cannot shift the layout. */
+.wrap {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Clears a control already sitting in the same corner (the reader's Back). */
+.offset {
+  top: 16px;
+  left: 110px;
+}
+
+.button {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: none;
+  border-radius: 50%;
+  background: rgba(198, 40, 40, 0.92);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.button:hover:not(:disabled) {
+  background: rgb(198, 40, 40);
+}
+
+.button:disabled {
+  cursor: progress;
+  opacity: 0.85;
+}
+
+.button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: regenSpin 0.8s linear infinite;
+}
+
+@keyframes regenSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2.4s; }
+}
+
+.note {
+  max-width: 190px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.ok { border-left: 3px solid #3fb950; }
+.bad { border-left: 3px solid #d13438; }

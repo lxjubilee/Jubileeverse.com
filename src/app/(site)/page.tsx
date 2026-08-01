@@ -7,10 +7,18 @@ import WeatherCard from '@/components/home/WeatherCard';
 import FinanceCard from '@/components/home/FinanceCard';
 import SportsCard from '@/components/home/SportsCard';
 import StoryCard from '@/components/content/StoryCard';
+import RegenerateImageButton from '@/components/admin/RegenerateImageButton';
 import { PREFS_CHANGED_EVENT } from '@/components/layout/PersonalizePopup';
 import { api, handleImgError, resolveImageUrl } from '@/lib/api';
-import { storeSelectedArticle, trackView } from '@/lib/article';
+import {
+  storeSelectedArticle,
+  trackView,
+  storyHref,
+  trackingIdOf,
+  regenTargetOf,
+} from '@/lib/article';
 import { useAuth } from '@/lib/auth';
+import { interleaveFeed } from '@/lib/homeFeed';
 import {
   articleTypeOf,
   fetchCounts,
@@ -24,7 +32,22 @@ import styles from './home.module.css';
 
 interface PlacementResponse extends HomepagePlacement {
   topicCards?: Story[];
+  /** Faith-based category articles, already rotated across the five categories. */
+  categoryCards?: Story[];
 }
+
+/**
+ * The four in-feed cards — Weather, Markets, Sports and the "Stay Inspired"
+ * newsletter — are switched off for now.
+ *
+ * Rendering only: the components, their data fetching, the newsletter state and
+ * its /api/newsletter/subscribe handler, and the card styles are all untouched,
+ * so flipping this back to `true` restores them exactly as they were.
+ *
+ * They sat at the end of the feed grid, which is a centred flex wrap, so their
+ * absence simply reflows the last row — no gap, no layout change.
+ */
+const SHOW_IN_FEED_CARDS = false;
 
 const PREFS_KEY = 'jubileeVersePrefs';
 
@@ -56,6 +79,10 @@ export default function HomePage() {
   const [hero, setHero] = useState<Story[]>([]);
   const [sidebar, setSidebar] = useState<Story[]>([]);
   const [feed, setFeed] = useState<Story[]>([]);
+  // Faith-based articles woven through the feed, one after every four stories.
+  const [categoryCards, setCategoryCards] = useState<Story[]>([]);
+  // Side hero images an admin has regenerated, by story id.
+  const [freshSidebarImages, setFreshSidebarImages] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [heroStatus, setHeroStatus] = useState<HeroStatus>('loading');
 
@@ -85,6 +112,10 @@ export default function HomePage() {
           title: s.headline || s.title || '',
           category: s.topic || s.category || '',
           image: resolveImageUrl(s),
+          // Carried so a search result can link to /<slug> rather than
+          // falling back to /article/<id>, which cannot resolve a news article.
+          slug: s.slug,
+          date: s.date,
         }));
       sessionStorage.setItem('jubileeSearchIndex', JSON.stringify(items));
       // Full stories (with article bodies) power Related Stories/Articles on the
@@ -106,14 +137,20 @@ export default function HomePage() {
         setHeroStatus('loading');
       }
       try {
-        const data = await api.get<PlacementResponse>('/api/homepage-placement');
+        // The daily news bundle on the CDN, not PostgreSQL. /news-feed is a
+        // Next route handler that reads R2 server-side (the CDN sends no CORS
+        // headers) and returns the same hero/sidebar/topicCards envelope this
+        // page has always consumed.
+        const data = await api.get<PlacementResponse>('/news-feed');
         const heroStories = (data.hero || []).slice(0, 5);
         const sidebarStories = data.sidebar || [];
         const topicCards = (data.topicCards || []).filter((s) => s.cached_image_path || s.image_url);
+        const categories = (data.categoryCards || []).filter((s) => s.cached_image_path || s.image_url);
         setHero(heroStories);
         setSidebar(sidebarStories);
         setFeed(topicCards);
-        buildSearchIndex([...heroStories, ...sidebarStories, ...topicCards]);
+        setCategoryCards(categories);
+        buildSearchIndex([...heroStories, ...sidebarStories, ...topicCards, ...categories]);
         setHeroStatus(heroStories.length ? 'ready' : 'empty');
         lastPlacementLoad.current = Date.now();
       } catch {
@@ -190,8 +227,12 @@ export default function HomePage() {
   // ---- Reactions: one batched fetch for the whole feed ----------------------
 
   useEffect(() => {
-    if (feed.length === 0) return;
-    const keys = feed.map((s) => reactionKey(s.id, articleTypeOf(s)));
+    const stories = [...feed, ...categoryCards];
+    if (stories.length === 0) return;
+    // Keyed on the tracking id, which is what StoryCard posts a reaction with:
+    // the backend parses the key's id as an integer, so a slug or a
+    // `<category>__<slug>` id would come back with no counts at all.
+    const keys = stories.map((s) => reactionKey(trackingIdOf(s), articleTypeOf(s)));
     let cancelled = false;
     (async () => {
       try {
@@ -212,7 +253,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [feed, isAuthenticated]);
+  }, [feed, categoryCards, isAuthenticated]);
 
   // ---- Personalization: re-read prefs when the popup saves ------------------
 
@@ -244,10 +285,29 @@ export default function HomePage() {
     });
   }, [feed, prefs, hidden]);
 
+  // The faith-based inserts answer to the same block/hide prefs as everything
+  // else in the grid. They are filtered but never re-sorted: their order is the
+  // category rotation the feed route already fixed.
+  const visibleCategoryCards = useMemo(() => {
+    const blocked = new Set(prefs.blocked.map((s) => s.toLowerCase()));
+    return categoryCards.filter(
+      (s) => !blocked.has(storySlug(s)) && !hidden.has(String(s.id)),
+    );
+  }, [categoryCards, prefs.blocked, hidden]);
+
+  // What the grid actually renders: the current-events feed with one faith-based
+  // article after every fourth card. Weaving last means the feed's own filtering
+  // and following-first ordering are untouched — inserts only land between
+  // cards that survived them.
+  const displayFeed = useMemo(
+    () => interleaveFeed(visibleFeed, visibleCategoryCards),
+    [visibleFeed, visibleCategoryCards],
+  );
+
   const openStory = (story: Story) => {
     storeSelectedArticle(story);
-    trackView(story.id);
-    router.push(`/article/${story.id}`);
+    trackView(trackingIdOf(story));
+    router.push(storyHref(story));
   };
 
   const hideStory = useCallback((id: string | number) => {
@@ -295,10 +355,16 @@ export default function HomePage() {
           </section>
           <div className={styles.heroSidebar}>
             {sidebar.map((story) => {
-              const img = resolveImageUrl(story);
+              const img = freshSidebarImages[String(story.id)] ?? resolveImageUrl(story);
               return (
                 <div key={story.id} className={styles.heroSidebarCard} onClick={() => openStory(story)}>
                   {img ? <img src={img} alt={story.headline || ''} onError={handleImgError} /> : null}
+                  <RegenerateImageButton
+                    target={regenTargetOf(story)}
+                    onRegenerated={(url) =>
+                      setFreshSidebarImages((prev) => ({ ...prev, [String(story.id)]: url }))
+                    }
+                  />
                   <div className={styles.heroSidebarOverlay}>
                     <span className={styles.heroSidebarCategory}>{story.topic || 'Faith'}</span>
                     <h3 className={styles.heroSidebarTitle}>{story.headline || story.title}</h3>
@@ -320,9 +386,9 @@ export default function HomePage() {
             ? Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="content-card skeleton" style={{ height: 304 }} />
               ))
-            : visibleFeed.map((story) => {
+            : displayFeed.map((story) => {
                 const type = articleTypeOf(story);
-                const key = reactionKey(story.id, type);
+                const key = reactionKey(trackingIdOf(story), type);
                 return (
                   <StoryCard
                     key={story.id}
@@ -338,7 +404,7 @@ export default function HomePage() {
               })}
 
           {/* In-feed widget cards (weather / markets / sports) */}
-          {!loading && feed.length > 0 ? (
+          {SHOW_IN_FEED_CARDS && !loading && feed.length > 0 ? (
             <>
               <WeatherCard />
               <FinanceCard />
@@ -347,7 +413,7 @@ export default function HomePage() {
           ) : null}
 
           {/* Newsletter card mixed into the grid */}
-          {!loading && feed.length > 0 ? (
+          {SHOW_IN_FEED_CARDS && !loading && feed.length > 0 ? (
             <div className={styles.newsletterCard}>
               <h3 className={styles.newsletterTitle}>Stay Inspired</h3>
               <p className={styles.newsletterDesc}>

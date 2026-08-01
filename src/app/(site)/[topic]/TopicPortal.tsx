@@ -5,23 +5,9 @@ import { useEffect, useState } from 'react';
 import StoryCard from '@/components/content/StoryCard';
 import { api } from '@/lib/api';
 import type { SiteArticle } from '@/lib/articles';
+import { NAMED_PORTAL_SLUGS as PORTAL_SLUGS } from '@/lib/portals';
 import type { Story } from '@/lib/types';
 import styles from './topic.module.css';
-
-/**
- * jubileeinspire.com portals, which have dedicated backend endpoints
- * (/api/portal/:slug) and are not published as article bundles. Their responses
- * are small (~100 KB) and carry no article bodies, so these still load on the
- * client.
- */
-const PORTAL_SLUGS = new Set([
-  'encouragement',
-  'faith-builders',
-  'hope-restored',
-  'lets-celebrate',
-  'purpose-driven',
-  'live-inspired',
-]);
 
 /** One row from /api/portal/:slug. */
 interface PortalArticle {

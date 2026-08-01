@@ -1,12 +1,13 @@
 import SiteShell from '@/components/layout/SiteShell';
-import { fetchNavCategories } from '@/lib/cdn';
+import { fetchNavCategories } from '@/lib/articles';
 
 /**
  * Layout for all public-facing pages — wraps them in the site chrome.
  *
- * The nav categories are read from the CDN articles catalog here (server side):
- * the catalog is ~2.6 MB and sends no CORS headers, so the browser must never
- * fetch it directly. Only the five slug/label pairs cross to the client.
+ * The nav categories are resolved here (server side) from the five published
+ * article bundles on the CDN, which sends no CORS headers — the browser must
+ * never read those manifests itself. Only the five slug/label pairs cross to
+ * the client.
  */
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const navCategories = await fetchNavCategories();

@@ -27,6 +27,18 @@ export interface Story {
   relevance_score?: number;
   /** Marks a story that came from the current_events namespace. */
   isCurrentEvent?: boolean;
+  /** CDN news: the article slug, which is also its URL and its `id`. */
+  slug?: string;
+  /** CDN news: the PST day it was published, `YYYY-MM-DD`. */
+  date?: string;
+  /**
+   * Numeric key for reactions and view tracking.
+   *
+   * `article_reactions.article_id` and `article_views.article_id` are INTEGER,
+   * so a slug id cannot be stored there. CDN news carries a stable hashed
+   * integer here; PostgreSQL stories leave it unset and fall back to `id`.
+   */
+  reaction_id?: number;
   [key: string]: unknown;
 }
 

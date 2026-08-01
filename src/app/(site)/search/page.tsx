@@ -17,14 +17,14 @@
    layered on top, populated from the categories actually present in the index.
 
    Clicking a result hands the story off via storeSelectedArticle() and
-   navigates to /article/[id] (the shared article convention).
+   navigates via storyHref(): /<slug> for CDN news, /article/[id] otherwise.
    ============================================================================ */
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api, resolveImageUrl } from '@/lib/api';
-import { storeSelectedArticle } from '@/lib/article';
+import { storeSelectedArticle, storyHref } from '@/lib/article';
 import type { Story } from '@/lib/types';
 import styles from './search.module.css';
 
@@ -36,6 +36,9 @@ interface SearchIndexItem {
   image?: string;
   /** Some legacy entries carried a summary; kept optional for parity. */
   summary?: string;
+  /** CDN news: slug + day, so the result can link to /<slug>. */
+  slug?: string;
+  date?: string;
 }
 
 const ALL_CATEGORIES = '__all__';
@@ -61,6 +64,8 @@ function toStory(item: SearchIndexItem): Story {
     category: item.category || '',
     image_url: item.image || null,
     isCurrentEvent: true,
+    slug: item.slug,
+    date: item.date,
   };
 }
 
@@ -118,8 +123,12 @@ function SearchInner() {
     let cancelled = false;
     (async () => {
       try {
+        // Same CDN feed the Home page builds its index from. Kept in step with
+        // it deliberately: pointing this at the old PostgreSQL endpoint would
+        // make a cold /search?q= visit return different results from a search
+        // started on the Home page.
         const data = await api.get<{ hero?: Story[]; sidebar?: Story[]; topicCards?: Story[] }>(
-          '/api/homepage-placement',
+          '/news-feed',
           { auth: false },
         );
         const stories = [...(data.hero || []), ...(data.sidebar || []), ...(data.topicCards || [])];
@@ -207,7 +216,7 @@ function SearchInner() {
   const openItem = (item: SearchIndexItem) => {
     const story = toStory(item);
     storeSelectedArticle(story);
-    router.push(`/article/${story.id}`);
+    router.push(storyHref(story));
   };
 
   const runSearch = () => {

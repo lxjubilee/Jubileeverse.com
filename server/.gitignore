@@ -63,3 +63,6 @@ logs/
 # Backups
 backup/
 public/images/deprecated/
+
+# News pipeline run logs
+/server/logs/news/

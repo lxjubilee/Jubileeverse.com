@@ -2,8 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import RegenerateImageButton from '@/components/admin/RegenerateImageButton';
 import { handleImgError, resolveImageUrl } from '@/lib/api';
-import { storeSelectedArticle, trackView } from '@/lib/article';
+import { storeSelectedArticle, trackView, storyHref, trackingIdOf, regenTargetOf } from '@/lib/article';
 import { useAuth } from '@/lib/auth';
 import { postReaction, type ReactionCounts, type ReactionType } from '@/lib/reactions';
 import type { Story } from '@/lib/types';
@@ -24,6 +25,8 @@ interface Props {
   showActions?: boolean;
   /** Called when the reader hides this story. */
   onHide?: (id: string | number) => void;
+  /** Where the card links. Defaults to `/article/<id>`. */
+  href?: string;
 }
 
 const PREFS_KEY = 'jubileeVersePrefs';
@@ -55,7 +58,11 @@ function updatePrefs(kind: 'follow' | 'block', slug: string) {
 
 /**
  * Standard content card used in feeds/grids. Clicking stashes the story and
- * navigates to /article/[id] (mirrors openCurrentEventArticle).
+ * navigates to the article (by default /article/[id]).
+ *
+ * Pass `href` when the story lives somewhere else — CDN news articles are read
+ * at the root, /<slug>, and routing them to /article/[id] would misfire, since
+ * a news id parses as a category slug there.
  *
  * When `showReactions` is true it renders a like/dislike footer wired to
  * /api/reactions. Reaction clicks stop propagation so they never open the
@@ -70,10 +77,18 @@ export default function StoryCard({
   articleType = 'current_event',
   showActions = false,
   onHide,
+  href,
 }: Props) {
   const router = useRouter();
+  const target = href ?? storyHref(story);
+  // Reactions and views are stored against an INTEGER article_id, so a slug id
+  // cannot be used directly. CDN news supplies a stable hashed integer.
+  const trackingId = trackingIdOf(story);
   const { isAuthenticated } = useAuth();
-  const img = resolveImageUrl(story);
+  // An admin regeneration swaps the picture in place; until then this is the
+  // published one exactly as before.
+  const [freshImg, setFreshImg] = useState<string | null>(null);
+  const img = freshImg ?? resolveImageUrl(story);
   const title = story.headline || story.title || '';
   const label = category || story.topic || story.category || '';
   const slug = (story.topic || story.category || '').toLowerCase();
@@ -94,15 +109,15 @@ export default function StoryCard({
   const share = (e: React.MouseEvent) => {
     e.stopPropagation();
     setMenuOpen(false);
-    const url = `${window.location.origin}/article/${story.id}`;
+    const url = `${window.location.origin}${target}`;
     if (navigator.share) navigator.share({ url, title }).catch(() => {});
     else navigator.clipboard?.writeText(url).catch(() => {});
   };
 
   const open = () => {
     storeSelectedArticle(story);
-    trackView(story.id);
-    router.push(`/article/${story.id}`);
+    trackView(trackingId);
+    router.push(target);
   };
 
   const react = async (e: React.MouseEvent, reaction: ReactionType) => {
@@ -113,7 +128,7 @@ export default function StoryCard({
       return;
     }
     try {
-      const res = await postReaction(story.id, articleType, reaction);
+      const res = await postReaction(trackingId, articleType, reaction);
       setCounts(res.counts);
       setMine(res.reaction);
     } catch {
@@ -166,6 +181,7 @@ export default function StoryCard({
         </div>
       ) : null}
       <div className="content-card-image">
+        <RegenerateImageButton target={regenTargetOf(story)} onRegenerated={setFreshImg} />
         {img ? (
           <img src={img} alt={title} loading="lazy" onError={handleImgError} />
         ) : (
