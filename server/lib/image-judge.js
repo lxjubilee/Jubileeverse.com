@@ -61,11 +61,25 @@ const JUDGE_EFFORT = process.env.NEWS_JUDGE_EFFORT || 'medium';
  * warn:    log the verdict and publish the best candidate anyway.
  * off:     skip the vision call; rank on the structural score alone.
  *
- * Defaults to enforce. Unlike the structural thresholds, the rubric here is a
- * judgement rather than a measurement, and the retry ladder below means a
- * rejection costs another render rather than an empty page.
+ * Defaults to **warn**, on measurement. This shipped as `enforce` on the
+ * reasoning that a rejection costs another render rather than an empty page.
+ * The evaluation disproved that: at MIN_JUDGE_SCORE 70, *nothing* passed —
+ * 0 of 10 articles across both profiles, every one exhausting all three
+ * rounds. A rejection does not cost a render, it costs a draft, and a gate
+ * that rejects everything empties the feed.
+ *
+ * The distribution says the bar is not marginally high, it is unreachable:
+ * schnell marks ran 26/34/51 (min/p50/max) and Juggernaut 16/27/39. Setting a
+ * real bar needs images a human has labelled publishable, scored through this
+ * rubric — an editorial judgement, and the owner's to make. Until then `warn`
+ * publishes the best candidate and records every mark, which is what produces
+ * that labelled set. Turn `enforce` on once the number is measured rather than
+ * guessed, exactly as the structural thresholds were.
+ *
+ * The structural gate is unaffected and stays in enforce: its thresholds were
+ * measured, and it passes 92-93% of renders.
  */
-const MODE = (process.env.NEWS_JUDGE_MODE || 'enforce').toLowerCase();
+const MODE = (process.env.NEWS_JUDGE_MODE || 'warn').toLowerCase();
 
 /** Candidates rendered per hero attempt. */
 const HERO_CANDIDATES = Number(process.env.NEWS_HERO_CANDIDATES || 3);
@@ -361,7 +375,13 @@ function selectWinner(candidates, judgement, { minScore = MIN_JUDGE_SCORE, mode 
 
     const preferred = Number(judgement?.best) || 0;
     eligible.sort((a, b) => (
-        b.rubric.score - a.rubric.score
+        // Publishable first. In enforce mode every eligible candidate already
+        // is one, so this is inert there; in warn mode it stops a high-scoring
+        // image the judge explicitly refused from outranking a lower-scoring
+        // one it would run. Warn means "do not withhold", not "ignore the
+        // verdict".
+        (b.rubric.publishable === true) - (a.rubric.publishable === true)
+        || b.rubric.score - a.rubric.score
         || b.rubric.anatomy - a.rubric.anatomy
         // Only now does the model's own pick break a genuine tie.
         || ((b.index === preferred - 1) - (a.index === preferred - 1))

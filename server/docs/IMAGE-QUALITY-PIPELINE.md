@@ -176,12 +176,57 @@ the giant-hand render 15/100. The first of those passed the structural gate at
 person detector installed, the structural gate cannot see a cropped face or a
 subtly wrong hand.
 
-### Then — final bake-off and recommendation
+## Done — evaluation and bake-off (`scripts/evaluate-image-pipeline.js`)
 
-Re-run schnell vs Juggernaut over a representative article set with the scoring
-gate in place. Report quality scores, pass/fail rates and generation time, plus
-qualitative examples, then recommend a default. Switch only on the owner's
-approval.
+Run over 5 real published articles per profile, then a shorter instrumented
+pass (3 articles, 1 round) to capture the judge's score distribution.
+
+| | schnell | Juggernaut-XI |
+|---|---|---|
+| structural pass rate | 92.3% | 93.3% |
+| judge marks: min / p50 / max | 26 / 34 / **51** | 16 / 27 / **39** |
+| marks at or above the bar (70) | **0 of 7** | **0 of 8** |
+| retry rate | 100% | 100% |
+| draft rate | **100%** | **100%** |
+| licence | Apache-2.0 | OpenRAIL++-M |
+
+**The headline result is about the gate, not the models: nothing passed.** All
+10 articles exhausted all three rounds and drafted. That is not a marginal
+miss — the best single candidate anywhere scored 51 against a bar of 70.
+
+`MIN_JUDGE_SCORE = 70` was **guessed, not measured** — the same mistake as the
+first structural thresholds, caught this time before it reached a nightly run.
+`NEWS_JUDGE_MODE` therefore now defaults to **warn**, not enforce: the judge
+scores and logs every candidate, and the best one publishes. The structural
+gate keeps enforcing, because its numbers were measured.
+
+**Setting the real bar needs an input this evaluation cannot produce**: images
+a human has marked publishable, scored through this rubric. That is an
+editorial judgement about what the site is willing to run, and it belongs to
+the owner. A week of `warn` produces exactly that labelled set, in the run logs.
+
+Note the rubric is also deliberately strict ("it is cheaper to reject every
+candidate and re-render") and the weights punish anatomy hardest. Two
+conservative choices compounding, neither calibrated, is how 100% rejection
+happens.
+
+**Recommendation: do not switch the default.** schnell scores *higher* than
+Juggernaut-XI on every point of the distribution (p50 34 vs 27, max 51 vs 39),
+its structural pass rate is within a point, and Apache-2.0 is the cleaner
+licence for a commercial publication. Nothing here argues for changing
+`DEFAULT_PROFILE`, and it is unchanged.
+
+**Do not read the timing numbers as a model comparison.** Wall clock per
+article was 350 s (schnell) vs 180 s (Juggernaut) in the short runs, but the
+render hosts are shared with the Wan video pipeline and single-render times
+varied 4 s to 121 s within one calibration run. The figures are also concurrent
+wall clock across articles sharing two lanes, not isolated per-article cost.
+Timing needs a quiet box before it means anything.
+
+**Caveats worth keeping in view.** n is small (7-8 judged candidates per
+profile). Face and person detectors are still not installed, so the structural
+pass rate flatters both profiles — it cannot see extra heads, cropped faces, or
+duplicated people, which is exactly what the judge kept citing.
 
 ## Prompt construction (applies throughout)
 

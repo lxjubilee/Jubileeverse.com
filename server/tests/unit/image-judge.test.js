@@ -132,13 +132,31 @@ describe('selection', () => {
 
     test('everything below the bar produces no winner, which is what triggers a retry', () => {
         const judgement = { rubrics: [{ ...rubric(), score: 40 }, { ...rubric(), score: 55 }] };
-        const { winner, reason } = Judge.selectWinner(candidates.slice(0, 2), judgement, { minScore: 70 });
+        // mode is explicit so this asserts the rule, not the shipped default —
+        // which moved from enforce to warn once the evaluation showed nothing
+        // reached the bar.
+        const { winner, reason } = Judge.selectWinner(
+            candidates.slice(0, 2), judgement, { minScore: 70, mode: 'enforce' },
+        );
         expect(winner).toBeNull();
         expect(reason).toMatch(/no candidate/);
     });
 
     test('warn mode ranks but never withholds', () => {
         const judgement = { rubrics: [{ ...rubric(), score: 10 }, { ...rubric(), score: 20 }] };
+        const { winner } = Judge.selectWinner(candidates.slice(0, 2), judgement, { mode: 'warn' });
+        expect(winner.index).toBe(1);
+    });
+
+    test('warn mode still prefers an image the judge would actually run', () => {
+        // "Do not withhold" is not "ignore the verdict": a refused candidate
+        // must not outrank an accepted one on score alone.
+        const judgement = {
+            rubrics: [
+                { ...rubric({ publishable: false }), score: 95 },
+                { ...rubric({ publishable: true }), score: 30 },
+            ],
+        };
         const { winner } = Judge.selectWinner(candidates.slice(0, 2), judgement, { mode: 'warn' });
         expect(winner.index).toBe(1);
     });
@@ -258,7 +276,7 @@ describe('produceImage — the whole ladder', () => {
 
         const out = await Judge.produceImage({
             prompt: 'a newsroom at dawn', articleId: 'a2', render, client, logger: quiet,
-            candidates: 1, maxRounds: 3,
+            candidates: 1, maxRounds: 3, mode: 'enforce',
         });
 
         expect(out.image).toBeTruthy();
@@ -277,7 +295,7 @@ describe('produceImage — the whole ladder', () => {
 
         const out = await Judge.produceImage({
             prompt: 'a newsroom at dawn', articleId: 'a3', render, client, logger: quiet,
-            candidates: 1, maxRounds: 2,
+            candidates: 1, maxRounds: 2, mode: 'enforce',
         });
 
         expect(out.image).toBeNull();

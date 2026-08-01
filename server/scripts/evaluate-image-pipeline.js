@@ -32,7 +32,7 @@ const path = require('path');
 (function loadDotEnv() {
     const file = path.join(__dirname, '..', '.env');
     if (!fs.existsSync(file)) return;
-    for (const line of fs.readFileSync(file, 'utf8').replace(/^﻿/, '').split(/\r?\n/)) {
+    for (const line of fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/)) {
         const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
         if (m && process.env[m[1]] === undefined) {
             process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
@@ -132,6 +132,8 @@ async function evaluateProfile(profileName, articles, lanes) {
             articleId: `eval-${profileName}-${i}`,
             article,
             n: 1,
+            candidates: Number(arg('candidates', Judge.HERO_CANDIDATES)),
+            maxRounds: Number(arg('rounds', Judge.MAX_ROUNDS)),
             render: (p, seed) => pool.submit(lane => Comfy.generateImage(p, {
                 lane, seed, opts: { profile: profileName },
             })),
@@ -147,6 +149,11 @@ async function evaluateProfile(profileName, articles, lanes) {
             rendered,
             structuralPassed: passed,
             flags: out.rounds.flatMap(r => r.flags || []),
+            // Every mark the judge gave, accepted or not. Recording only the
+            // winner's score made a total rejection indistinguishable from a
+            // judge that never ran: the first evaluation drafted 10/10 articles
+            // and left no evidence of how close any of them came.
+            allJudgeScores: out.rounds.flatMap(r => r.scores || []),
             judgeScore: out.image?.rubric?.score ?? null,
             structuralScore: out.image?.structural?.score ?? null,
             accepted: Boolean(out.image),
@@ -225,6 +232,17 @@ async function evaluateProfile(profileName, articles, lanes) {
     for (const r of reports) {
         const flags = Object.entries(r.flagCounts).sort((a, b) => b[1] - a[1]);
         console.log(`\n  ${r.profile} structural flags: ${flags.length ? flags.map(([f, c]) => `${f}x${c}`).join(', ') : '(none)'}`);
+
+        // The distribution matters more than the mean when nothing passes: it
+        // is the difference between "the bar is slightly high" and "these
+        // images are not close".
+        const all = r.results.flatMap(x => x.allJudgeScores || []).sort((a, b) => a - b);
+        if (all.length) {
+            const pct = (p) => all[Math.min(all.length - 1, Math.floor(all.length * p))];
+            console.log(`  ${r.profile} judge marks (n=${all.length}): min ${all[0]}, p50 ${pct(0.5)}, `
+                + `p90 ${pct(0.9)}, max ${all[all.length - 1]} | bar is ${Judge.MIN_JUDGE_SCORE}`
+                + ` | ${all.filter(s => s >= Judge.MIN_JUDGE_SCORE).length} of ${all.length} at or above it`);
+        }
     }
 
     if (reports.length === 2) {
