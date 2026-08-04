@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getAuthToken } from '@/lib/authStorage';
 import { LANGUAGES, getLangName } from '@/lib/languages';
+import { getSiteLang } from '@/lib/translate';
 import styles from './widgets.module.css';
 
 interface Props {
@@ -41,6 +42,7 @@ export default function TranslateArticle({
   const [status, setStatus] = useState<'idle' | 'loading' | 'streaming' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const titleRef = useRef(fallbackTitle);
+  const didAdoptSiteLang = useRef(false);
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -131,6 +133,23 @@ export default function TranslateArticle({
       setCurrent('en-US');
     }
   };
+
+  // The header's language picker translates the chrome but not the story, so a
+  // reader on Spanish used to land on an English article and have to ask for the
+  // same language a second time, on every article. Adopt their site choice here.
+  // Once only: after a Restore English, or a different pick in this widget, the
+  // reader's choice for THIS article stands. The ref (not a state flag) is also
+  // what makes StrictMode's double-invoked effect a single translation.
+  useEffect(() => {
+    if (didAdoptSiteLang.current) return;
+    const siteLang = getSiteLang();
+    if (!siteLang || siteLang.startsWith('en')) return;
+    didAdoptSiteLang.current = true;
+    void translate(siteLang);
+    // translate() closes over the parent's inline callbacks, which change identity
+    // every render; the ref guard is what keeps this to a single pass.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const restore = () => {
     setCurrent('en-US');

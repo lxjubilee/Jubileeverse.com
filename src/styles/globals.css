@@ -466,7 +466,11 @@ img {
   box-shadow: -8px 0 30px rgba(0, 0, 0, 0.4);
   z-index: 1100;
   transform: translateX(100%);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* visibility, not just the off-screen transform: an offset panel keeps its
+     search field and close button in the tab order. The 0.3s delay holds it
+     visible for the full slide-out, then takes it out of the tree. */
+  visibility: hidden;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.3s;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -474,6 +478,8 @@ img {
 
 .lang-panel.open {
   transform: translateX(0);
+  visibility: visible;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s;
 }
 
 .lang-panel-header {
@@ -560,10 +566,23 @@ img {
   color: var(--text-secondary);
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
+  /* Button reset — the rows are <button> so they answer Enter/Space and land in
+     the tab order, but they read as list rows. */
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: inherit;
+  text-align: left;
 }
 
 .lang-option:hover {
   background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.lang-option:focus-visible {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: -2px;
   color: var(--text-primary);
 }
 
