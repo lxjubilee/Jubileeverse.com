@@ -7,7 +7,7 @@
  * means content/image URLs returned by the API ("/images/...") just work.
  */
 import type { SyntheticEvent } from 'react';
-import { getAuthToken } from './authStorage';
+import { clearStoredAuth, getAuthToken, getRefreshToken, getStoredAuth, setStoredAuth } from './authStorage';
 
 export class ApiError extends Error {
   status: number;
@@ -44,26 +44,92 @@ function buildHeaders(options: ApiFetchOptions): Headers {
   return headers;
 }
 
+const REFRESH_PATH = '/api/auth/refresh';
+
+/**
+ * Outcome of a refresh attempt:
+ *   'ok'      — a fresh access token is stored, retry the call
+ *   'invalid' — the server definitively rejected the refresh token; sign out
+ *   'error'   — transient (network, 5xx). Keep the tokens; a blip must never
+ *               log the user out.
+ */
+type RefreshResult = 'ok' | 'invalid' | 'error';
+
+/** In-flight refresh, shared by every concurrent caller so we only ever do one. */
+let refreshing: Promise<RefreshResult> | null = null;
+
+async function doRefresh(): Promise<RefreshResult> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return 'invalid';
+  try {
+    const res = await fetch(REFRESH_PATH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (res.status === 401) return 'invalid';
+    if (!res.ok) return 'error';
+    const data = (await res.json()) as { token?: string; refreshToken?: string; expiresAt?: string };
+    if (!data?.token) return 'error';
+    const stored = getStoredAuth();
+    setStoredAuth({
+      authenticated: true,
+      user: stored?.user ?? null,
+      token: data.token,
+      refreshToken: data.refreshToken,
+      expiresAt: data.expiresAt,
+    });
+    return 'ok';
+  } catch {
+    return 'error';
+  }
+}
+
+function tryRefresh(): Promise<RefreshResult> {
+  if (!refreshing) {
+    refreshing = doRefresh().finally(() => {
+      refreshing = null;
+    });
+  }
+  return refreshing;
+}
+
 /**
  * Core request helper. Returns parsed JSON (typed as T) or text. Throws
  * ApiError on a non-2xx response so callers can branch on `.status`.
+ *
+ * Token upkeep happens here so no caller has to think about it: PROACTIVELY when
+ * the access token has lapsed but a refresh token remains, and REACTIVELY on a
+ * 401 (refresh once, replay once).
  */
 export async function apiFetch<T = unknown>(
   path: string,
   options: ApiFetchOptions = {},
 ): Promise<T> {
   const { json, auth, headers: _headers, ...rest } = options;
-  const init: RequestInit = {
-    ...rest,
-    headers: buildHeaders(options),
+  const send = () => {
+    const init: RequestInit = { ...rest, headers: buildHeaders(options) };
+    if (json !== undefined) {
+      init.body = JSON.stringify(json);
+    } else if (options.body !== undefined) {
+      init.body = options.body;
+    }
+    return fetch(path, init);
   };
-  if (json !== undefined) {
-    init.body = JSON.stringify(json);
-  } else if (options.body !== undefined) {
-    init.body = options.body;
+
+  const wantsAuth = auth !== false && path !== REFRESH_PATH;
+
+  if (wantsAuth && !getAuthToken() && getRefreshToken()) {
+    if ((await tryRefresh()) === 'invalid') clearStoredAuth();
   }
 
-  const res = await fetch(path, init);
+  let res = await send();
+
+  if (res.status === 401 && wantsAuth && getRefreshToken()) {
+    const result = await tryRefresh();
+    if (result === 'ok') res = await send();
+    else if (result === 'invalid') clearStoredAuth();
+  }
 
   const contentType = res.headers.get('content-type') || '';
   const isJson = contentType.includes('application/json');

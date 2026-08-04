@@ -54,6 +54,25 @@ async function sendEmail(to, subject, html) {
     } catch (e) { console.error('[email]', e.message); }
 }
 
+/**
+ * Async route wrapper.
+ *
+ * Express 4 does not understand promises: when an `async` handler rejects, the
+ * rejection is never passed to the error middleware. On Node 15+ an unhandled
+ * rejection terminates the process by default, so a single database blip during
+ * a login would take the whole API down and every subsequent request would fail.
+ * Wrapping forwards the rejection to the error handler instead, which turns it
+ * into a proper JSON status response.
+ */
+const ah = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+// Last-resort net: log a stray rejection rather than letting the default
+// behaviour kill the server. Anything reaching here is a bug worth fixing, but
+// staying up beats dropping every in-flight request.
+process.on('unhandledRejection', (reason) => {
+    console.error('[unhandledRejection]', reason instanceof Error ? reason.stack : reason);
+});
+
 // ── Auth constants ─────────────────────────────────────────────────────────
 const CMS_CLIENT_ID = 'jubileeverse-cms';
 const CMS_CLIENT_SECRET = process.env.OIDC_CLIENT_SECRET || 'jubileeverse-cms-secret-dev';
@@ -3255,8 +3274,43 @@ function requireReviewer(req, res) {
 //
 // jubileeinspire.com is the external OIDC IdP.
 // jubileeverse.com is a Relying Party (RP) that trusts jubileeinspire.com tokens.
+//
+// NOTE: this OIDC browser-redirect scaffolding is DORMANT — the IdP endpoints it
+// targets (/authorize, /token, /.well-known/jwks.json) do not exist yet. Live SSO
+// runs through the Jubilee Identity Authority delegation below instead, which is
+// a pure server-to-server credential check with no front-channel at all.
 
 const OIDC_ISSUER = process.env.OIDC_ISSUER || 'https://jubileeinspire.com/idp';
+
+// ── Jubilee Identity Authority (SSO) delegation ──────────────────────────────
+// Where the email/password sign-in is authenticated:
+//   'local' (default) — verify against jv_users in our own DB.
+//   'sso'             — verify at sso.jubileeinspire.com, then upsert the returned
+//                       user locally and mint OUR OWN session tokens.
+// Gated on an explicit env var (not NODE_ENV) so either mode is testable anywhere;
+// rollback is "set back to 'local' + restart" with no redeploy. See lib/sso-client.js.
+const AUTH_LOGIN_MODE = (process.env.AUTH_LOGIN_MODE || 'local').toLowerCase() === 'sso' ? 'sso' : 'local';
+const {
+  ssoEnabled, ssoHashPassword, ssoLogin, ssoLookup, ssoProvisionHash, ssoSetPassword,
+} = require('./lib/sso-client');
+
+/** True when delegation is both selected AND actually configured with a secret. */
+const ssoDelegationActive = () => AUTH_LOGIN_MODE === 'sso' && ssoEnabled();
+
+/**
+ * Push a new password to the Identity Authority so the shared credential stays in
+ * lockstep after a local reset or change. Best-effort and never throws — the local
+ * update has already committed by the time this runs, so a failure here must not
+ * turn into a 500. The outcome is returned to the caller as `ssoSync` so the UI can
+ * warn: in 'sso' mode a failed push means sign-in still expects the OLD password.
+ *   { skipped: true } | { ok: true } | { ok: false, status | error }
+ */
+async function syncPasswordToSso(email, newPassword) {
+    if (!ssoDelegationActive()) return { skipped: true };
+    const result = await ssoSetPassword(email, newPassword);
+    if (!result.ok) console.error('[sso] password sync FAILED for', email, JSON.stringify(result));
+    return result;
+}
 
 function _parseCookies(req) {
   const out = {}; const header = req.headers.cookie || '';
@@ -10340,43 +10394,189 @@ const JWT_SECRET = process.env.JWT_SECRET || 'jubileeverse-jwt-secret-2026';
 function authHashPassword(password, salt) {
     return crypto.scryptSync(password, salt, 64).toString('hex');
 }
-function authCreateJWT(payload, expiresInSecs = 8 * 3600) {
+// Access-token lifetime. Short by design — durable session length comes from the
+// refresh token (jv_refresh_tokens), not from stretching this.
+const ACCESS_TTL_SECS = Number(process.env.ACCESS_TOKEN_TTL_SECS || 8 * 3600);
+function authCreateJWT(payload, expiresInSecs = ACCESS_TTL_SECS) {
     const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
     const now = Math.floor(Date.now() / 1000);
     const body = Buffer.from(JSON.stringify({ ...payload, iat: now, exp: now + expiresInSecs })).toString('base64url');
     const sig = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
     return `${header}.${body}.${sig}`;
 }
-function authVerifyJWT(token) {
+// Verify a presented token. `expectedType` defaults to 'access', and a token with
+// no `type` claim counts as an access token — so every pre-existing access token
+// keeps verifying, while a REFRESH token (type:'refresh') is rejected by all the
+// ordinary Bearer call sites. Only authRedeemRefreshToken asks for 'refresh'.
+function authVerifyJWT(token, expectedType = 'access') {
     try {
         const [header, body, sig] = token.split('.');
         const expected = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
         if (sig !== expected) return null;
         const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
         if (payload.exp < Math.floor(Date.now() / 1000)) return null;
+        if ((payload.type || 'access') !== expectedType) return null;
         return payload;
     } catch { return null; }
 }
 
+// ── Refresh tokens ───────────────────────────────────────────────────────────
+// The access token is stateless and short-lived; the refresh token is the durable,
+// revocable half of the session. Only its SHA-256 hash is stored (jv_refresh_tokens)
+// so the raw token never sits in the DB. `extended` is the "Keep me signed in"
+// lifetime. Redemption is NON-ROTATING: the same token comes back with its expiry
+// slid forward, so concurrent tabs/devices never invalidate each other.
+const REFRESH_TTL_SECS          = Number(process.env.REFRESH_TOKEN_TTL_SECS || 30 * 24 * 3600);   // 30d
+const EXTENDED_REFRESH_TTL_SECS = Number(process.env.EXTENDED_REFRESH_TTL_SECS || 365 * 24 * 3600); // 1y
+
+const authHashRefreshToken = (raw) => crypto.createHash('sha256').update(String(raw)).digest('hex');
+
+async function authIssueRefreshToken(userId, { extended = false } = {}) {
+    const ttl = extended ? EXTENDED_REFRESH_TTL_SECS : REFRESH_TTL_SECS;
+    const token = authCreateJWT({ userId, type: 'refresh' }, ttl);
+    const expiresAt = new Date(Date.now() + ttl * 1000);
+    await pgPool.query(
+        `INSERT INTO jv_refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+        [userId, authHashRefreshToken(token), expiresAt]
+    );
+    return { token, expiresAt };
+}
+
+// Verify signature/exp/type, then confirm the row is live and the user is active.
+// Slides expires_at forward so an actively-used session stays alive. -> { userId } | null
+async function authRedeemRefreshToken(raw) {
+    if (!raw) return null;
+    const payload = authVerifyJWT(raw, 'refresh');
+    if (!payload?.userId) return null;
+    const { rows: [row] } = await pgPool.query(
+        `SELECT rt.id, rt.user_id, u.is_active, u.is_locked
+           FROM jv_refresh_tokens rt
+           JOIN jv_users u ON u.id = rt.user_id
+          WHERE rt.token_hash = $1 AND rt.revoked_at IS NULL AND rt.expires_at > NOW()`,
+        [authHashRefreshToken(raw)]
+    );
+    if (!row || !row.is_active || row.is_locked) return null;
+    await pgPool.query(
+        `UPDATE jv_refresh_tokens SET expires_at = $2 WHERE id = $1`,
+        [row.id, new Date(Date.now() + REFRESH_TTL_SECS * 1000)]
+    );
+    return { userId: row.user_id };
+}
+
+async function authRevokeRefreshToken(raw) {
+    if (!raw) return;
+    await pgPool.query(
+        `UPDATE jv_refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1 AND revoked_at IS NULL`,
+        [authHashRefreshToken(raw)]
+    );
+}
+
+// Revoke every live refresh token for a user (logout-all, password reset). With
+// { exceptToken } the caller's own session survives — used by change-password so
+// the user isn't signed out of the tab they just changed it in.
+async function authRevokeAllRefreshTokens(userId, { exceptToken } = {}) {
+    if (exceptToken) {
+        await pgPool.query(
+            `UPDATE jv_refresh_tokens SET revoked_at = NOW()
+              WHERE user_id = $1 AND revoked_at IS NULL AND token_hash <> $2`,
+            [userId, authHashRefreshToken(exceptToken)]
+        );
+    } else {
+        await pgPool.query(
+            `UPDATE jv_refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`,
+            [userId]
+        );
+    }
+}
+
 // POST /api/auth/register
-app.post('/api/auth/register', async (req, res) => {
-    const { email, password, name } = req.body || {};
-    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+//
+// In 'sso' mode the identity is ALSO created at the Identity Authority so the
+// account works across the family from day one. A 409 there means the email
+// already has a Jubilee ID — surfaced as `existingIdentity` so the client can
+// offer "sign in instead" rather than a dead-end error.
+app.post('/api/auth/register', ah(async (req, res) => {
+    const { email, password, name, firstName, lastName, dateOfBirth } = req.body || {};
+    // Type-check before use — see the note on /api/auth/login.
+    if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
+        return res.status(400).json({ error: 'Email and password required' });
+    }
+    for (const [label, value] of [['name', name], ['firstName', firstName], ['lastName', lastName], ['dateOfBirth', dateOfBirth]]) {
+        if (value !== undefined && value !== null && typeof value !== 'string') {
+            return res.status(400).json({ error: `Invalid ${label}.` });
+        }
+    }
+    const emailNorm = email.toLowerCase().trim();
+
+    // Date of birth is optional, but if given it must be a real past date.
+    let dob = null;
+    if (dateOfBirth) {
+        const parsed = Date.parse(dateOfBirth);
+        if (Number.isNaN(parsed)) return res.status(400).json({ error: 'Please enter a valid date of birth.' });
+        if (parsed > Date.now()) return res.status(400).json({ error: 'Date of birth cannot be in the future.' });
+        dob = new Date(parsed).toISOString().slice(0, 10);
+    }
+
+    // Prefer the explicit name parts; fall back to splitting the display name.
+    const nameParts = (name || '').trim().split(/\s+/).filter(Boolean);
+    const first = (firstName || '').trim() || nameParts[0] || null;
+    const last  = (lastName  || '').trim() || nameParts.slice(1).join(' ') || null;
+    const display = (name || '').trim() || [first, last].filter(Boolean).join(' ');
+
+    // The client checks GET /api/auth/lookup before showing the form, but that is a
+    // UX affordance, not a control — it can be skipped, stale, or raced. Re-ask the
+    // authority here so an address it already knows can never be registered afresh.
+    // Fails OPEN: an unreachable authority must not halt registration, and the
+    // provision call immediately below still catches a genuine collision.
+    if (ssoDelegationActive()) {
+        const found = await ssoLookup(emailNorm);
+        if (found.ok && found.exists) {
+            return res.status(409).json({ error: 'That email already has a Jubilee ID. Please sign in instead.', existingIdentity: true });
+        }
+        if (!found.ok) console.warn('[sso] lookup unavailable during registration; allowing signup');
+    }
+
+    // Reserve the Jubilee ID BEFORE creating anything locally, so a conflict at the
+    // authority doesn't leave an orphaned local account behind.
+    if (ssoDelegationActive()) {
+        const provisioned = await ssoProvisionHash({
+            email: emailNorm,
+            firstName: first,
+            lastName: last,
+            passwordHash: ssoHashPassword(password),
+        });
+        if (provisioned.conflict) {
+            return res.status(409).json({ error: 'That email already has a Jubilee ID. Please sign in instead.', existingIdentity: true });
+        }
+        if (!provisioned.ok) {
+            return res.status(503).json({ error: 'The sign-up service is temporarily unavailable. Please try again shortly.' });
+        }
+    }
+
     const salt = crypto.randomBytes(16).toString('hex');
     const hash = authHashPassword(password, salt);
     try {
+        // entitlements is explicitly empty: the column DEFAULT is '["jubileeverse_cms"]',
+        // which would grant back-office access to every self-registered account.
         const { rows: [insertedUser] } = await pgPool.query(
-            `INSERT INTO jv_users (email, password_hash, password_salt, name) VALUES ($1, $2, $3, $4) RETURNING id`,
-            [email.toLowerCase().trim(), hash, salt, name || '']
+            `INSERT INTO jv_users (email, password_hash, password_salt, name, first_name, last_name, date_of_birth, role, entitlements)
+                  VALUES ($1, $2, $3, $4, $5, $6, $7, 'user', '[]'::jsonb) RETURNING id`,
+            [emailNorm, hash, salt, display, first, last, dob]
         );
-        const user = { id: insertedUser.id, email: email.toLowerCase().trim(), name: name || '', role: 'user', permissions: [] };
+        const user = { id: insertedUser.id, email: emailNorm, name: display, role: 'user', permissions: [] };
         const token = authCreateJWT({ userId: user.id, email: user.email, role: user.role });
-        res.json({ success: true, token, user });
+        const refresh = await authIssueRefreshToken(user.id);
+        res.json({
+            success: true, token,
+            refreshToken: refresh.token,
+            expiresAt: new Date(Date.now() + ACCESS_TTL_SECS * 1000).toISOString(),
+            user,
+        });
     } catch (e) {
         if (e.code === '23505') return res.status(409).json({ error: 'Email already registered' });
         res.status(500).json({ error: 'Registration failed' });
     }
-});
+}));
 
 // Phase 10: TOTP MFA helpers
 const { authenticator: _authenticator } = require('otplib');
@@ -10631,14 +10831,143 @@ app.post('/auth/logout', express.json(), async (req, res) => {
   }
 });
 
-// POST /api/auth/login — MFA-aware (Phase 10)
-app.post('/api/auth/login', loginLimiter, async (req, res) => {
-    const { email, password, totp_code } = req.body || {};
-    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
-    const { rows: [user] } = await pgPool.query(`SELECT * FROM jv_users WHERE email = $1`, [email.toLowerCase().trim()]);
-    if (!user) return res.status(401).json({ error: 'Invalid email or password' });
-    const hash = authHashPassword(password, user.password_salt);
-    if (hash !== user.password_hash) return res.status(401).json({ error: 'Invalid email or password' });
+// ── SSO delegation helpers ───────────────────────────────────────────────────
+
+/**
+ * Upsert a user the Identity Authority just authenticated. Keys on EMAIL — that
+ * is the real cross-platform key; sso_subject_id is recorded for traceability.
+ *
+ * The SSO is the CREDENTIAL authority only, NOT the role authority. On the first
+ * sign-in we seed the lowest-privilege defaults; on return logins we deliberately
+ * do NOT touch role, permissions, entitlements or cms_roles, so privileges granted
+ * here survive and are never re-derived from the authority.
+ *
+ * Names are refreshed with COALESCE so a name changed on any family site
+ * propagates here, but a null from the authority never blanks a local value.
+ *
+ * Note the explicit `'[]'::jsonb` entitlements on INSERT: the column DEFAULT is
+ * '["jubileeverse_cms"]', which would hand back-office access to every identity
+ * that can sign in. New SSO users start with none.
+ */
+async function upsertUserFromSso(ssoUser) {
+    const email = String(ssoUser.email || '').toLowerCase().trim();
+    if (!email) throw new Error('SSO login response missing email');
+    const firstName = (ssoUser.first_name ?? ssoUser.firstName ?? '').trim() || null;
+    const lastName  = (ssoUser.last_name  ?? ssoUser.lastName  ?? '').trim() || null;
+    const name = [firstName, lastName].filter(Boolean).join(' ').trim()
+        || ssoUser.display_name || ssoUser.name || email;
+    const subject = `sso|${ssoUser.id ?? email}`;
+
+    const { rows: [user] } = await pgPool.query(
+        `INSERT INTO jv_users (email, name, first_name, last_name, sso_subject_id, role, entitlements, last_login_at)
+              VALUES ($1, $2, $3, $4, $5, 'user', '[]'::jsonb, NOW())
+         ON CONFLICT (email) DO UPDATE
+            SET last_login_at   = NOW(),
+                updated_at      = NOW(),
+                first_name      = COALESCE(EXCLUDED.first_name, jv_users.first_name),
+                last_name       = COALESCE(EXCLUDED.last_name,  jv_users.last_name),
+                name            = COALESCE(EXCLUDED.name,       jv_users.name),
+                sso_subject_id  = COALESCE(jv_users.sso_subject_id, EXCLUDED.sso_subject_id)
+         RETURNING *`,
+        [email, name, firstName, lastName, subject]
+    );
+    return user;
+}
+
+/**
+ * Lazy migration for accounts that predate SSO. The authority returned 401, which
+ * for a pre-SSO account is expected — it has simply never heard of them. Their
+ * local hash cannot be exported in bulk (server.js and the authority salt scrypt
+ * differently), so each account migrates itself on the next correct password.
+ *
+ * Returns the user row when the account was migrated and may sign in, else null.
+ */
+async function selfHealSsoLogin(emailNorm, password, req) {
+    const { rows: [user] } = await pgPool.query(
+        `SELECT * FROM jv_users WHERE email = $1`, [emailNorm]
+    );
+    // No local password-capable account, or the password is simply wrong -> this
+    // is a genuine auth failure, not an unmigrated account.
+    if (!user || !user.password_hash || !user.password_salt) return null;
+    if (authHashPassword(password, user.password_salt) !== user.password_hash) return null;
+    if (!user.is_active || user.is_locked) return null;
+
+    const result = await ssoProvisionHash({
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        passwordHash: ssoHashPassword(password),
+    });
+    // ONLY a fresh create (201) means "the authority didn't know them" -> safe to
+    // sign in. A 409 means the email already exists there, so the 401 was a REAL
+    // bad password; anything else means the authority is unavailable. Both must
+    // fall through to a 401 rather than granting a session.
+    if (!result.ok) {
+        console.warn('[sso] self-provision did not create the account:', JSON.stringify(result));
+        return null;
+    }
+    logAuditEvent(pgPool, {
+        event_type: 'auth.sso_self_provisioned', actor_id: user.email,
+        target_type: 'jv_users', target_id: String(user.id), details: { via: 'signin_migration' },
+        ip_address: req.ip, user_agent: req.get('user-agent'),
+    });
+    await pgPool.query(`UPDATE jv_users SET sso_subject_id = COALESCE(sso_subject_id, $2) WHERE id = $1`,
+        [user.id, `sso|${user.email}`]);
+    return user;
+}
+
+// POST /api/auth/login — MFA-aware (Phase 10), SSO-delegating when configured.
+//
+// In 'sso' mode the Identity Authority verifies the password and we mint our own
+// session from the user it returns. MFA stays LOCAL and still runs afterwards for
+// privileged roles: a remote first factor does not replace our second factor.
+app.post('/api/auth/login', loginLimiter, ah(async (req, res) => {
+    const { email, password, totp_code, rememberMe } = req.body || {};
+    // Type-check before use: a non-string here would throw inside toLowerCase()
+    // or scryptSync and surface as a 500 for what is really a malformed request.
+    if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
+        return res.status(400).json({ error: 'Email and password required' });
+    }
+    if (totp_code !== undefined && typeof totp_code !== 'string') {
+        return res.status(400).json({ error: 'Invalid authentication code.' });
+    }
+    const emailNorm = email.toLowerCase().trim();
+
+    let user = null;
+    let authMethod = 'password';
+
+    if (ssoDelegationActive()) {
+        let ssoStatus = null;
+        try {
+            const { status, body } = await ssoLogin({ email: emailNorm, password });
+            ssoStatus = status;
+            if (status === 200 && body && body.user) {
+                user = await upsertUserFromSso(body.user);
+                authMethod = 'sso';
+            }
+        } catch (err) {
+            // The authority is unreachable. Fail OPEN to the local credential path
+            // so an SSO outage cannot lock staff out of the back office. A 401 is
+            // a different thing entirely and must NOT fall through this way.
+            console.error('[sso] login unreachable, falling back to local:', err.message);
+        }
+        if (!user && ssoStatus === 401) {
+            user = await selfHealSsoLogin(emailNorm, password, req);
+            if (user) authMethod = 'sso';
+            else return res.status(401).json({ error: 'Invalid email or password' });
+        }
+    }
+
+    if (!user) {
+        const { rows: [row] } = await pgPool.query(`SELECT * FROM jv_users WHERE email = $1`, [emailNorm]);
+        if (!row || !row.password_hash) return res.status(401).json({ error: 'Invalid email or password' });
+        const hash = authHashPassword(password, row.password_salt);
+        if (hash !== row.password_hash) return res.status(401).json({ error: 'Invalid email or password' });
+        user = row;
+    }
+
+    if (!user.is_active) return res.status(403).json({ error: 'This account has been disabled.' });
+    if (user.is_locked)  return res.status(403).json({ error: 'This account is locked. Contact an administrator.' });
 
     // MFA check for privileged roles
     if (user.mfa_enabled && MFA_REQUIRED_ROLES.includes(user.role)) {
@@ -10662,9 +10991,12 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
     let permissions = [];
     try { permissions = JSON.parse(user.permissions || '[]'); } catch {}
     const token = authCreateJWT({ userId: user.id, email: user.email, role: user.role });
+    // "Keep me signed in" selects the long refresh lifetime. The access token's
+    // TTL is unaffected — durable session length lives entirely in this token.
+    const refresh = await authIssueRefreshToken(user.id, { extended: !!rememberMe });
     logAuditEvent(pgPool, {
         event_type: 'user.login', actor_id: user.email,
-        target_type: 'users', target_id: String(user.id), details: { role: user.role },
+        target_type: 'users', target_id: String(user.id), details: { role: user.role, auth_method: authMethod },
         ip_address: req.ip, user_agent: req.get('user-agent'),
     });
     // Session recording (Part 3 Section 8)
@@ -10674,17 +11006,43 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
         const deviceParsed = _parseUserAgent(req.get('user-agent') || '');
         await pgPool.query(
             `INSERT INTO jv_user_sessions (user_email, session_token_hash, ip_address, user_agent, device_parsed, auth_method, mfa_satisfied)
-             VALUES ($1, $2, $3, $4, $5, 'password', $6)`,
-            [user.email, tokenHash, req.ip || null, req.get('user-agent') || null, JSON.stringify(deviceParsed), mfaSatisfied]
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [user.email, tokenHash, req.ip || null, req.get('user-agent') || null, JSON.stringify(deviceParsed), authMethod, mfaSatisfied]
         );
         await pgPool.query(`UPDATE jv_users SET last_login_at=NOW() WHERE id=$1`, [user.id]);
     } catch (sessErr) { /* non-fatal */ }
-    res.json({ success: true, token, force_password_reset: !!user.force_password_reset,
+    res.json({ success: true, token,
+               refreshToken: refresh.token,
+               expiresAt: new Date(Date.now() + ACCESS_TTL_SECS * 1000).toISOString(),
+               force_password_reset: !!user.force_password_reset,
                user: { id: user.id, email: user.email, name: user.name, role: user.role, permissions, mfa_enabled: !!user.mfa_enabled } });
-});
+}));
+
+// GET /api/auth/lookup?email= — does a Jubilee ID already exist for this email?
+//
+// Drives the email-first signup: an existing identity is offered "sign in" rather
+// than a doomed registration form. In 'sso' mode this asks the shared authority;
+// otherwise it checks our own table. Deliberately FAILS OPEN (exists:false) when
+// the authority is unreachable so signup is never blocked — a genuine collision is
+// still caught later at registration. `available` tells the client whether the
+// answer is authoritative. GET so it stays CSRF-exempt.
+app.get('/api/auth/lookup', ah(async (req, res) => {
+    const email = String(req.query.email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+        return res.status(400).json({ error: 'A valid email is required.' });
+    }
+    if (ssoDelegationActive()) {
+        const found = await ssoLookup(email);
+        return res.json({ exists: found.ok ? found.exists : false, available: found.ok });
+    }
+    const { rows } = await pgPool.query(
+        `SELECT 1 FROM jv_users WHERE email = $1 AND is_active = 1`, [email]
+    );
+    res.json({ exists: rows.length > 0, available: true });
+}));
 
 // GET /api/auth/me — cookie-first, Bearer fallback (S12: includes entitlements + has_cms_access)
-app.get('/api/auth/me', async (req, res) => {
+app.get('/api/auth/me', ah(async (req, res) => {
     function _buildUserResponse(user) {
         // JSONB columns come back from pg already parsed; handle both string and object forms
         const _parseJsonb = (val, fallback = []) => {
@@ -10719,10 +11077,14 @@ app.get('/api/auth/me', async (req, res) => {
     );
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ success: true, user: _buildUserResponse(user) });
-});
+}));
 
 // POST /api/auth/logout
-app.post('/api/auth/logout', async (req, res) => {
+app.post('/api/auth/logout', ah(async (req, res) => {
+    // Revoke the durable half of the session. Bearer clients must pass their
+    // refresh token in the body — it is not otherwise carried on the request.
+    // The access token is stateless and simply lapses at its TTL.
+    try { await authRevokeRefreshToken(req.body?.refreshToken); } catch (e) { /* non-fatal */ }
     // Close session record (Part 3 Section 8)
     try {
         const raw = (req.headers.authorization || '').replace('Bearer ', '').trim();
@@ -10739,16 +11101,53 @@ app.post('/api/auth/logout', async (req, res) => {
         }
     } catch (e) { /* non-fatal */ }
     res.json({ success: true, message: 'Logged out' });
-});
+}));
 
-// POST /api/auth/refresh
-app.post('/api/auth/refresh', async (req, res) => {
-    const token = (req.headers.authorization || '').replace('Bearer ', '');
-    const payload = authVerifyJWT(token);
+// POST /api/auth/refresh — redeem a refresh token for a fresh access token.
+// Unauthenticated by design: the refresh token IS the credential, and the whole
+// point is that it works once the access token has already lapsed. Non-rotating —
+// the SAME refresh token is returned (its expiry slides forward server-side), so
+// concurrent refreshes from multiple tabs all succeed.
+//
+// Legacy fallback: an older client with no stored refresh token may still present
+// a live access token in the Authorization header; re-mint from that so existing
+// sessions survive the upgrade. That path disappears as tokens age out.
+app.post('/api/auth/refresh', ah(async (req, res) => {
+    const raw = req.body?.refreshToken || '';
+    if (raw) {
+        const redeemed = await authRedeemRefreshToken(raw);
+        if (!redeemed) return res.status(401).json({ error: 'Invalid or expired refresh token' });
+        const { rows: [user] } = await pgPool.query(
+            `SELECT id, email, role FROM jv_users WHERE id = $1`, [redeemed.userId]
+        );
+        if (!user) return res.status(401).json({ error: 'Invalid or expired refresh token' });
+        const token = authCreateJWT({ userId: user.id, email: user.email, role: user.role });
+        return res.json({
+            success: true,
+            token,
+            refreshToken: raw,
+            expiresAt: new Date(Date.now() + ACCESS_TTL_SECS * 1000).toISOString(),
+        });
+    }
+    const bearer = (req.headers.authorization || '').replace('Bearer ', '');
+    const payload = authVerifyJWT(bearer);
     if (!payload) return res.status(401).json({ error: 'Invalid or expired token' });
     const newToken = authCreateJWT({ userId: payload.userId, email: payload.email, role: payload.role });
-    res.json({ success: true, token: newToken });
-});
+    res.json({
+        success: true,
+        token: newToken,
+        expiresAt: new Date(Date.now() + ACCESS_TTL_SECS * 1000).toISOString(),
+    });
+}));
+
+// POST /api/auth/logout-all — revoke every refresh token for the caller, ending
+// the session on all their devices. Outstanding access tokens lapse at their TTL.
+app.post('/api/auth/logout-all', ah(async (req, res) => {
+    const payload = authVerifyJWT((req.headers.authorization || '').replace('Bearer ', ''));
+    if (!payload) return res.status(401).json({ error: 'Unauthorized' });
+    await authRevokeAllRefreshTokens(payload.userId);
+    res.json({ success: true });
+}));
 
 // Phase 10: TOTP MFA endpoints
 
@@ -10800,7 +11199,7 @@ app.delete('/api/auth/mfa', async (req, res) => {
 // =============================================================================
 
 // PUT /api/auth/profile — Update profile (name, email)
-app.put('/api/auth/profile', async (req, res) => {
+app.put('/api/auth/profile', ah(async (req, res) => {
     const token = (req.headers.authorization || '').replace('Bearer ', '');
     const payload = authVerifyJWT(token);
     if (!payload) return res.status(401).json({ error: 'Unauthorized' });
@@ -10838,10 +11237,10 @@ app.put('/api/auth/profile', async (req, res) => {
         user: { id: user.id, email: newEmail, name: newName, role: user.role, permissions },
         ...(newToken ? { token: newToken } : {})
     });
-});
+}));
 
 // PUT /api/auth/change-password — Change password (authenticated)
-app.put('/api/auth/change-password', async (req, res) => {
+app.put('/api/auth/change-password', ah(async (req, res) => {
     const token = (req.headers.authorization || '').replace('Bearer ', '');
     const payload = authVerifyJWT(token);
     if (!payload) return res.status(401).json({ error: 'Unauthorized' });
@@ -10851,7 +11250,7 @@ app.put('/api/auth/change-password', async (req, res) => {
     if (newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' });
 
     const { rows: [user] } = await pgPool.query(
-        `SELECT id, password_hash, password_salt FROM jv_users WHERE id=$1`, [payload.userId]
+        `SELECT id, email, password_hash, password_salt FROM jv_users WHERE id=$1`, [payload.userId]
     );
     if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -10865,12 +11264,15 @@ app.put('/api/auth/change-password', async (req, res) => {
         `UPDATE jv_users SET password_hash=$1, password_salt=$2, updated_at=NOW() WHERE id=$3`,
         [newHash, newSalt, user.id]
     );
+    const sync = await syncPasswordToSso(user.email, newPassword);
+    // Sign out every OTHER device — the caller keeps the session they just used.
+    await authRevokeAllRefreshTokens(user.id, { exceptToken: req.body?.refreshToken });
 
-    res.json({ success: true, message: 'Password updated successfully' });
-});
+    res.json({ success: true, message: 'Password updated successfully', ssoSync: sync });
+}));
 
 // POST /api/auth/change-password — Change password via cookie session (cockpit profile settings)
-app.post('/api/auth/change-password', async (req, res) => {
+app.post('/api/auth/change-password', ah(async (req, res) => {
     const actor = await requireSession(req, res);
     if (!actor) return;
     const { current_password, new_password } = req.body || {};
@@ -10878,7 +11280,7 @@ app.post('/api/auth/change-password', async (req, res) => {
     if (new_password.length < 8) return res.status(400).json({ error: 'New password must be at least 8 characters.' });
     try {
         const { rows: [user] } = await pgPool.query(
-            `SELECT id, password_hash, password_salt FROM jv_users WHERE id=$1`, [actor.userId]
+            `SELECT id, email, password_hash, password_salt FROM jv_users WHERE id=$1`, [actor.userId]
         );
         if (!user) return res.status(404).json({ error: 'User not found.' });
         if (!user.password_hash) return res.status(400).json({ error: 'No password is set on this account.' });
@@ -10890,17 +11292,19 @@ app.post('/api/auth/change-password', async (req, res) => {
             `UPDATE jv_users SET password_hash=$1, password_salt=$2, updated_at=NOW() WHERE id=$3`,
             [newHash, newSalt, user.id]
         );
+        const sync = await syncPasswordToSso(user.email, new_password);
+        await authRevokeAllRefreshTokens(user.id, { exceptToken: req.body?.refreshToken });
         logAuditEvent(pgPool, { event_type: 'user.password_changed', actor_id: actor.email,
             target_type: 'jv_users', target_id: String(user.id), ip_address: req.ip });
-        res.json({ success: true });
+        res.json({ success: true, ssoSync: sync });
     } catch (e) {
         console.error('[change-password]', e.message);
         res.status(500).json({ error: 'Server error.' });
     }
-});
+}));
 
 // POST /api/auth/forgot-password — Request password reset (public)
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', ah(async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
@@ -10923,10 +11327,10 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     console.log(`[PasswordReset] Reset link for ${user.email}: ${resetUrl}`);
 
     res.json(successResponse);
-});
+}));
 
 // POST /api/auth/reset-password — Reset password with token (public)
-app.post('/api/auth/reset-password', async (req, res) => {
+app.post('/api/auth/reset-password', ah(async (req, res) => {
     const { token, newPassword } = req.body;
     if (!token || !newPassword) return res.status(400).json({ error: 'Token and new password required' });
     if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
@@ -10936,7 +11340,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
     );
     if (!row) return res.status(400).json({ error: 'Invalid or expired reset link' });
 
-    const { rows: [user] } = await pgPool.query(`SELECT id FROM jv_users WHERE id=$1`, [row.user_id]);
+    const { rows: [user] } = await pgPool.query(`SELECT id, email FROM jv_users WHERE id=$1`, [row.user_id]);
     if (!user) return res.status(400).json({ error: 'User not found' });
 
     const newSalt = crypto.randomBytes(16).toString('hex');
@@ -10946,12 +11350,15 @@ app.post('/api/auth/reset-password', async (req, res) => {
         [newHash, newSalt, user.id]
     );
     await pgPool.query(`UPDATE password_reset_tokens SET used=1 WHERE id=$1`, [row.id]);
+    const sync = await syncPasswordToSso(user.email, newPassword);
+    // A reset means the old password may be compromised — sign out ALL devices.
+    await authRevokeAllRefreshTokens(user.id);
 
-    res.json({ success: true, message: 'Password has been reset. You can now sign in.' });
-});
+    res.json({ success: true, message: 'Password has been reset. You can now sign in.', ssoSync: sync });
+}));
 
 // GET /api/auth/validate-reset-token — Check if a reset token is valid
-app.get('/api/auth/validate-reset-token', async (req, res) => {
+app.get('/api/auth/validate-reset-token', ah(async (req, res) => {
     const { token } = req.query;
     if (!token) return res.json({ valid: false });
 
@@ -10959,7 +11366,7 @@ app.get('/api/auth/validate-reset-token', async (req, res) => {
         `SELECT id FROM password_reset_tokens WHERE token=$1 AND used=0 AND expires_at > NOW()`, [token]
     );
     res.json({ valid: !!row });
-});
+}));
 
 // =============================================================================
 // ARTICLE REACTIONS (Like / Dislike)
@@ -13654,12 +14061,32 @@ app.post('/api/admin/remove-faith-work-stewardship', async (req, res) => {
 // ERROR HANDLING
 // =============================================================================
 
+// Postgres connectivity failures (pool exhausted, tunnel down, host unreachable)
+// are not the caller's fault and are usually transient — answer 503 so clients
+// can retry, rather than a flat 500 that reads as "this request is broken".
+const DB_DOWN_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EHOSTUNREACH', 'ENOTFOUND', 'EPIPE']);
+function isDatabaseUnavailable(err) {
+    if (!err) return false;
+    if (DB_DOWN_CODES.has(err.code)) return true;
+    return /Connection terminated|timeout exceeded when trying to connect|too many clients|server closed the connection/i
+        .test(err.message || '');
+}
+
 app.use((err, req, res, next) => {
     console.error(JSON.stringify({ level: 'error', reqId: req.id, msg: err.message, stack: err.stack }));
-    res.status(500).json({
-        error: NODE_ENV === 'development' ? err.message : 'Internal server error',
-        reqId: req.id,
-    });
+    // Headers already flushed — hand back to Express so it can close the socket
+    // instead of throwing "Cannot set headers after they are sent".
+    if (res.headersSent) return next(err);
+
+    const status = isDatabaseUnavailable(err)
+        ? 503
+        : (Number.isInteger(err.status) && err.status >= 400 && err.status <= 599 ? err.status : 500);
+
+    const message = status === 503
+        ? 'The service is temporarily unavailable. Please try again in a moment.'
+        : NODE_ENV === 'development' ? err.message : 'Internal server error';
+
+    res.status(status).json({ error: message, reqId: req.id });
 });
 
 // =============================================================================
@@ -15896,6 +16323,33 @@ async function runMigrations() {
             updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )`,
         `CREATE UNIQUE INDEX IF NOT EXISTS idx_jv_users_idp_subject ON jv_users(idp_subject_id) WHERE idp_subject_id IS NOT NULL`,
+
+        // ── Jubilee Identity Authority (SSO) delegation ──────────────────────
+        // The SSO subject is recorded for traceability, but EMAIL stays the real
+        // cross-platform key (that is what the authority matches on). first/last
+        // name mirror the authority's identity fields so a name changed on any
+        // family site propagates here on the next sign-in.
+        `ALTER TABLE jv_users ADD COLUMN IF NOT EXISTS sso_subject_id TEXT`,
+        `ALTER TABLE jv_users ADD COLUMN IF NOT EXISTS first_name TEXT`,
+        `ALTER TABLE jv_users ADD COLUMN IF NOT EXISTS last_name TEXT`,
+        `ALTER TABLE jv_users ADD COLUMN IF NOT EXISTS date_of_birth DATE`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_jv_users_sso_subject ON jv_users(sso_subject_id) WHERE sso_subject_id IS NOT NULL`,
+
+        // Durable, revocable refresh tokens. Only the SHA-256 hash is stored —
+        // the raw token never touches the DB. The access token stays stateless
+        // and lapses at its TTL; revoking the refresh token is what durably ends
+        // a session, since no new access token can then be minted.
+        `CREATE TABLE IF NOT EXISTS jv_refresh_tokens (
+            id         BIGSERIAL PRIMARY KEY,
+            user_id    BIGINT NOT NULL REFERENCES jv_users(id) ON DELETE CASCADE,
+            token_hash TEXT NOT NULL UNIQUE,
+            expires_at TIMESTAMPTZ NOT NULL,
+            revoked_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_jv_refresh_tokens_user ON jv_refresh_tokens(user_id) WHERE revoked_at IS NULL`,
+        `CREATE INDEX IF NOT EXISTS idx_jv_refresh_tokens_expires ON jv_refresh_tokens(expires_at)`,
+
         `CREATE TABLE IF NOT EXISTS jv_cms_sessions (
             session_id     TEXT PRIMARY KEY,
             user_id        BIGINT NOT NULL REFERENCES jv_users(id) ON DELETE CASCADE,

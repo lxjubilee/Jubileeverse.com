@@ -19,6 +19,7 @@ import { api } from './api';
 import {
   canAccessCms as computeCanAccessCms,
   clearStoredAuth,
+  getRefreshToken,
   getStoredAuth,
   setStoredAuth,
   userInitials,
@@ -86,6 +87,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
+      // api.get transparently redeems the refresh token when the access token has
+      // lapsed, so this doubles as the session keepalive.
       const res = await api.get<{ success?: boolean; user?: AuthUser }>('/api/auth/me');
       if (!res?.success || !res.user) throw new Error('not authenticated');
       setUser(res.user);
@@ -97,7 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           user: res.user,
           token: stored.token,
           tokens: stored.tokens,
+          refreshToken: stored.refreshToken,
+          expiresAt: stored.expiresAt,
         });
+        setToken(stored.token || '');
       }
     } catch {
       // Token invalid/expired — treat as signed out.
@@ -107,9 +113,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Keep the session warm: periodically re-validate, which transparently mints a
+  // fresh access token via the refresh token, so a long-running or idle tab never
+  // silently lapses mid-edit. Only runs while a refresh token exists.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (getRefreshToken()) void refresh();
+    }, 25 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [refresh]);
+
   const signOut = useCallback(() => {
-    // Best-effort server-side logout (revokes the session) before clearing local state.
-    api.post('/api/auth/logout').catch(() => {});
+    // Best-effort server-side logout. The refresh token must go in the body — it is
+    // the durable half of the session and is not otherwise carried on the request.
+    api.post('/api/auth/logout', { refreshToken: getRefreshToken() }).catch(() => {});
     clearStoredAuth();
     setUser(null);
     setToken('');

@@ -32,9 +32,19 @@ export function getStoredAuth(): StoredAuth | null {
   }
 }
 
+/**
+ * Persist the session. The refresh token is MERGED from what is already stored:
+ * a refresh response carries a new access token but echoes (or omits) the refresh
+ * token, and dropping it here would silently end the session.
+ */
 export function setStoredAuth(auth: StoredAuth): void {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+  const prev = getStoredAuth();
+  const merged: StoredAuth = {
+    ...auth,
+    refreshToken: auth.refreshToken ?? prev?.refreshToken ?? prev?.tokens?.refresh,
+  };
+  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(merged));
 }
 
 export function clearStoredAuth(): void {
@@ -42,11 +52,24 @@ export function clearStoredAuth(): void {
   window.localStorage.removeItem(AUTH_STORAGE_KEY);
 }
 
-/** Returns the bearer token, tolerating the legacy `tokens.access` shape. */
+/**
+ * Returns a *usable* bearer token, tolerating the legacy `tokens.access` shape.
+ *
+ * Once `expiresAt` has passed this returns '' so the API client refreshes rather
+ * than firing a request it knows will 401 — but it deliberately does NOT clear
+ * storage, because the refresh token next to it is still perfectly good.
+ */
 export function getAuthToken(): string {
   const auth = getStoredAuth();
   if (!auth) return '';
+  if (auth.expiresAt && Date.parse(auth.expiresAt) <= Date.now()) return '';
   return auth.token || auth.tokens?.access || auth.tokens?.accessToken || '';
+}
+
+/** The durable half of the session, if one was issued. */
+export function getRefreshToken(): string {
+  const auth = getStoredAuth();
+  return auth?.refreshToken || auth?.tokens?.refresh || '';
 }
 
 export function isAuthenticated(): boolean {

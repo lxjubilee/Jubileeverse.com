@@ -6,6 +6,8 @@ import AuthBackground from '@/components/auth/AuthBackground';
 import LegalModals from '@/components/auth/LegalModals';
 import { api, ApiError } from '@/lib/api';
 import { getStoredAuth, setStoredAuth } from '@/lib/authStorage';
+import { hasJubileeId } from '@/lib/identity';
+import { safeRedirectTarget } from '@/lib/redirect';
 import type { AuthUser } from '@/lib/types';
 import styles from '../auth.module.css';
 
@@ -26,6 +28,8 @@ interface MfaRequiredResponse {
 interface LoginSuccessResponse {
   success: true;
   token: string;
+  refreshToken?: string;
+  expiresAt?: string;
   force_password_reset: boolean;
   user: AuthUser;
 }
@@ -51,10 +55,10 @@ const EyeIcon = ({ open }: { open: boolean }) =>
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 /**
- * "Remember me" persists only the email address so it prefills on the next
- * visit. The session token itself is always stored under
- * localStorage["jubileeVerseAuth"] by the shared auth layer (and by the backend
- * OIDC callback), so the checkbox deliberately does not change session lifetime.
+ * "Keep me signed in" does two things: it prefills the email on the next visit,
+ * and it is sent to the server as `rememberMe`, which selects the long (1 year vs
+ * 30 day) refresh-token lifetime. The tokens themselves always live under
+ * localStorage["jubileeVerseAuth"] either way.
  */
 const REMEMBERED_EMAIL_KEY = 'jubileeVerseRememberedEmail';
 
@@ -73,25 +77,6 @@ function writeRememberedEmail(value: string | null): void {
   } catch {
     /* storage unavailable (private mode / blocked) — not fatal */
   }
-}
-
-/** Auth screens are never a valid post-login destination — they would bounce
- *  the user straight back to sign-in. */
-const AUTH_PATHS = ['/signin', '/signup', '/forgot-password', '/reset-password'];
-
-/**
- * Resolve a safe post-login destination from ?redirect= / ?next=. Only same-site
- * relative paths are honored (must start with a single "/" and not "//"), to
- * avoid open-redirect to an external origin. Anything else — no param, an
- * external URL, or an auth route — lands on the home screen.
- */
-function safeRedirectTarget(): string {
-  const params = new URLSearchParams(window.location.search);
-  const raw = params.get('redirect') || params.get('next') || '';
-  if (!raw.startsWith('/') || raw.startsWith('//')) return '/';
-  const path = raw.split(/[?#]/)[0].replace(/\/+$/, '').toLowerCase() || '/';
-  if (AUTH_PATHS.includes(path)) return '/';
-  return raw;
 }
 
 export default function SignInPage() {
@@ -115,6 +100,13 @@ export default function SignInPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('registered') === 'true') setRegistered(true);
 
+    // ?email= is set when sign-up discovers the address already has a Jubilee ID
+    // and hands the visitor over here; it wins over the remembered address.
+    const handedOver = params.get('email');
+    if (handedOver) {
+      setEmail(handedOver);
+      return;
+    }
     const remembered = readRememberedEmail();
     if (remembered) {
       setEmail(remembered);
@@ -145,9 +137,15 @@ export default function SignInPage() {
 
     setSubmitting(true);
     try {
-      const body: { email: string; password: string; totp_code?: string } = {
+      const body: {
+        email: string;
+        password: string;
+        rememberMe: boolean;
+        totp_code?: string;
+      } = {
         email: email.trim(),
         password,
+        rememberMe,
       };
       if (mfaRequired && totp.trim()) body.totp_code = totp.trim();
 
@@ -161,7 +159,13 @@ export default function SignInPage() {
       }
 
       writeRememberedEmail(rememberMe ? email.trim() : null);
-      setStoredAuth({ authenticated: true, user: data.user, token: data.token });
+      setStoredAuth({
+        authenticated: true,
+        user: data.user,
+        token: data.token,
+        refreshToken: data.refreshToken,
+        expiresAt: data.expiresAt,
+      });
 
       if (data.force_password_reset) {
         window.location.assign('/forgot-password');
@@ -170,11 +174,22 @@ export default function SignInPage() {
       // Full-page navigation so the AuthProvider re-hydrates from storage.
       window.location.assign(safeRedirectTarget());
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : 'Connection error. Please check your internet and try again.',
-      );
+      // A 401 is ambiguous: wrong password, or no Jubilee ID at all? Ask the
+      // lookup so we can point a first-time visitor at sign-up instead of letting
+      // them retype a password they never had.
+      if (err instanceof ApiError && err.status === 401) {
+        setError(
+          (await hasJubileeId(email.trim()))
+            ? 'Incorrect password. Please try again.'
+            : 'No account found for that email. Please sign up first.',
+        );
+      } else {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : 'Connection error. Please check your internet and try again.',
+        );
+      }
       setSubmitting(false);
     }
   };

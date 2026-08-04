@@ -660,3 +660,25 @@
     display: block;
   }
 }
+
+/* Link-styled button, for in-form navigation that is an action rather than a
+   destination — e.g. "Use a different email" stepping the sign-up wizard back. */
+.linkBtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: #ffbd59;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.linkBtn:hover {
+  text-decoration: underline;
+}
+
+.linkBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  text-decoration: none;
+}
