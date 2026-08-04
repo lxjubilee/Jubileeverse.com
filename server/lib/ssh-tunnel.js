@@ -95,6 +95,15 @@ async function initializeSSHTunnel() {
 
             // Create forward server
             forwardServer = net.createServer((socket) => {
+                // A dropped connection makes the socket emit 'error'. Without a
+                // listener Node's default for an unhandled 'error' event is to
+                // THROW, which takes down the whole API process — an ECONNRESET on
+                // one idle database connection must not do that. Handle it here so
+                // the reset kills only this connection.
+                socket.on('error', (err) => {
+                    console.warn(`[SSH Tunnel] client socket error (dropping connection):`, err.code || err.message);
+                    socket.destroy();
+                });
                 sshClient.forwardOut(
                     LOCAL_BIND_HOST,
                     LOCAL_BIND_PORT,
@@ -106,6 +115,11 @@ async function initializeSSHTunnel() {
                             socket.destroy();
                             return;
                         }
+                        // Same reasoning for the far end of the pipe.
+                        stream.on('error', (streamErr) => {
+                            console.warn(`[SSH Tunnel] forward stream error (dropping connection):`, streamErr.message);
+                            socket.destroy();
+                        });
                         socket.pipe(stream).pipe(socket);
                     }
                 );
