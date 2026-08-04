@@ -24,10 +24,11 @@ const { describe, it, before, after } = require('node:test')
 
 const BASE = process.env.TEST_BASE_URL || 'http://localhost:3107'
 
-let adminToken  = ''
-let adminUserId = ''
-let testUserId  = ''
-let testToken   = ''
+let adminToken   = ''
+let adminUserId  = ''
+let testUserId   = ''
+let testUserEmail = ''
+let testToken    = ''
 
 async function req(method, path, body, token) {
   const res = await fetch(`${BASE}${path}`, {
@@ -56,8 +57,11 @@ async function createTestUser(adminToken) {
 describe('Part 3 / Section 9 — User Account Editor & Administrative Controls', () => {
 
   before(async () => {
+    // `email`, not `username`: /api/auth/login destructures { email, password } and
+    // hard-rejects a non-string email with a 400, so this suite used to die here on
+    // the assert below before a single test ran.
     const adminLogin = await req('POST', '/api/auth/login', {
-      username: process.env.TEST_ADMIN_USER || 'admin',
+      email: process.env.TEST_ADMIN_USER || 'admin',
       password: process.env.TEST_ADMIN_PASS || 'admin',
     })
     assert.equal(adminLogin.status, 200, 'Admin login should succeed')
@@ -71,8 +75,9 @@ describe('Part 3 / Section 9 — User Account Editor & Administrative Controls',
     const newUser = await createTestUser(adminToken)
     if (newUser?.id) {
       testUserId = newUser.id
+      testUserEmail = newUser.email
       // Get a token for test user
-      const loginRes = await req('POST', '/api/auth/login', { username: newUser.email, password: newUser.password })
+      const loginRes = await req('POST', '/api/auth/login', { email: newUser.email, password: newUser.password })
       if (loginRes.status === 200) testToken = (await loginRes.json()).token
     } else {
       // Fall back to admin user for tests that only need the ID
@@ -86,7 +91,9 @@ describe('Part 3 / Section 9 — User Account Editor & Administrative Controls',
     if (testUserId && testUserId !== adminUserId) {
       // Re-enable before deletion in case tests left it disabled
       await req('POST', `/api/admin/users/${testUserId}/enable`, undefined, adminToken)
-      await req('DELETE', `/api/admin/users/${testUserId}`, undefined, adminToken)
+      // confirm_email is required by the delete endpoint as a second factor against
+      // a mistyped or scripted id. Without it this cleanup 400s and leaks the user.
+      await req('DELETE', `/api/admin/users/${testUserId}`, { confirm_email: testUserEmail }, adminToken)
     }
   })
 

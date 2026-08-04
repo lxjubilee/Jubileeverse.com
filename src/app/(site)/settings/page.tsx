@@ -13,12 +13,24 @@
  *  - Security: change password (current / new / confirm) with a live strength
  *              meter.
  *  - Account : Back to Home, Sign Out (with confirm), and a Danger Zone whose
- *              Delete Account is intentionally a no-op toast (as in the original).
+ *              Delete Account opens a confirmation dialog requiring the account
+ *              password AND the account email typed out. Deletion is a HARD
+ *              delete: no grace period, no undo. The user's Jubilee ID
+ *              (sso.jubileeinspire.com) is NOT deleted and keeps working on the
+ *              other Jubilee family sites. On success the page replaces itself
+ *              with a farewell panel instead of redirecting — see the `deleted`
+ *              flag in the auth guard below, without which the user is bounced
+ *              to /signin the instant isAuthenticated flips false.
  *
  * API (exact methods/paths/bodies from the original + the unchanged backend):
  *   GET  /api/auth/me                -> { success, user }
  *   PUT  /api/auth/profile           { name, email }            -> { success, user, token? }
  *   PUT  /api/auth/change-password   { currentPassword, newPassword } -> { success, message }
+ *   POST /api/auth/account/delete    { password, confirmEmail } -> { success, deleted }
+ *
+ * `user.can_delete_account` from /api/auth/me reflects the server-side feature
+ * flag and the caller's role; when false the Danger Zone button renders disabled
+ * rather than letting someone type a password into a form that will 501.
  *
  * `api` auto-attaches the Authorization: Bearer <token> header. After a profile
  * save we call useAuth().refresh() so the shared header avatar/initials and the
@@ -31,8 +43,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { setStoredAuth } from '@/lib/authStorage';
+import { setStoredAuth, clearStoredAuth } from '@/lib/authStorage';
 import type { AuthUser } from '@/lib/types';
+import DeleteAccountDialog from './DeleteAccountDialog';
 import styles from './settings.module.css';
 
 type TabName = 'profile' | 'security' | 'account';
@@ -118,6 +131,12 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
 
+  // Delete Account.
+  const [canDeleteAccount, setCanDeleteAccount] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+  const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
+
   // Toast.
   const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -136,10 +155,15 @@ export default function SettingsPage() {
 
   // --- Auth guard -----------------------------------------------------------
   useEffect(() => {
+    // A completed deletion signs the user out on purpose, so `isAuthenticated`
+    // goes false a moment later. Without this bail-out the guard would fire and
+    // replace the farewell panel with /signin — inviting someone who just deleted
+    // their account to sign back into it.
+    if (deleted) return;
     if (!isLoading && !isAuthenticated) {
       router.replace('/signin?redirect=/settings');
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, router, deleted]);
 
   // Apply a user record to both the header card and the editable form fields.
   const applyUser = useCallback((user: AuthUser) => {
@@ -160,6 +184,12 @@ export default function SettingsPage() {
     setHeaderRole(capitalize(role));
     setHeaderDate(`Joined ${memberDate}`);
     setAvatarInitials(deriveInitials(name, email));
+
+    // Server-side feature flag + role check, so the Danger Zone button can be
+    // honestly disabled instead of failing after a password has been typed.
+    setCanDeleteAccount(
+      (user as AuthUser & { can_delete_account?: boolean }).can_delete_account === true,
+    );
   }, []);
 
   // --- Load profile (GET /api/auth/me) -------------------------------------
@@ -275,6 +305,20 @@ export default function SettingsPage() {
     }
   }, [signOutAndRedirect]);
 
+  // --- Account deleted ------------------------------------------------------
+  const handleDeleted = useCallback(() => {
+    // clearStoredAuth() first and explicitly: signOut() does call it, but it also
+    // fires a logout POST, and the storage clear is the part that must be
+    // synchronous and unconditional. (The POST is harmless against a deleted
+    // user — /api/auth/logout never reads jv_users and the context swallows its
+    // errors — it is simply redundant.) signOut() is still needed for the context
+    // reset, without which the shared header keeps rendering the avatar.
+    clearStoredAuth();
+    signOut();
+    setDeleteOpen(false);
+    setDeleted(true);
+  }, [signOut]);
+
   // --- Password strength meter ---------------------------------------------
   const strengthScore = (() => {
     const pwd = newPassword;
@@ -298,6 +342,39 @@ export default function SettingsPage() {
   };
 
   // --- Render guards --------------------------------------------------------
+  // Checked before the auth guard below: after a deletion the visitor is
+  // intentionally signed out, so every other branch here would send them away.
+  if (deleted) {
+    return (
+      <main className={styles.settingsPage}>
+        <div className={`${styles.settingsCard} ${styles.farewellCard}`}>
+          <h1 className={styles.farewellTitle}>Your account has been deleted</h1>
+          <p className={styles.farewellBody}>
+            Everything we held for you on JubileeVerse is gone. Thank you for the time you spent
+            here — you are welcome back whenever you wish.
+          </p>
+          <p className={styles.farewellBody}>
+            Your Jubilee ID is untouched, so you can still sign in to other Jubilee sites with the
+            same email.
+          </p>
+          <p className={styles.farewellVerse}>
+            &ldquo;The Lord bless you and keep you; the Lord make his face shine on you.&rdquo;
+            &mdash; Numbers 6:24-25
+          </p>
+          {/* A plain anchor, not next/link, on purpose: the full document load
+              discards the React tree so no component is left holding a stale user,
+              and it stops the auth context's periodic refresh() from polling an
+              account that no longer exists. A client-side navigation would keep
+              both alive, which is exactly what we are trying to avoid here. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          <a href="/" className={`${styles.btn} ${styles.btnOutline} ${styles.farewellLink}`}>
+            Return to JubileeVerse
+          </a>
+        </div>
+      </main>
+    );
+  }
+
   if (isLoading || (!isAuthenticated && !isLoading) || !profileLoaded) {
     // While auth hydrates, or before the profile fetch resolves, show a spinner.
     // (If not authenticated, the effect above is redirecting to /signin.)
@@ -535,16 +612,32 @@ export default function SettingsPage() {
             </div>
             <div className={`${styles.btnGroup} ${styles.btnGroupTight}`}>
               <button
+                ref={deleteTriggerRef}
                 className={`${styles.btn} ${styles.btnDangerOutline}`}
-                onClick={() =>
-                  showToast('Account deletion is not available at this time.', 'error')
-                }
+                aria-haspopup="dialog"
+                disabled={!canDeleteAccount}
+                onClick={() => setDeleteOpen(true)}
               >
                 Delete Account
               </button>
             </div>
+            {!canDeleteAccount && (
+              <p className={styles.hint}>Account deletion is not available at this time.</p>
+            )}
           </div>
         </>
+      )}
+
+      {/* Mounted only while open. Modal hides itself with opacity + pointer-events
+          rather than display:none, so leaving it mounted would keep a password
+          field in the DOM, focusable, inside aria-hidden="true". */}
+      {deleteOpen && (
+        <DeleteAccountDialog
+          accountEmail={headerEmail}
+          onClose={() => setDeleteOpen(false)}
+          onDeleted={handleDeleted}
+          returnFocusTo={deleteTriggerRef}
+        />
       )}
 
       {/* Toast */}

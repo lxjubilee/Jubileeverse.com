@@ -66,17 +66,23 @@
   gap: 10px;
 }
 
-/* Voice picker is pushed to the trailing edge of the control row. */
+/* Voice picker is pushed to the trailing edge of the control row. The two
+   figures read as one two-state control, so there is no gap between them —
+   the svg art already carries whitespace inside its own viewBox. */
 .voiceGroup {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0;
   margin-left: auto;
 }
 
+/* The box is the glyph, with no inset: any padding here reads as distance
+   between the two figures, which sit side by side. It must not go below the
+   svg size either — a smaller box would spill the figure past the hover tint
+   and the hit area. */
 .voiceBtn {
-  width: 34px;
-  height: 34px;
+  width: 50px;
+  height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -89,8 +95,8 @@
 }
 
 .voiceBtn svg {
-  width: 24px;
-  height: 24px;
+  width: 50px;
+  height: 50px;
   fill: currentColor;
 }
 

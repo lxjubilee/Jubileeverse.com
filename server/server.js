@@ -1229,6 +1229,19 @@ const loginLimiter = rateLimit({
     message: { error: 'Too many login attempts, please try again in 15 minutes' },
     skip: () => NODE_ENV === 'test',
 });
+// Account deletion re-verifies a password, so it is a credential-guessing surface —
+// but it must NOT share loginLimiter's bucket. That one is keyed per-IP across all of
+// /api/auth/login, so ten mistyped sign-ins would block a legitimate deletion and a
+// few deletion attempts would lock the user out of signing in. Its 15min/10 is also
+// too loose for a surface that, in SSO mode, proxies guesses to the Identity Authority.
+const accountDeleteLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many account deletion attempts. Please try again in an hour.' },
+    skip: () => NODE_ENV === 'test',
+});
 const backOfficeLimiter = rateLimit({
     windowMs: 60_000,
     max: 600,  // back-office tool: small number of admins making many API calls on page load
@@ -3297,6 +3310,62 @@ const {
 /** True when delegation is both selected AND actually configured with a secret. */
 const ssoDelegationActive = () => AUTH_LOGIN_MODE === 'sso' && ssoEnabled();
 
+// ── Account deletion ─────────────────────────────────────────────────────────
+// Gated on an explicit env var, mirroring AUTH_LOGIN_MODE above: rollback is
+// "unset + restart", no redeploy. While off, both delete endpoints answer 501
+// with the exact string the settings page already shows, so the flag-off state
+// is behaviourally identical to today.
+const ACCOUNT_DELETION_ENABLED =
+    (process.env.ACCOUNT_DELETION_ENABLED || 'false').toLowerCase() === 'true';
+
+// Set by the boot probe below runMigrations(). The migration loop swallows any
+// error whose message contains 'already exists' OR 'does not exist', so a failed
+// CREATE TABLE would otherwise leave the server running with no tombstone table —
+// and a deletion without a tombstone is a silent-resurrection bomb. We degrade
+// this one feature to 503 rather than refusing to boot the whole site.
+let _tombstoneReady = false;
+
+const {
+    hashIdentity: _tombstoneHash,
+    purgeUserAccount,
+} = require('./lib/account-deletion');
+
+/**
+ * Is this identity tombstoned? Returns { deleted_at } or null.
+ *
+ * THROWS on a DB error, and callers on the auth path must let it propagate. A
+ * tombstone check that fails open re-creates deleted accounts during exactly the
+ * incident nobody is watching; a login 500 during a database outage is the
+ * correct trade.
+ *
+ * The SSO subject is matched as well as the email because upsertUserFromSso
+ * builds it as `sso|${ssoUser.id ?? email}` — an identity whose address changed
+ * at the authority still matches on the subject. UNION ALL rather than OR so
+ * each branch is a guaranteed index seek.
+ */
+async function accountTombstone({ email, ssoSubjectId = null }) {
+    const params = [_tombstoneHash(email)];
+    let sql = `SELECT deleted_at FROM jv_deleted_accounts
+                WHERE email_sha256 = $1 AND reinstated_at IS NULL`;
+    if (ssoSubjectId) {
+        params.push(_tombstoneHash(ssoSubjectId));
+        sql += ` UNION ALL
+                 SELECT deleted_at FROM jv_deleted_accounts
+                  WHERE sso_subject_sha256 = $2 AND reinstated_at IS NULL`;
+    }
+    const { rows } = await pgPool.query(`${sql} LIMIT 1`, params);
+    return rows[0] || null;
+}
+
+/** Standard 410 for a sign-in attempt against a deleted identity. */
+function _respondAccountDeleted(res) {
+    return res.status(410).json({
+        error: 'This account was deleted and can no longer sign in.',
+        accountDeleted: true,
+        canReinstate: true,
+    });
+}
+
 /**
  * Push a new password to the Identity Authority so the shared credential stays in
  * lockstep after a local reset or change. Best-effort and never throws — the local
@@ -3341,8 +3410,15 @@ function _setCookie(res, name, value, opts = {}) {
   res.setHeader('Set-Cookie', [...(Array.isArray(existing) ? existing : [existing]), parts.join('; ')]);
 }
 
-function _clearCookie(res, name) {
-  const fullName = _useSecureCookies ? `__Host-${name}` : name;
+// Takes the FULL cookie name, exactly as it appears in the Set-Cookie header.
+//
+// This used to re-apply the `__Host-` prefix itself, which cleared neither cookie
+// in production: both call sites already pass a complete name, so the session
+// cookie became `__Host-__Host-jv-session` and `jv-csrf` — which _setCookie writes
+// WITHOUT the prefix, since it is not httpOnly — became `__Host-jv-csrf`. Signing
+// out therefore left both cookies in the browser. Callers were already correct;
+// the prefixing here was the bug.
+function _clearCookie(res, fullName) {
   const existing = res.getHeader('Set-Cookie') || [];
   const newCookie = `${fullName}=; Max-Age=0; Path=/; SameSite=Lax${_useSecureCookies ? '; Secure' : ''}`;
   res.setHeader('Set-Cookie', [...(Array.isArray(existing) ? existing : [existing]), newCookie]);
@@ -3588,7 +3664,11 @@ async function requireRole(req, res, ...roles) {
     if (!roles.includes(payload.role)) {
         res.status(403).json({ error: `Required role: ${roles.join(' or ')}` }); return null;
     }
-    if (!_checkAccountStatus(payload, res)) return null;
+    // _checkAccountStatus is async — without the await this tests a Promise, which is
+    // always truthy, so a disabled/locked/session-revoked admin sailed through every
+    // /api/admin/* route on the Bearer path (and the rejection then wrote a second
+    // response, throwing ERR_HTTP_HEADERS_SENT). requirePrivileged has always awaited it.
+    if (!await _checkAccountStatus(payload, res)) return null;
     return payload;
 }
 
@@ -10555,14 +10635,30 @@ app.post('/api/auth/register', ah(async (req, res) => {
 
     const salt = crypto.randomBytes(16).toString('hex');
     const hash = authHashPassword(password, salt);
+    const client = await pgPool.connect();
     try {
+        // Registration is a deliberate front-door act with a typed password, so it
+        // clears any tombstone rather than being blocked by one — the tombstone
+        // exists to stop IMPLICIT re-creation, not to exile people.
+        //
+        // The clear and the INSERT must be one transaction. A crash between them
+        // would leave a live user carrying a live tombstone, i.e. an account that
+        // exists but can never sign in — a self-inflicted permanent lockout that
+        // only direct database access could undo.
+        await client.query('BEGIN');
         // entitlements is explicitly empty: the column DEFAULT is '["jubileeverse_cms"]',
         // which would grant back-office access to every self-registered account.
-        const { rows: [insertedUser] } = await pgPool.query(
+        const { rows: [insertedUser] } = await client.query(
             `INSERT INTO jv_users (email, password_hash, password_salt, name, first_name, last_name, date_of_birth, role, entitlements)
                   VALUES ($1, $2, $3, $4, $5, $6, $7, 'user', '[]'::jsonb) RETURNING id`,
             [emailNorm, hash, salt, display, first, last, dob]
         );
+        await client.query(
+            `UPDATE jv_deleted_accounts SET reinstated_at = NOW(), reinstated_by = 'self-registration'
+              WHERE email_sha256 = $1 AND reinstated_at IS NULL`,
+            [_tombstoneHash(emailNorm)]
+        );
+        await client.query('COMMIT');
         const user = { id: insertedUser.id, email: emailNorm, name: display, role: 'user', permissions: [] };
         const token = authCreateJWT({ userId: user.id, email: user.email, role: user.role });
         const refresh = await authIssueRefreshToken(user.id);
@@ -10573,8 +10669,11 @@ app.post('/api/auth/register', ah(async (req, res) => {
             user,
         });
     } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
         if (e.code === '23505') return res.status(409).json({ error: 'Email already registered' });
         res.status(500).json({ error: 'Registration failed' });
+    } finally {
+        client.release();
     }
 }));
 
@@ -10661,6 +10760,16 @@ app.post('/auth/local-login', express.urlencoded({ extended: false }), async (re
 
   if (!email || !email.includes('@')) {
     return res.status(400).json({ error: 'Invalid email address.' });
+  }
+
+  // Tombstone gate. This route is the single worst resurrection vector in the
+  // codebase: it sits OUTSIDE the /api/ mount so it has neither requireCsrf nor
+  // backOfficeLimiter, and the LOCAL_AUTH_ENABLED branch below upserts a row with
+  // role='admin' from nothing but an email address. Both branches are guarded —
+  // the password branch does not insert, but it would still mint a jv_cms_sessions
+  // row for an account that is supposed to be gone.
+  if (await accountTombstone({ email })) {
+    return _respondAccountDeleted(res);
   }
 
   try {
@@ -10754,6 +10863,15 @@ app.get('/auth/callback', async (req, res) => {
 
     if (!Array.isArray(idTokenPayload.entitlements) || !idTokenPayload.entitlements.includes('jubileeverse_cms')) {
       return res.status(403).send('<!DOCTYPE html><html><head><title>Access Denied</title><style>body{font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f4f4f5}.card{background:#fff;padding:2rem;border-radius:8px;max-width:360px;text-align:center}h1{color:#dc2626;margin-bottom:1rem}a{color:#2563eb}</style></head><body><div class="card"><h1>Access Denied</h1><p>You don\'t have access to JubileeVerse CMS.</p><a href="/">Back to JubileeVerse</a></div></body></html>');
+    }
+
+    // Tombstone gate. This OIDC path is dormant today, but a dormant path is
+    // precisely what gets switched back on without review, and the upsert below
+    // would re-create a deleted account. Note the `sub` is checked as BOTH the
+    // email and the subject: line ~10850 passes idTokenPayload.sub into the email
+    // column (a pre-existing quirk of this route), so we must match either shape.
+    if (await accountTombstone({ email: idTokenPayload.sub, ssoSubjectId: idTokenPayload.sub })) {
+      return res.status(410).send('<h1>Account Deleted</h1><p>This account was deleted and can no longer sign in.</p><a href="/">Back to JubileeVerse</a>');
     }
 
     // Upsert user in jv_users (first SSO login creates row)
@@ -10858,6 +10976,22 @@ async function upsertUserFromSso(ssoUser) {
         || ssoUser.display_name || ssoUser.name || email;
     const subject = `sso|${ssoUser.id ?? email}`;
 
+    // The INSERT below is ON CONFLICT, so without this check a deleted account
+    // silently re-creates itself the moment the user signs in again — and because
+    // we deliberately leave the Jubilee ID alive, they still hold working
+    // credentials, so that sign-in is the expected outcome rather than an edge case.
+    //
+    // Throw rather than return null: this function's contract is "returns a user
+    // row", and a null would flow into `user.is_active` at the call site as a
+    // TypeError instead of a clean 410.
+    const tomb = await accountTombstone({ email, ssoSubjectId: subject });
+    if (tomb) {
+        const err = new Error('account_deleted');
+        err.code = 'ACCOUNT_DELETED';
+        err.deletedAt = tomb.deleted_at;
+        throw err;
+    }
+
     const { rows: [user] } = await pgPool.query(
         `INSERT INTO jv_users (email, name, first_name, last_name, sso_subject_id, role, entitlements, last_login_at)
               VALUES ($1, $2, $3, $4, $5, 'user', '[]'::jsonb, NOW())
@@ -10946,6 +11080,11 @@ app.post('/api/auth/login', loginLimiter, ah(async (req, res) => {
                 authMethod = 'sso';
             }
         } catch (err) {
+            // A tombstoned identity is a definitive answer, not an outage. Without
+            // this the catch below would swallow it, the local lookup would find no
+            // row, and the user would get a misleading "Invalid email or password"
+            // for an account they deliberately deleted.
+            if (err.code === 'ACCOUNT_DELETED') return _respondAccountDeleted(res);
             // The authority is unreachable. Fail OPEN to the local credential path
             // so an SSO outage cannot lock staff out of the back office. A 401 is
             // a different thing entirely and must NOT fall through this way.
@@ -10959,7 +11098,20 @@ app.post('/api/auth/login', loginLimiter, ah(async (req, res) => {
     }
 
     if (!user) {
-        const { rows: [row] } = await pgPool.query(`SELECT * FROM jv_users WHERE email = $1`, [emailNorm]);
+        // The tombstone is joined here rather than queried separately so the local
+        // path costs no extra round-trip. A hard delete already removes the row, so
+        // this looks redundant — but /api/admin/directory/grant-access re-inserts by
+        // email, and a row restored that way must not become a working login until
+        // the tombstone is deliberately cleared.
+        const { rows: [row] } = await pgPool.query(
+            `SELECT u.*, d.deleted_at AS _tombstoned_at
+               FROM jv_users u
+               LEFT JOIN jv_deleted_accounts d
+                 ON d.email_sha256 = $2 AND d.reinstated_at IS NULL
+              WHERE u.email = $1`,
+            [emailNorm, _tombstoneHash(emailNorm)]
+        );
+        if (row && row._tombstoned_at) return _respondAccountDeleted(res);
         if (!row || !row.password_hash) return res.status(401).json({ error: 'Invalid email or password' });
         const hash = authHashPassword(password, row.password_salt);
         if (hash !== row.password_hash) return res.status(401).json({ error: 'Invalid email or password' });
@@ -11053,7 +11205,13 @@ app.get('/api/auth/me', ah(async (req, res) => {
         const entitlements  = _parseJsonb(user.entitlements, ['jubileeverse_cms']);
         const cms_roles     = _parseJsonb(user.cms_roles, []);
         const has_cms_access = entitlements.includes('jubileeverse_cms') || PRIVILEGED_ROLES.includes(user.role);
-        return { ...user, permissions, entitlements, cms_roles, has_cms_access };
+        // Surfaced so the settings page can render an honestly-disabled Delete
+        // Account button instead of letting someone type their password into a
+        // form that was always going to 501. Back-office accounts are excluded
+        // for the same reason the endpoint refuses them.
+        const can_delete_account =
+            ACCOUNT_DELETION_ENABLED && _tombstoneReady && !PRIVILEGED_ROLES.includes(user.role);
+        return { ...user, permissions, entitlements, cms_roles, has_cms_access, can_delete_account };
     }
     // Try cookie session first
     const cookies = _parseCookies(req);
@@ -11301,6 +11459,246 @@ app.post('/api/auth/change-password', ah(async (req, res) => {
         console.error('[change-password]', e.message);
         res.status(500).json({ error: 'Server error.' });
     }
+}));
+
+// ── Account deletion ─────────────────────────────────────────────────────────
+
+/**
+ * Resolve the caller for a self-service destructive action: Bearer first (the
+ * Next.js portal is Bearer-only and never sends X-CSRF-Token), cookie session as
+ * the fallback for the cockpit. Returns { userId, email, role } or null once a
+ * response has been sent.
+ *
+ * The Bearer branch calls _checkAccountStatus explicitly — none of the other
+ * /api/auth/* endpoints do, so a disabled account can still drive them until its
+ * access token lapses. That is not acceptable on an irreversible action.
+ */
+async function _requireSelfActor(req, res) {
+    const raw = (req.headers.authorization || '').replace('Bearer ', '').trim();
+    if (raw) {
+        const payload = authVerifyJWT(raw);
+        if (!payload) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+        if (!await _checkAccountStatus(payload, res)) return null;
+        return { userId: payload.userId, email: payload.email, role: payload.role };
+    }
+    return requireSession(req, res);
+}
+
+/**
+ * Re-verify a password for a destructive action, wherever the credential lives.
+ * Returns { ok: true } or { status, error } ready to send.
+ *
+ * Fails CLOSED when the Identity Authority is unreachable. This is the opposite
+ * of /api/auth/login, which deliberately falls back to the local hash so an SSO
+ * outage cannot lock staff out of the back office — do not "fix" this to match
+ * it. Failing open there costs a delayed sign-in; failing open here performs an
+ * UNVERIFIED irreversible deletion.
+ */
+async function _reverifyPasswordForDeletion(user, password) {
+    if (user.password_hash) {
+        const hash = authHashPassword(password, user.password_salt);
+        if (hash !== user.password_hash) return { status: 401, error: 'Password is incorrect.' };
+        return { ok: true };
+    }
+    // No local hash: an account created by upsertUserFromSso. The authority is the
+    // only place that can answer, so ask it.
+    if (!ssoDelegationActive()) {
+        return { status: 409, error: 'This account has no password set. Please set a password before deleting it.' };
+    }
+    let result;
+    try {
+        result = await ssoLogin({ email: user.email, password });
+    } catch (e) {
+        // Unreachable host, or our own client secret rejected — both land here.
+        console.error('[account-delete] SSO verify unreachable:', e.message);
+        return { status: 503, error: 'We could not verify your identity right now. Please try again shortly.' };
+    }
+    if (result.status === 401) {
+        // Byte-identical to the local mismatch above, so nothing leaks about which
+        // credential store backs this account.
+        return { status: 401, error: 'Password is incorrect.' };
+    }
+    if (result.status !== 200) {
+        return { status: 503, error: 'We could not verify your identity right now. Please try again shortly.' };
+    }
+    const returned = String(result.body?.user?.email || '').toLowerCase().trim();
+    if (returned && returned !== user.email) {
+        console.error('[account-delete] SSO returned a different identity than requested');
+        return { status: 500, error: 'Identity verification returned an unexpected account.' };
+    }
+    return { ok: true };
+}
+
+// POST /api/auth/account/delete — permanently delete the caller's own account.
+//
+// POST rather than DELETE: RFC 9110 gives a DELETE body no defined semantics and
+// permits intermediaries to strip it. The request crosses the Next rewrite and a
+// production reverse proxy, and a silently-dropped body would turn "password
+// required" into a 400 the user cannot act on. Not a risk worth taking on the one
+// endpoint that destroys data.
+app.post('/api/auth/account/delete', accountDeleteLimiter, ah(async (req, res) => {
+    if (!ACCOUNT_DELETION_ENABLED) {
+        return res.status(501).json({ error: 'Account deletion is not available at this time.' });
+    }
+    if (!_tombstoneReady) {
+        return res.status(503).json({ error: 'Account deletion is temporarily unavailable. Please try again later.' });
+    }
+
+    const actor = await _requireSelfActor(req, res);
+    if (!actor) return;
+
+    const { password, confirmEmail, reason } = req.body || {};
+    // Type-check before use: a non-string would throw inside scryptSync and surface
+    // as a 500 for what is really a malformed request.
+    if (typeof password !== 'string' || typeof confirmEmail !== 'string' || !password || !confirmEmail.trim()) {
+        return res.status(400).json({ error: 'Your password and your email address are both required.' });
+    }
+    if (reason !== undefined && reason !== null && (typeof reason !== 'string' || reason.length > 500)) {
+        return res.status(400).json({ error: 'Invalid reason.' });
+    }
+
+    const { rows: [user] } = await pgPool.query(
+        `SELECT id, email, role, password_hash, password_salt, sso_subject_id, idp_subject_id
+           FROM jv_users WHERE id = $1`,
+        [actor.userId]
+    );
+    // 401 rather than 404: the token is valid but its subject is gone, so the
+    // session is stale or forged. Do not confirm whether an id exists.
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    // confirmEmail is COMPARED against the session's own account, never used as a
+    // lookup key. Turning it into one would make this endpoint an IDOR: anyone
+    // could delete any account by typing its address. Do not "simplify" it.
+    if (confirmEmail.trim().toLowerCase() !== String(user.email).toLowerCase()) {
+        return res.status(400).json({ error: 'The email you typed does not match the email on this account.' });
+    }
+
+    const verified = await _reverifyPasswordForDeletion(user, password);
+    if (!verified.ok) return res.status(verified.status).json({ error: verified.error });
+
+    // Back-office accounts cannot be self-deleted. Three reasons: the last-admin
+    // quorum lives on the admin endpoint and duplicating it here invites drift;
+    // combined with audit pseudonymization a privileged self-delete becomes an
+    // anti-forensics tool; and back-office accounts are organisational property.
+    if (PRIVILEGED_ROLES.includes(user.role)) {
+        return res.status(403).json({
+            error: 'Accounts with back-office access cannot be deleted here. Please ask an administrator.',
+            requiresAdmin: true,
+        });
+    }
+
+    const client = await pgPool.connect();
+    let result;
+    try {
+        await client.query('BEGIN');
+        // Re-read under a row lock so a concurrent admin delete cannot interleave.
+        const { rows: [locked] } = await client.query(
+            `SELECT id, email, role, sso_subject_id, idp_subject_id FROM jv_users WHERE id = $1 FOR UPDATE`,
+            [user.id]
+        );
+        if (!locked) { await client.query('ROLLBACK'); return res.status(401).json({ error: 'Unauthorized' }); }
+        result = await purgeUserAccount(client, locked, { actor: 'self', reason: reason || null });
+        await client.query('COMMIT');
+    } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
+        // Log the pg error CODE, never e.message — sibling routes leak message text
+        // straight into 500 bodies and that is not a habit to copy here.
+        console.error('[account-delete] failed:', e.code || 'no-code', e.message);
+        return res.status(500).json({ error: 'Account deletion failed. Nothing was changed. Please try again.' });
+    } finally {
+        client.release();
+    }
+
+    // After COMMIT only: logAuditEvent uses the pool, not our client, so it would
+    // survive a rollback and claim a deletion that never happened.
+    // actor_id is 'self' and target_id is the HASH — writing the address here would
+    // reintroduce the exact plaintext the purge just removed.
+    logAuditEvent(pgPool, {
+        event_type: 'user_account.self_deleted',
+        actor_id: 'self',
+        target_type: 'user_account',
+        target_id: result.emailHash,
+        details: {
+            former_user_id: user.id,
+            former_role: user.role,
+            auth_method: user.password_hash ? 'password' : 'sso',
+            reason_given: !!reason,
+            counts: result.counts,
+            skipped: result.skipped,
+        },
+        ip_address: req.ip,
+        user_agent: req.get('user-agent'),
+    });
+
+    // The jv_cms_sessions rows are already gone via FK cascade, so the cookie is
+    // inert — but leaving it set makes every later request answer 401 "Session
+    // expired", which reads to the user like a bug rather than a completed action.
+    if (_parseCookies(req)[_getSessionCookieName()]) {
+        _clearCookie(res, _getSessionCookieName());
+        _clearCookie(res, 'jv-csrf');
+    }
+
+    res.json({ success: true, deleted: true, newsletterUnsubscribed: result.newsletterUnsubscribed });
+}));
+
+// POST /api/auth/reinstate — clear a tombstone so a deleted identity can sign up again.
+//
+// Needed because the tombstone is otherwise a dead end in SSO mode: the Jubilee ID
+// still exists at the authority, so POST /api/auth/register short-circuits on the
+// ssoLookup 409 before it ever reaches the local insert. Without this route an
+// ordinary reader who changes their mind has no way back at all.
+//
+// Requires the same proof as deletion — live credentials plus the typed address —
+// so it can never be triggered by a stale cookie or a background token refresh.
+app.post('/api/auth/reinstate', accountDeleteLimiter, ah(async (req, res) => {
+    if (!_tombstoneReady) {
+        return res.status(503).json({ error: 'This service is temporarily unavailable. Please try again later.' });
+    }
+    const { email, password, confirmEmail } = req.body || {};
+    if (typeof email !== 'string' || typeof password !== 'string' || typeof confirmEmail !== 'string') {
+        return res.status(400).json({ error: 'Email, password and confirmation are required.' });
+    }
+    const emailNorm = email.trim().toLowerCase();
+    if (!emailNorm || confirmEmail.trim().toLowerCase() !== emailNorm) {
+        return res.status(400).json({ error: 'The email you typed does not match.' });
+    }
+
+    const tomb = await accountTombstone({ email: emailNorm });
+    // Generic 400 rather than "not deleted": a specific answer here would turn this
+    // unauthenticated route into a "was this account deleted?" oracle.
+    if (!tomb) return res.status(400).json({ error: 'This account cannot be restored.' });
+
+    // Only the authority can verify — the local row and its hash are both gone.
+    if (!ssoDelegationActive()) {
+        return res.status(409).json({ error: 'Please register again to create a new account.' });
+    }
+    let result;
+    try {
+        result = await ssoLogin({ email: emailNorm, password });
+    } catch (e) {
+        console.error('[reinstate] SSO verify unreachable:', e.message);
+        return res.status(503).json({ error: 'We could not verify your identity right now. Please try again shortly.' });
+    }
+    if (result.status === 401) return res.status(401).json({ error: 'Email or password is incorrect.' });
+    if (result.status !== 200) {
+        return res.status(503).json({ error: 'We could not verify your identity right now. Please try again shortly.' });
+    }
+
+    await pgPool.query(
+        `UPDATE jv_deleted_accounts SET reinstated_at = NOW(), reinstated_by = 'self-reinstate'
+          WHERE email_sha256 = $1 AND reinstated_at IS NULL`,
+        [_tombstoneHash(emailNorm)]
+    );
+    logAuditEvent(pgPool, {
+        event_type: 'user_account.reinstated', actor_id: 'self',
+        target_type: 'user_account', target_id: _tombstoneHash(emailNorm),
+        details: { via: 'self_reinstate' },
+        ip_address: req.ip, user_agent: req.get('user-agent'),
+    });
+
+    // No session is minted here. The next sign-in creates a fresh, empty account
+    // via upsertUserFromSso — the old one is not coming back.
+    res.json({ success: true, reinstated: true, message: 'You can now sign in again. Your new account will start empty.' });
 }));
 
 // POST /api/auth/forgot-password — Request password reset (public)
@@ -16569,6 +16967,46 @@ async function runMigrations() {
             created_by VARCHAR(255) DEFAULT 'system'
         )`,
         `CREATE INDEX IF NOT EXISTS idx_qdrant_snapshots_hash ON jv_qdrant_snapshots(data_hash)`,
+
+        // ── Account deletion tombstones ──────────────────────────────────────
+        // A hard DELETE of jv_users leaves nothing behind to check, so every
+        // implicit "a token showed up, make a user" path — upsertUserFromSso,
+        // /auth/callback, /auth/local-login — would silently re-create a deleted
+        // account on the next sign-in. In SSO mode that sign-in is not
+        // hypothetical: the Jubilee ID is deliberately left alive, so the user
+        // still has working credentials. This table is the only thing standing
+        // between a deletion and that resurrection, and it must therefore
+        // outlive the row it describes.
+        //
+        // Identities are stored as SHA-256 so the table is not itself a
+        // directory of everyone who ever left. The SSO subject is hashed too,
+        // and not merely copied: upsertUserFromSso builds it as
+        // `sso|${ssoUser.id ?? email}` and selfHealSsoLogin as `sso|${email}`,
+        // so it frequently embeds the address verbatim — storing it raw would
+        // defeat hashing the email.
+        //
+        // The row doubles as the durable record of the deletion: logAuditEvent
+        // is fire-and-forget and can fail silently, so former_user_id /
+        // former_role / deleted_at / deleted_by live here as the backstop.
+        `CREATE TABLE IF NOT EXISTS jv_deleted_accounts (
+            id                 BIGSERIAL   PRIMARY KEY,
+            email_sha256       TEXT        NOT NULL UNIQUE,
+            sso_subject_sha256 TEXT,
+            hash_algo          TEXT        NOT NULL DEFAULT 'sha256',
+            email_domain       TEXT,
+            former_user_id     BIGINT      NOT NULL,
+            former_role        TEXT,
+            deleted_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            deleted_by         TEXT        NOT NULL,
+            deletion_reason    TEXT,
+            reinstated_at      TIMESTAMPTZ,
+            reinstated_by      TEXT
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_jv_deleted_accounts_subject
+            ON jv_deleted_accounts(sso_subject_sha256)
+            WHERE sso_subject_sha256 IS NOT NULL AND reinstated_at IS NULL`,
+        `CREATE INDEX IF NOT EXISTS idx_jv_deleted_accounts_at
+            ON jv_deleted_accounts(deleted_at DESC)`,
     ];
     for (const sql of migrations) {
         try { await pgPool.query(sql); } catch (e) {
@@ -16577,6 +17015,22 @@ async function runMigrations() {
                 console.warn('[migration]', e.message.substring(0, 120));
             }
         }
+    }
+
+    // Tombstone probe. The loop above swallows any error mentioning 'already exists'
+    // or 'does not exist', so a failed CREATE TABLE jv_deleted_accounts would pass
+    // silently. Account deletion without a working tombstone is worse than no
+    // deletion at all: in SSO mode the account resurrects on the next sign-in while
+    // the user believes it is gone. Verify explicitly rather than trusting the loop.
+    try {
+        await pgPool.query('SELECT 1 FROM jv_deleted_accounts LIMIT 1');
+        _tombstoneReady = true;
+    } catch (e) {
+        _tombstoneReady = false;
+        console.error(
+            '[FATAL] jv_deleted_accounts is unavailable — account deletion is DISABLED:',
+            e.message
+        );
     }
 
     // Backfill category_id for existing records that have none
@@ -18837,6 +19291,24 @@ app.post('/api/admin/directory/grant-access', express.json(), async (req, res) =
         return res.status(400).json({ error: `initial_role must be one of: ${PRIVILEGED_ROLES.join(', ')}` });
     }
     try {
+        // Granting access is a deliberate, authenticated admin act, so it is the one
+        // upsert that is allowed to bring back a deleted identity — but the tombstone
+        // must be cleared explicitly, or login would keep answering 410 for a user
+        // who now has a perfectly good row. Audited, because un-deleting an account
+        // deserves a trail of its own.
+        const { rowCount: reinstated } = await pgPool.query(
+            `UPDATE jv_deleted_accounts SET reinstated_at = NOW(), reinstated_by = $2
+              WHERE email_sha256 = $1 AND reinstated_at IS NULL`,
+            [_tombstoneHash(email), actor.email || actor.sub]
+        );
+        if (reinstated) {
+            logAuditEvent(pgPool, {
+                event_type: 'user_account.reinstated', actor_id: actor.email || actor.sub,
+                target_type: 'user_account', target_id: _tombstoneHash(email),
+                details: { via: 'directory.grant_access', role: initial_role },
+                ip_address: req.ip, user_agent: req.get('user-agent'),
+            });
+        }
         // Upsert user
         await pgPool.query(
             `INSERT INTO jv_users (email, idp_subject_id, role, entitlements, is_active)
@@ -19025,6 +19497,103 @@ app.put('/api/admin/users/:id', async (req, res) => {
         const { rows: [updated] } = await pgPool.query(`SELECT id, email, name, role, is_active, is_locked, mfa_enabled, force_password_reset, last_login_at, created_at, updated_at, updated_by FROM jv_users WHERE id=$1`, [req.params.id]);
         res.json({ user: updated });
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/admin/users/:id — permanently delete another user's account.
+//
+// Shares purgeUserAccount with the self-service route, so the two can never drift
+// apart on what "deleted" means.
+app.delete('/api/admin/users/:id', express.json(), async (req, res) => {
+    const actor = await requireRole(req, res, 'admin'); if (!actor) return;
+    if (!ACCOUNT_DELETION_ENABLED) {
+        return res.status(501).json({ error: 'Account deletion is not available at this time.' });
+    }
+    if (!_tombstoneReady) {
+        return res.status(503).json({ error: 'Account deletion is temporarily unavailable. Please try again later.' });
+    }
+    // Sibling admin routes pass req.params.id straight into a BIGINT comparison, so
+    // /api/admin/users/abc throws "invalid input syntax for type bigint" and their
+    // catch leaks e.message in a 500. Validate here; the siblings deserve the same.
+    if (!/^\d+$/.test(String(req.params.id))) {
+        return res.status(400).json({ error: 'Invalid user id.' });
+    }
+    // Accepted from the body or the query string — the back office is served
+    // directly by Express, but a DELETE body is still the fragile way to carry it.
+    const confirmEmail = (req.body && req.body.confirm_email) || req.query.confirm_email;
+    const reason = (req.body && req.body.reason) || null;
+    if (typeof confirmEmail !== 'string' || !confirmEmail.trim()) {
+        return res.status(400).json({ error: 'confirm_email is required.' });
+    }
+    if (reason !== null && (typeof reason !== 'string' || reason.length > 500)) {
+        return res.status(400).json({ error: 'Invalid reason.' });
+    }
+
+    const client = await pgPool.connect();
+    let target, result;
+    try {
+        await client.query('BEGIN');
+        // Serialises the last-admin quorum check below against every other deletion.
+        // FOR UPDATE alone is not enough: two concurrent deletions of two DIFFERENT
+        // admins would each see the other as still present, both succeed, and leave
+        // zero admins — a state only direct database access can recover from.
+        await client.query(`SELECT pg_advisory_xact_lock(hashtext('jv_users:admin_quorum'))`);
+
+        const { rows: [row] } = await client.query(
+            `SELECT id, email, role, sso_subject_id, idp_subject_id FROM jv_users WHERE id = $1 FOR UPDATE`,
+            [req.params.id]
+        );
+        if (!row) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'User not found' }); }
+        target = row;
+
+        // A second factor against a mistyped or scripted id, not an identity check.
+        if (confirmEmail.trim().toLowerCase() !== String(target.email).toLowerCase()) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'confirm_email does not match the target account.' });
+        }
+        if (String(target.id) === String(actor.userId) ||
+            (actor.email && String(actor.email).toLowerCase() === String(target.email).toLowerCase())) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                error: 'You cannot delete your own account from the admin console. Use account settings.',
+            });
+        }
+        if (target.role === 'admin') {
+            const { rows: [{ remaining }] } = await client.query(
+                `SELECT COUNT(*)::int AS remaining FROM jv_users
+                  WHERE role = 'admin' AND is_active = 1 AND id <> $1`,
+                [target.id]
+            );
+            if (remaining === 0) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ error: 'Cannot delete the last active administrator.' });
+            }
+        }
+
+        result = await purgeUserAccount(client, target, { actor: actor.email || actor.sub, reason });
+        await client.query('COMMIT');
+    } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
+        console.error('[admin-delete-user] failed:', e.code || 'no-code', e.message);
+        return res.status(500).json({ error: 'Account deletion failed. Nothing was changed.' });
+    } finally {
+        client.release();
+    }
+
+    // actor_id is the admin's real address — unlike the self-service route, they are
+    // a live and accountable party. target_id is hashed for the same reason it is there.
+    logAuditEvent(pgPool, {
+        event_type: 'user_account.deleted',
+        actor_id: actor.email || actor.sub,
+        target_type: 'user_account',
+        target_id: result.emailHash,
+        details: {
+            former_user_id: target.id, former_role: target.role,
+            reason, counts: result.counts, skipped: result.skipped,
+        },
+        ip_address: req.ip, user_agent: req.get('user-agent'),
+    });
+
+    res.json({ success: true, deleted: true, counts: result.counts, skipped: result.skipped });
 });
 
 // POST /api/admin/users/:id/enable
