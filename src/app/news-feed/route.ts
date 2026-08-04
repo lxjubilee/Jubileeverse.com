@@ -15,25 +15,32 @@
  */
 import { NextResponse } from 'next/server';
 import { CATEGORY_ROUTES, fetchCategoryArticles, type SiteArticle } from '@/lib/articles';
-import { fetchLatestNews } from '@/lib/news';
-import { buildHomeFeed, categoryArticleToStory, rotateCategories } from '@/lib/homeFeed';
+import { FEED_WINDOW_DAYS, fetchNewsWindow } from '@/lib/news';
+import {
+  PAGE_SIZE, buildHomeFeed, categoryArticleToStory, intParam, rotateCategories,
+} from '@/lib/homeFeed';
 import type { Story } from '@/lib/types';
 
-/** Days of history to surface on the Home page. */
-const DAYS = 7;
-
-/** Upper bound on cards, matching the old portal capacity. */
-const LIMIT = 58;
+/**
+ * Days of history to surface on the Home page.
+ *
+ * Was 7, but paired with a 58-card cap it showed one day: the pipeline
+ * publishes 60 articles a day, so today alone filled every slot and nothing
+ * older was ever reached. The window and the page size are now independent —
+ * the window says how far back the feed goes, the page size says how much of it
+ * travels in one response.
+ */
+const DAYS = FEED_WINDOW_DAYS;
 
 /**
  * Faith-based articles offered for insertion into the feed.
  *
- * Generous enough to cover the longest feed the limit above can produce (one
- * insert per four cards), so the page never runs short of them. They come from
- * manifests this process already memoises for five minutes, so the extra reads
- * cost nothing after the first.
+ * One insert per four grid cards, so a month-deep window needs far more of them
+ * than the old single-page feed did. They come from manifests this process
+ * already memoises for five minutes, so the extra reads cost nothing after the
+ * first, and `rotateCategories` keeps any one category from dominating.
  */
-const CATEGORY_POOL = 20;
+const CATEGORY_POOL = 200;
 
 /** Re-read the CDN at most this often; `news.ts` also memoises manifests 5 min. */
 export const revalidate = 60;
@@ -58,18 +65,25 @@ async function fetchCategoryPool(): Promise<Story[]> {
   );
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const params = new URL(request.url).searchParams;
+  // Bounded so a crafted `?limit=100000` cannot turn one request into a
+  // month-long payload, which is the whole thing paging exists to avoid.
+  const offset = intParam(params.get('offset'), 0, 100_000);
+  const pageSize = intParam(params.get('limit'), PAGE_SIZE, 200) || PAGE_SIZE;
+
   try {
     const [articles, categoryCards] = await Promise.all([
-      fetchLatestNews(DAYS, LIMIT),
+      fetchNewsWindow(DAYS),
       fetchCategoryPool(),
     ]);
-    const feed = buildHomeFeed(articles, categoryCards);
+    const feed = buildHomeFeed(articles, categoryCards, { offset, pageSize });
 
     return NextResponse.json(feed, {
       headers: {
-        // Short public cache: the pipeline republishes hourly, and the day
-        // manifest itself is served with max-age=60.
+        // Short public cache: the pipeline republishes every six hours, and the
+        // day manifest itself is served with max-age=60. Pages past the first
+        // are keyed by their query string, so each caches independently.
         'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
       },
     });
@@ -78,7 +92,10 @@ export async function GET() {
     // failure rather than an error, and the page renders that state fine.
     console.error('[news-feed]', err instanceof Error ? err.message : err);
     return NextResponse.json(
-      { success: true, hero: [], sidebar: [], topicCards: [], categoryCards: [] },
+      {
+        success: true, hero: [], sidebar: [], topicCards: [], categoryCards: [],
+        total: 0, offset, hasMore: false,
+      },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   }

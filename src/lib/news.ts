@@ -33,6 +33,20 @@ const FETCH_TIMEOUT_MS = 8000;
 /** How long a fetched manifest stays fresh. */
 const MANIFEST_TTL_MS = 5 * 60 * 1000;
 
+/** Days of history the Home page draws on. */
+export const FEED_WINDOW_DAYS = 30;
+
+/**
+ * Day manifests to request at once.
+ *
+ * A month of history is thirty separate objects. Firing all thirty together
+ * works but puts a burst on one origin from every cold render, and a single
+ * slow response then holds the whole batch. Eight at a time keeps the wall
+ * clock close to the parallel case while bounding the burst; after the first
+ * pass they are memoised for five minutes, so paging costs nothing.
+ */
+const MANIFEST_CONCURRENCY = 8;
+
 export interface NewsImage {
   n: number;
   role: string;
@@ -266,22 +280,55 @@ export async function fetchNewsDay(date?: string): Promise<NewsArticle[]> {
   return publishedFrom(await readDayManifest(day), day);
 }
 
+/** Run `fn` over `items` with at most `limit` promises in flight. */
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let cursor = 0;
+  await Promise.all(
+    Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
+      for (;;) {
+        const i = cursor++;
+        if (i >= items.length) return;
+        out[i] = await fn(items[i]);
+      }
+    }),
+  );
+  return out;
+}
+
+/** Newest day first, then newest article within the day. */
+function byRecency(a: NewsArticle, b: NewsArticle): number {
+  // Sorting on `date` before `created` is what puts today's articles above
+  // yesterday's even when a late top-up run gives an older article a fresher
+  // `created`.
+  return b.date.localeCompare(a.date) || b.created.localeCompare(a.created);
+}
+
+/**
+ * Every published article in the last `days`, newest first.
+ *
+ * Returns the whole window rather than a page: the caller slices it. That keeps
+ * the ordering decision in one place, and the cost is nothing after the first
+ * call because each day's manifest is memoised — paging through a month re-reads
+ * the CDN zero times.
+ *
+ * Reads `latest.json` for the days that actually exist, so a quiet stretch costs
+ * no requests at all rather than one 404 per empty day.
+ */
+export async function fetchNewsWindow(days = FEED_WINDOW_DAYS): Promise<NewsArticle[]> {
+  const dates = await recentDays(days);
+  const perDay = await mapLimit(dates, MANIFEST_CONCURRENCY, d => fetchNewsDay(d));
+  return perDay.flat().sort(byRecency);
+}
+
 /**
  * The most recent published articles, walking back day by day.
  *
- * Reads `latest.json` for the days that actually exist so a quiet stretch does
- * not cost one 404 per empty day; falls back to walking the calendar when that
- * pointer is missing.
+ * A capped view of `fetchNewsWindow`, kept for callers that want a fixed-size
+ * list (the /news index) rather than a pageable window.
  */
 export async function fetchLatestNews(days = 7, limit = 60): Promise<NewsArticle[]> {
-  const perDay = await Promise.all((await recentDays(days)).map(d => fetchNewsDay(d)));
-  return perDay
-    .flat()
-    // Newest day first, then newest article within the day. Sorting on `date`
-    // before `created` is what puts today's articles above yesterday's even
-    // when a late top-up run gives an older article a fresher `created`.
-    .sort((a, b) => b.date.localeCompare(a.date) || b.created.localeCompare(a.created))
-    .slice(0, limit);
+  return (await fetchNewsWindow(days)).slice(0, limit);
 }
 
 /**

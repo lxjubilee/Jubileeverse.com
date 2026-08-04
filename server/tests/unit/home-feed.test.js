@@ -17,6 +17,13 @@ function loadHomeFeed() {
     const src = fs.readFileSync(file, 'utf8')
         .replace(/^import[\s\S]*?;$/gm, '')                 // type-only imports
         .replace(/^export interface[\s\S]*?^}/gm, '')        // interfaces
+        // Inline object type on a destructured options parameter, e.g.
+        // `{ offset = 0 }: { offset?: number } = {}`. Must run before the
+        // `: number` rule, which would otherwise leave `{ offset?; }` behind.
+        .replace(/:\s*\{[^{}]*\}\s*=\s*\{\}/g, ' = {}')
+        // Union annotations, before the bare `: string` / `: number` rules,
+        // which would otherwise leave the `| null` half behind.
+        .replace(/:\s*string\s*\|\s*null/g, '')
         .replace(/:\s*NewsArticle\[\]/g, '')
         .replace(/:\s*NewsArticle/g, '')
         .replace(/:\s*HomeFeed/g, '')
@@ -40,7 +47,8 @@ function loadHomeFeed() {
         + `exports.rotateCategories = rotateCategories;`
         + `exports.interleaveFeed = interleaveFeed;`
         + `exports.insertsNeeded = insertsNeeded;`
-        + `exports.INSERT_EVERY = INSERT_EVERY;`,
+        + `exports.INSERT_EVERY = INSERT_EVERY;`
+        + `exports.PAGE_SIZE = PAGE_SIZE;`,
         sandbox,
     );
     return sandbox.exports;
@@ -163,7 +171,10 @@ describe('buildHomeFeed — hero / sidebar / grid split', () => {
 
     test('degrades to empty arrays rather than throwing', () => {
         const feed = HF.buildHomeFeed([]);
-        expect(feed).toEqual({ success: true, hero: [], sidebar: [], topicCards: [], categoryCards: [] });
+        expect(feed).toEqual({
+            success: true, hero: [], sidebar: [], topicCards: [], categoryCards: [],
+            total: 0, offset: 0, hasMore: false,
+        });
     });
 
     test('a short day still fills hero before sidebar', () => {
@@ -171,6 +182,109 @@ describe('buildHomeFeed — hero / sidebar / grid split', () => {
         expect(feed.hero).toHaveLength(3);
         expect(feed.sidebar).toHaveLength(0);
         expect(feed.topicCards).toHaveLength(0);
+    });
+});
+
+// ── Paging the 30-day window ─────────────────────────────────────────────────
+
+describe('buildHomeFeed — paging the grid', () => {
+    // Enough to page several times. Descending dates so the ordering assertions
+    // below are about real recency rather than insertion order.
+    const windowOf = (n) => Array.from({ length: n }, (_, i) => article({
+        slug: `story-${String(i).padStart(4, '0')}`,
+        id: `2026-07-31__story-${i}`,
+        title: `Story ${i}`,
+        date: `2026-07-${String(31 - Math.floor(i / 60)).padStart(2, '0')}`,
+        created: `2026-07-31T${String(23 - (i % 24)).padStart(2, '0')}:00:00.000Z`,
+    }));
+
+    test('the first page carries the hero and sidebar, later pages do not', () => {
+        // They are a fixed region of the layout. Re-sending them would either
+        // duplicate cards into the grid or shift what is already on screen.
+        const first = HF.buildHomeFeed(windowOf(300), [], { offset: 0, pageSize: 50 });
+        expect(first.hero).toHaveLength(5);
+        expect(first.sidebar).toHaveLength(3);
+
+        const second = HF.buildHomeFeed(windowOf(300), [], { offset: 50, pageSize: 50 });
+        expect(second.hero).toEqual([]);
+        expect(second.sidebar).toEqual([]);
+        expect(second.topicCards).toHaveLength(50);
+    });
+
+    test('pages tile the grid exactly — no gaps, no repeats', () => {
+        const all = windowOf(300);
+        const seen = [];
+        let offset = 0;
+        for (;;) {
+            const page = HF.buildHomeFeed(all, [], { offset, pageSize: 50 });
+            seen.push(...page.topicCards.map(s => s.id));
+            if (!page.hasMore) break;
+            offset += page.topicCards.length;
+        }
+        // 300 articles minus the 8 that hero and sidebar consume.
+        expect(seen).toHaveLength(292);
+        expect(new Set(seen).size).toBe(292);
+
+        const expected = all.slice(8).map(a => a.slug);
+        expect(seen).toEqual(expected);
+    });
+
+    test('newest first is preserved across page boundaries', () => {
+        const all = windowOf(200);
+        const p1 = HF.buildHomeFeed(all, [], { offset: 0, pageSize: 50 });
+        const p2 = HF.buildHomeFeed(all, [], { offset: 50, pageSize: 50 });
+        const ordered = [...p1.topicCards, ...p2.topicCards].map(s => s.id);
+        expect(ordered).toEqual(all.slice(8, 108).map(a => a.slug));
+    });
+
+    test('reports the whole window total, not the page length', () => {
+        const feed = HF.buildHomeFeed(windowOf(300), [], { offset: 0, pageSize: 50 });
+        expect(feed.topicCards).toHaveLength(50);
+        expect(feed.total).toBe(292);
+        expect(feed.hasMore).toBe(true);
+    });
+
+    test('the last page reports no more', () => {
+        const feed = HF.buildHomeFeed(windowOf(58), [], { offset: 0, pageSize: 50 });
+        expect(feed.topicCards).toHaveLength(50);
+        expect(feed.hasMore).toBe(false);
+    });
+
+    test('an offset past the end is empty rather than an error', () => {
+        const feed = HF.buildHomeFeed(windowOf(20), [], { offset: 500, pageSize: 50 });
+        expect(feed.topicCards).toEqual([]);
+        expect(feed.hasMore).toBe(false);
+    });
+
+    test('a negative offset is clamped to the first page', () => {
+        const feed = HF.buildHomeFeed(windowOf(100), [], { offset: -10, pageSize: 50 });
+        expect(feed.offset).toBe(0);
+        expect(feed.topicCards).toHaveLength(50);
+    });
+
+    test('inserts continue the rotation instead of repeating page one', () => {
+        // Otherwise every page shows the same faith-based articles.
+        const cards = Array.from({ length: 60 }, (_, i) => ({ id: `cat-${i}` }));
+        const p1 = HF.buildHomeFeed(windowOf(300), cards, { offset: 0, pageSize: 50 });
+        const p2 = HF.buildHomeFeed(windowOf(300), cards, { offset: 50, pageSize: 50 });
+        const ids1 = p1.categoryCards.map(c => c.id);
+        const ids2 = p2.categoryCards.map(c => c.id);
+        // Only the two-card overlap the +2 spare deliberately allows.
+        expect(ids1.filter(id => ids2.includes(id)).length).toBeLessThanOrEqual(2);
+        expect(ids2[0]).not.toBe(ids1[0]);
+    });
+
+    test('defaults to the standard page size when no options are given', () => {
+        const feed = HF.buildHomeFeed(windowOf(300));
+        expect(feed.topicCards).toHaveLength(HF.PAGE_SIZE);
+        expect(HF.PAGE_SIZE).toBe(50);
+    });
+
+    test('imageless articles are excluded before paging, so pages stay full', () => {
+        const all = windowOf(120).map((a, i) => (i % 2 ? { ...a, image: null } : a));
+        const feed = HF.buildHomeFeed(all, [], { offset: 0, pageSize: 50 });
+        expect(feed.topicCards.every(s => s.cached_image_path)).toBe(true);
+        expect(feed.total).toBe(52);   // 60 with images, minus hero+sidebar
     });
 });
 

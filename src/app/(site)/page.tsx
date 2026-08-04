@@ -7,7 +7,6 @@ import WeatherCard from '@/components/home/WeatherCard';
 import FinanceCard from '@/components/home/FinanceCard';
 import SportsCard from '@/components/home/SportsCard';
 import StoryCard from '@/components/content/StoryCard';
-import RegenerateImageButton from '@/components/admin/RegenerateImageButton';
 import { PREFS_CHANGED_EVENT } from '@/components/layout/PersonalizePopup';
 import { api, handleImgError, resolveImageUrl } from '@/lib/api';
 import {
@@ -15,7 +14,6 @@ import {
   trackView,
   storyHref,
   trackingIdOf,
-  regenTargetOf,
 } from '@/lib/article';
 import { useAuth } from '@/lib/auth';
 import { interleaveFeed } from '@/lib/homeFeed';
@@ -34,6 +32,10 @@ interface PlacementResponse extends HomepagePlacement {
   topicCards?: Story[];
   /** Faith-based category articles, already rotated across the five categories. */
   categoryCards?: Story[];
+  /** Grid cards available across the whole 30-day window. */
+  total?: number;
+  /** Whether another page follows this one. */
+  hasMore?: boolean;
 }
 
 /**
@@ -81,8 +83,6 @@ export default function HomePage() {
   const [feed, setFeed] = useState<Story[]>([]);
   // Faith-based articles woven through the feed, one after every four stories.
   const [categoryCards, setCategoryCards] = useState<Story[]>([]);
-  // Side hero images an admin has regenerated, by story id.
-  const [freshSidebarImages, setFreshSidebarImages] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [heroStatus, setHeroStatus] = useState<HeroStatus>('loading');
 
@@ -94,9 +94,42 @@ export default function HomePage() {
   const didLoad = useRef(false);
   const lastPlacementLoad = useRef(0); // ms epoch of the last successful feed load
 
-  // Reactions (batched once for the whole feed)
+  // Paging through the 30-day window.
+  //
+  // The feed is a month deep — roughly 1,800 articles at full production — and
+  // sending it in one response would be about a megabyte of JSON and 1,800
+  // cards in the DOM before the reader has scrolled past the first row. Pages
+  // arrive as the end of the grid comes into view, so nothing about the layout
+  // changes: there is no button and no visible control, only cards that are
+  // already there by the time they are reached.
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const nextOffset = useRef(0);
+  // Guards against a second request while one is in flight. State would settle
+  // a render too late and the observer can fire twice in the same frame.
+  const fetchingMore = useRef(false);
+  // Everything handed to the search index so far. The index is written whole
+  // each time, so appending a page has to rebuild it from the running total —
+  // passing just the new page would drop every earlier one out of search.
+  const indexedStories = useRef<Story[]>([]);
+
+  // Reactions (batched per page of the feed)
   const [counts, setCounts] = useState<Record<string, ReactionCounts>>({});
   const [mine, setMine] = useState<Record<string, ReactionType>>({});
+  /** Reaction keys already requested, so an appended page asks only for its own. */
+  const requestedReactions = useRef<Set<string>>(new Set());
+  /**
+   * Which page each card arrived on.
+   *
+   * The followed-topics-first ordering below is applied WITHIN a page rather
+   * than across the whole accumulated feed. Sorting the lot would let a
+   * followed-topic card from page three jump above cards from page one — the
+   * reader would watch the story they were reading slide down the screen.
+   */
+  const pageOfStory = useRef<Map<string, number>>(new Map());
+  /** Pages fetched so far, page one included. */
+  const pagesLoaded = useRef(0);
 
   // Personalization prefs
   const [prefs, setPrefs] = useState<FeedPrefs>({ following: [], blocked: [] });
@@ -132,6 +165,12 @@ export default function HomePage() {
   // flashing the skeletons, and keeps the existing feed on error.
   const loadPlacement = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
+      // A silent refresh replaces the feed with page one. That was harmless
+      // when the feed WAS one page; now it would delete everything a reader has
+      // scrolled through. Leave a paged-through feed alone — it refreshes on
+      // the next real navigation.
+      if (silent && pagesLoaded.current > 1) return;
+
       if (!silent) {
         setLoading(true);
         setHeroStatus('loading');
@@ -150,7 +189,18 @@ export default function HomePage() {
         setSidebar(sidebarStories);
         setFeed(topicCards);
         setCategoryCards(categories);
-        buildSearchIndex([...heroStories, ...sidebarStories, ...topicCards, ...categories]);
+        // Count what the SERVER sent, not what survived the image filter: the
+        // offset is an index into the server's grid, and advancing it by the
+        // filtered length would silently re-request the dropped cards.
+        nextOffset.current = (data.topicCards || []).length;
+        setHasMore(Boolean(data.hasMore));
+        // A full (re)load starts the window over, so let the reaction counts be
+        // fetched afresh rather than kept from the previous page-0.
+        requestedReactions.current.clear();
+        pagesLoaded.current = 1;
+        pageOfStory.current = new Map(topicCards.map((s) => [String(s.id), 0]));
+        indexedStories.current = [...heroStories, ...sidebarStories, ...topicCards, ...categories];
+        buildSearchIndex(indexedStories.current);
         setHeroStatus(heroStories.length ? 'ready' : 'empty');
         lastPlacementLoad.current = Date.now();
       } catch {
@@ -161,6 +211,78 @@ export default function HomePage() {
     },
     [buildSearchIndex],
   );
+
+  /**
+   * Append the next page of the 30-day window.
+   *
+   * Additive only: hero and sidebar are a fixed region and the server sends
+   * them on the first page alone, so nothing already on screen moves.
+   */
+  const loadMore = useCallback(async () => {
+    if (fetchingMore.current) return;
+    fetchingMore.current = true;
+    setLoadingMore(true);
+    try {
+      const data = await api.get<PlacementResponse>(`/news-feed?offset=${nextOffset.current}`);
+      const more = (data.topicCards || []).filter((s) => s.cached_image_path || s.image_url);
+      const moreCategories = (data.categoryCards || []).filter(
+        (s) => s.cached_image_path || s.image_url,
+      );
+
+      const returned = (data.topicCards || []).length;
+      nextOffset.current += returned;
+      // An empty page with `hasMore` still set would leave the offset where it
+      // was and re-request the same page forever. Trust the count over the flag.
+      setHasMore(returned > 0 && Boolean(data.hasMore));
+
+      const pageIndex = pagesLoaded.current;
+      pagesLoaded.current += 1;
+      for (const s of more) pageOfStory.current.set(String(s.id), pageIndex);
+
+      if (more.length) {
+        // Dedupe on id. A page boundary that shifts between requests — a run
+        // publishing mid-scroll — would otherwise repeat a card, and React
+        // would warn about the duplicate key.
+        setFeed((prev) => {
+          const seen = new Set(prev.map((s) => String(s.id)));
+          return [...prev, ...more.filter((s) => !seen.has(String(s.id)))];
+        });
+        setCategoryCards((prev) => {
+          const seen = new Set(prev.map((s) => String(s.id)));
+          return [...prev, ...moreCategories.filter((s) => !seen.has(String(s.id)))];
+        });
+        indexedStories.current = [...indexedStories.current, ...more, ...moreCategories];
+        buildSearchIndex(indexedStories.current);
+      }
+    } catch {
+      // Leave hasMore alone: a transient failure should let the next scroll
+      // retry rather than permanently ending the feed.
+    } finally {
+      fetchingMore.current = false;
+      setLoadingMore(false);
+    }
+  }, [buildSearchIndex]);
+
+  // Append when the end of the grid comes into view. `rootMargin` starts the
+  // request while the sentinel is still a screen away, so the cards are usually
+  // in place before the reader arrives at them.
+  //
+  // Re-created whenever the feed grows. An IntersectionObserver only reports
+  // CHANGES, so on a tall viewport where the sentinel stays in view after a
+  // page lands, no further callback would ever fire and paging would stall
+  // until the reader happened to scroll. Re-observing forces a fresh check.
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || !hasMore || loading) return;
+    if (typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries.some((e) => e.isIntersecting)) void loadMore(); },
+      { rootMargin: '800px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadMore, feed.length]);
 
   useEffect(() => {
     if (didLoad.current) return;
@@ -232,19 +354,31 @@ export default function HomePage() {
     // Keyed on the tracking id, which is what StoryCard posts a reaction with:
     // the backend parses the key's id as an integer, so a slug or a
     // `<category>__<slug>` id would come back with no counts at all.
-    const keys = stories.map((s) => reactionKey(trackingIdOf(s), articleTypeOf(s)));
+    //
+    // Only keys we have not already asked about. This effect re-runs on every
+    // appended page, and over a 30-day window re-requesting the whole feed each
+    // time would make the last page ask for ~1,800 keys and the run of pages
+    // quadratic. Each page now costs one request for its own cards.
+    const keys = stories
+      .map((s) => reactionKey(trackingIdOf(s), articleTypeOf(s)))
+      .filter((k) => !requestedReactions.current.has(k));
+    if (keys.length === 0) return;
+    for (const k of keys) requestedReactions.current.add(k);
+
     let cancelled = false;
     (async () => {
       try {
         const c = await fetchCounts(keys);
-        if (!cancelled) setCounts(c);
+        if (!cancelled) setCounts((prev) => ({ ...prev, ...c }));
       } catch {
-        /* ignore */
+        // Let a later page retry these rather than leaving them permanently
+        // unfetched because one request failed.
+        for (const k of keys) requestedReactions.current.delete(k);
       }
       if (isAuthenticated) {
         try {
           const r = await fetchUserReactions(keys);
-          if (!cancelled) setMine(r);
+          if (!cancelled) setMine((prev) => ({ ...prev, ...r }));
         } catch {
           /* ignore */
         }
@@ -278,7 +412,13 @@ export default function HomePage() {
       (s) => !blocked.has(storySlug(s)) && !hidden.has(String(s.id)),
     );
     if (following.size === 0) return filtered;
+    // Page first, followed second. Sorting on `following` alone would reorder
+    // across page boundaries and move cards the reader has already scrolled
+    // past; within a page it does exactly what it always did.
     return [...filtered].sort((a, b) => {
+      const pa = pageOfStory.current.get(String(a.id)) ?? 0;
+      const pb = pageOfStory.current.get(String(b.id)) ?? 0;
+      if (pa !== pb) return pa - pb;
       const af = following.has(storySlug(a)) ? 0 : 1;
       const bf = following.has(storySlug(b)) ? 0 : 1;
       return af - bf;
@@ -355,16 +495,10 @@ export default function HomePage() {
           </section>
           <div className={styles.heroSidebar}>
             {sidebar.map((story) => {
-              const img = freshSidebarImages[String(story.id)] ?? resolveImageUrl(story);
+              const img = resolveImageUrl(story);
               return (
                 <div key={story.id} className={styles.heroSidebarCard} onClick={() => openStory(story)}>
                   {img ? <img src={img} alt={story.headline || ''} onError={handleImgError} /> : null}
-                  <RegenerateImageButton
-                    target={regenTargetOf(story)}
-                    onRegenerated={(url) =>
-                      setFreshSidebarImages((prev) => ({ ...prev, [String(story.id)]: url }))
-                    }
-                  />
                   <div className={styles.heroSidebarOverlay}>
                     <span className={styles.heroSidebarCategory}>{story.topic || 'Faith'}</span>
                     <h3 className={styles.heroSidebarTitle}>{story.headline || story.title}</h3>
@@ -398,10 +532,19 @@ export default function HomePage() {
                     initialCounts={counts[key]}
                     initialMine={mine[key] ?? null}
                     showActions
+                    showRegenerate={false}
                     onHide={hideStory}
                   />
                 );
               })}
+
+          {/* Cards for the next page, in the same skeleton the initial load
+              uses so the grid never changes shape while it fills. */}
+          {loadingMore
+            ? Array.from({ length: 4 }).map((_, i) => (
+                <div key={`more-${i}`} className="content-card skeleton" style={{ height: 304 }} />
+              ))
+            : null}
 
           {/* In-feed widget cards (weather / markets / sports) */}
           {SHOW_IN_FEED_CARDS && !loading && feed.length > 0 ? (
@@ -437,6 +580,10 @@ export default function HomePage() {
             </div>
           ) : null}
         </div>
+        {/* Paging sentinel. Deliberately empty and unstyled: it occupies no
+            space and adds no control, so the page looks exactly as it did —
+            crossing it simply means the next page is already on its way. */}
+        {hasMore ? <div ref={sentinelRef} aria-hidden="true" /> : null}
         {!loading && visibleFeed.length === 0 ? (
           <div className="empty-state">No stories available right now. Please check back soon.</div>
         ) : null}

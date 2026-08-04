@@ -21,6 +21,38 @@ export const SIDEBAR_COUNT = 3;
 /** Current-event cards between each inserted faith-based article. */
 export const INSERT_EVERY = 4;
 
+/**
+ * Grid cards served per request.
+ *
+ * The window is a month deep, which at full production is ~1,800 articles. Sent
+ * in one response that is roughly a megabyte of JSON and eighteen hundred cards
+ * in the DOM before the reader has scrolled past the first four. A page of
+ * fifty is more than fills the first few screens, and the rest arrive as they
+ * are approached.
+ */
+export const PAGE_SIZE = 50;
+
+/**
+ * A non-negative integer query param, clamped, or the fallback.
+ *
+ * Lives here rather than in the route because a Next route module may only
+ * export the HTTP handlers and a fixed set of config names — exporting a helper
+ * from it fails the production build with a type error that `tsc --noEmit`
+ * does not reproduce.
+ *
+ * The clamping is the only thing between a crafted `?limit=100000` and a
+ * month-long payload, which is what paging exists to avoid.
+ */
+export function intParam(value: string | null, fallback: number, max: number): number {
+  // Absent and blank are checked before Number(), because `Number(null)` and
+  // `Number('')` are both 0 — a finite, non-negative 0 that sails past the
+  // guard below and silently returns 0 instead of the fallback it was given.
+  if (value === null || value.trim() === '') return fallback;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return Math.min(Math.floor(n), max);
+}
+
 export interface HomeFeed {
   success: true;
   hero: Story[];
@@ -28,6 +60,12 @@ export interface HomeFeed {
   topicCards: Story[];
   /** Faith-based category articles, in the order they should be inserted. */
   categoryCards: Story[];
+  /** Grid cards available across the whole window, for paging. */
+  total: number;
+  /** Index this page starts at, within the grid. */
+  offset: number;
+  /** Whether another page exists after this one. */
+  hasMore: boolean;
 }
 
 /**
@@ -174,25 +212,47 @@ export function insertsNeeded(feedLength: number, every = INSERT_EVERY): number 
 /**
  * Split the feed into the hero / sidebar / grid the Home page expects.
  *
- * Input must already be newest-first; `fetchLatestNews` sorts by day then by
- * article within the day, which is exactly the requested "today at the top,
- * previous days below in descending order".
+ * Input must already be newest-first; `fetchNewsWindow` sorts by day then by
+ * article within the day, which is exactly the requested "newest at the top,
+ * older below in descending order".
  *
  * Articles with no image are dropped. Imageless stories are a hard exclusion on
  * this site — the pipeline already holds them back as drafts, and this is the
  * last line of that rule.
+ *
+ * `offset` pages the GRID only. The hero and sidebar are always the newest
+ * eight stories and are returned on the first page alone: they are a fixed
+ * region of the layout, and re-sending them with every page would either
+ * duplicate cards in the grid or shift the ones already on screen.
  */
-export function buildHomeFeed(articles: NewsArticle[], categoryCards: Story[] = []): HomeFeed {
+export function buildHomeFeed(
+  articles: NewsArticle[],
+  categoryCards: Story[] = [],
+  { offset = 0, pageSize = PAGE_SIZE }: { offset?: number; pageSize?: number } = {},
+): HomeFeed {
   const usable = articles.filter(a => a.image);
   const stories = usable.map(toStory);
-  const topicCards = stories.slice(HERO_COUNT + SIDEBAR_COUNT);
+
+  const grid = stories.slice(HERO_COUNT + SIDEBAR_COUNT);
+  const start = Math.max(0, Math.floor(offset));
+  const page = grid.slice(start, start + Math.max(1, pageSize));
+  const firstPage = start === 0;
+
+  // Inserts continue the rotation rather than restarting it, so page two does
+  // not repeat the faith-based articles page one already showed.
+  const insertsBefore = insertsNeeded(start);
+  const insertsHere = insertsNeeded(page.length);
+
   return {
     success: true,
-    hero: stories.slice(0, HERO_COUNT),
-    sidebar: stories.slice(HERO_COUNT, HERO_COUNT + SIDEBAR_COUNT),
-    topicCards,
+    hero: firstPage ? stories.slice(0, HERO_COUNT) : [],
+    sidebar: firstPage ? stories.slice(HERO_COUNT, HERO_COUNT + SIDEBAR_COUNT) : [],
+    topicCards: page,
     // A few spare: the page filters blocked and hidden stories before weaving,
     // which only ever shortens the feed, and an unused insert costs nothing.
-    categoryCards: categoryCards.slice(0, insertsNeeded(topicCards.length) + 2),
+    categoryCards: categoryCards.slice(insertsBefore, insertsBefore + insertsHere + 2),
+    total: grid.length,
+    offset: start,
+    hasMore: start + page.length < grid.length,
   };
 }

@@ -62,6 +62,10 @@ export interface StoredAuth {
   user: AuthUser | null;
   token?: string;
   tokens?: { access?: string; accessToken?: string; refresh?: string };
+  /** Durable half of the session — redeemed at POST /api/auth/refresh. */
+  refreshToken?: string;
+  /** ISO expiry of `token`. Used to refresh proactively instead of on a 401. */
+  expiresAt?: string;
 }
 
 /** A node in the editorial taxonomy used to build the nav bar. */
