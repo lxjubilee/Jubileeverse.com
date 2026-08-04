@@ -85,6 +85,89 @@ function mintImageSetId(articleId) {
     return base62FromHex(crypto.createHash('sha256').update(String(articleId)).digest('hex'), 12);
 }
 
+/**
+ * Salt for an image taken from the originating outlet rather than rendered.
+ *
+ * Fixed, not random, so re-running the sourcing pass lands on the same key and
+ * skip-if-present still works. Distinct from the unsalted render id so that
+ * replacing a generated image with the real photograph writes a NEW key: image
+ * URLs are served with a week of cache life, and reusing the key would leave
+ * the old picture on the page until it expired.
+ */
+const SOURCED_SALT = 'src';
+
+/** The published filename contract: 12 chars of base62. */
+const IMAGE_ID_RE = /^[0-9A-Za-z]{12}$/;
+
+/** The image id inside a frontmatter `image_file` value, or '' if it isn't one. */
+function imageIdFromFile(file) {
+    const base = String(file || '').split('/').pop() || '';
+    const id = base.replace(/\.(webp|png|jpe?g)$/i, '');
+    return IMAGE_ID_RE.test(id) ? id : '';
+}
+
+/**
+ * Match the image objects stored for an article back to their display slots.
+ *
+ * Rebuilding a manifest means answering "which of these files is the hero?"
+ * from storage alone. Deriving the id and keeping only exact matches — the
+ * obvious approach, and the one this replaces — is wrong in a way that destroys
+ * articles: any id the deriver cannot reproduce is dropped, the article ends up
+ * with no images, and `buildIndexEntry` then forces it to draft. An admin
+ * regeneration mints a RANDOM salt, so its id is unreproducible by construction;
+ * every regenerated hero was silently unpublished by the next repair.
+ *
+ * So the ladder goes from most authoritative to most forgiving:
+ *   1. the frontmatter's `image_file` — what the published markdown actually
+ *      links to, and true regardless of how the id was minted
+ *   2. derivation, over every salt this pipeline has published under
+ *   3. a lone unrecognised object, adopted as the hero
+ *
+ * Rung 3 stops at exactly one file on purpose. With several unmatched objects
+ * there is no honest way to order them, and inventing an order would put an
+ * arbitrary picture at the top of the article.
+ *
+ * @param {string} articleId
+ * @param {Map<string,string>|Object} stored   imageId -> file extension
+ * @param {object}   [options]
+ * @param {string}   [options.imageFile]  frontmatter `image_file`
+ * @param {number}   [options.expected]   slots to look for
+ * @param {string[]} [options.salts]      salts to try, most recent first
+ * @returns {Array<{n:number, role:string, id:string, ext:string}>} sorted by n
+ */
+function matchStoredImages(articleId, stored, {
+    imageFile = '',
+    expected = IMAGES_PER_ARTICLE,
+    salts = [SOURCED_SALT, ''],
+} = {}) {
+    const present = stored instanceof Map ? stored : new Map(Object.entries(stored || {}));
+    const claimed = new Set();
+    const bySlot = new Map();
+
+    const claim = (n, id) => {
+        if (claimed.has(id) || bySlot.has(n)) return false;
+        claimed.add(id);
+        bySlot.set(n, id);
+        return true;
+    };
+
+    const declared = imageIdFromFile(imageFile);
+    if (declared && present.has(declared)) claim(1, declared);
+
+    for (let n = 1; n <= expected; n++) {
+        for (const salt of salts) {
+            if (present.has(mintImageId(articleId, n, salt))
+                && claim(n, mintImageId(articleId, n, salt))) break;
+        }
+    }
+
+    if (!bySlot.size && present.size === 1) claim(1, [...present.keys()][0]);
+
+    return [...bySlot.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([n, id]) => ({ n, role: ROLES[n - 1] || '', id, ext: present.get(id) }));
+}
+
 /** Stable per-image seed, so a regenerated image reproduces rather than drifts. */
 function seedFor(articleId, n, salt = 0) {
     const hex = crypto.createHash('sha256').update(`${articleId}:${n}:${salt}`).digest('hex');
@@ -220,11 +303,15 @@ module.exports = {
     IMAGES_PER_ARTICLE,
     IMAGE_EXT,
     IMAGE_CONTENT_TYPE,
+    IMAGE_ID_RE,
+    SOURCED_SALT,
     WEBP_QUALITY,
     toWebp,
     ROLES,
     mintImageId,
     mintImageSetId,
+    imageIdFromFile,
+    matchStoredImages,
     seedFor,
     deriveImagePrompts,
     extractPromptsFromMarkdown,

@@ -52,6 +52,23 @@ export function regenTargetOf(story: Pick<Story, 'id' | 'slug' | 'date'>): Regen
 }
 
 /**
+ * Whether an admin may regenerate this article's image.
+ *
+ * News is excluded. Its picture is the photograph the originating outlet
+ * published, so there is nothing to regenerate — the control offered an action
+ * that no longer means anything, on every card in every grid.
+ *
+ * Category articles keep it: those images are still generated, and a bad one
+ * still needs a way to be replaced.
+ *
+ * Defined here rather than at each render site so a new surface cannot bring
+ * the control back by forgetting to pass a prop.
+ */
+export function canRegenerateImage(target: RegenTarget | null): boolean {
+  return target !== null && target.kind !== 'news';
+}
+
+/**
  * Where a story is read.
  *
  * CDN news articles live at the root, /<slug> — a real, server-rendered,

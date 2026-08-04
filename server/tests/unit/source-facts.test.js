@@ -90,6 +90,93 @@ describe('meta extraction', () => {
     });
 });
 
+describe('image extraction', () => {
+    test('prefers og:image', () => {
+        const out = F.extractMetaFacts(page(`<meta property="og:image" content="https://cdn.x/og.jpg">`));
+        expect(out.image).toBe('https://cdn.x/og.jpg');
+    });
+
+    test.each([
+        ['og:image:secure_url', `<meta property="og:image:secure_url" content="https://cdn.x/s.jpg">`],
+        ['og:image:url', `<meta property="og:image:url" content="https://cdn.x/s.jpg">`],
+        ['twitter:image', `<meta name="twitter:image" content="https://cdn.x/s.jpg">`],
+        ['twitter:image:src', `<meta name="twitter:image:src" content="https://cdn.x/s.jpg">`],
+        ['link rel=image_src', `<link rel="image_src" href="https://cdn.x/s.jpg">`],
+    ])('falls back to %s', (_label, tag) => {
+        expect(F.extractMetaFacts(page(tag)).image).toBe('https://cdn.x/s.jpg');
+    });
+
+    test('decodes entities in the query string', () => {
+        // Unescaped, `&amp;` survives into the URL and the download 404s.
+        const out = F.extractMetaFacts(page(`<meta property="og:image" content="https://cdn.x/p.jpg?w=1200&amp;h=630">`));
+        expect(out.image).toBe('https://cdn.x/p.jpg?w=1200&h=630');
+    });
+
+    test('reports no image rather than an empty tag artefact', () => {
+        expect(F.extractMetaFacts(page('<title>t</title>')).image).toBe('');
+    });
+});
+
+describe('schema.org image shapes', () => {
+    test('a bare url string', () => {
+        expect(F.jsonLdImageUrl('https://cdn.x/a.jpg')).toBe('https://cdn.x/a.jpg');
+    });
+
+    test('an ImageObject', () => {
+        expect(F.jsonLdImageUrl({ '@type': 'ImageObject', url: 'https://cdn.x/a.jpg' })).toBe('https://cdn.x/a.jpg');
+    });
+
+    test('contentUrl, which some CMSs emit instead of url', () => {
+        expect(F.jsonLdImageUrl({ contentUrl: 'https://cdn.x/a.jpg' })).toBe('https://cdn.x/a.jpg');
+    });
+
+    test('an array takes the first entry, which is the largest by convention', () => {
+        expect(F.jsonLdImageUrl(['https://cdn.x/big.jpg', 'https://cdn.x/small.jpg'])).toBe('https://cdn.x/big.jpg');
+        expect(F.jsonLdImageUrl([{ url: 'https://cdn.x/big.jpg' }])).toBe('https://cdn.x/big.jpg');
+    });
+
+    test('absent, empty and malformed values yield an empty string', () => {
+        expect(F.jsonLdImageUrl(undefined)).toBe('');
+        expect(F.jsonLdImageUrl([])).toBe('');
+        expect(F.jsonLdImageUrl({ width: 1200 })).toBe('');
+    });
+
+    test('the article node carries its image through', () => {
+        const ld = F.extractJsonLdNewsArticle(page(
+            `<script type="application/ld+json">${JSON.stringify({
+                '@type': 'NewsArticle',
+                headline: 'H',
+                image: [{ '@type': 'ImageObject', url: 'https://cdn.x/ld.jpg' }],
+            })}</script>`,
+        ));
+        expect(ld.image).toBe('https://cdn.x/ld.jpg');
+    });
+});
+
+describe('absoluteUrl', () => {
+    const PAGE = 'https://news.example.com/world/story.html';
+
+    test.each([
+        ['root-relative', '/media/p.jpg', 'https://news.example.com/media/p.jpg'],
+        ['protocol-relative', '//cdn.example.com/p.jpg', 'https://cdn.example.com/p.jpg'],
+        ['path-relative', 'p.jpg', 'https://news.example.com/world/p.jpg'],
+        ['already absolute', 'https://cdn.example.com/p.jpg', 'https://cdn.example.com/p.jpg'],
+    ])('resolves a %s url', (_label, src, expected) => {
+        expect(F.absoluteUrl(src, PAGE)).toBe(expected);
+    });
+
+    test('refuses non-http schemes', () => {
+        expect(F.absoluteUrl('data:image/png;base64,AAAA', PAGE)).toBe('');
+        expect(F.absoluteUrl('javascript:alert(1)', PAGE)).toBe('');
+    });
+
+    test('an empty or unparseable value is empty, never a throw', () => {
+        expect(F.absoluteUrl('', PAGE)).toBe('');
+        expect(F.absoluteUrl(null, PAGE)).toBe('');
+        expect(F.absoluteUrl('http://[bad', PAGE)).toBe('');
+    });
+});
+
 describe('paragraph extraction', () => {
     test('keeps substantive paragraphs, drops furniture', () => {
         const html = page('', `

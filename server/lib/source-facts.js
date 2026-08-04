@@ -167,10 +167,26 @@ function extractJsonLdNewsArticle(html) {
                 datePublished: node.datePublished || node.dateCreated || '',
                 author,
                 publisher: node.publisher?.name || '',
+                image: jsonLdImageUrl(node.image),
             };
         }
     }
     return null;
+}
+
+/**
+ * The URL out of a schema.org `image` value.
+ *
+ * The spec allows a bare URL string, an ImageObject, or an array of either, and
+ * publishers use all three. Arrays are ordered largest-first by convention, so
+ * the first entry is the one to take.
+ */
+function jsonLdImageUrl(image) {
+    const first = Array.isArray(image) ? image[0] : image;
+    if (!first) return '';
+    if (typeof first === 'string') return first.trim();
+    const url = first.url || first.contentUrl || '';
+    return typeof url === 'string' ? url.trim() : '';
 }
 
 /** OpenGraph and standard meta tags — near-universal, cheap, a good fallback. */
@@ -193,8 +209,26 @@ function extractMetaFacts(html) {
         description: meta('og:description') || meta('description') || meta('twitter:description'),
         publishedTime: meta('article:published_time') || meta('datePublished'),
         siteName: meta('og:site_name'),
-        image: meta('og:image') || meta('twitter:image'),
+        // `og:image` alone misses a real slice of outlets. The secure_url and
+        // :url variants are part of the same spec and some CMSs emit only
+        // those; image_src predates OpenGraph and still appears on older sites.
+        image: meta('og:image') || meta('og:image:secure_url') || meta('og:image:url')
+            || meta('twitter:image') || meta('twitter:image:src')
+            || linkHref(html, 'image_src'),
     };
+}
+
+/** The href of a `<link rel="...">`, decoded. */
+function linkHref(html, rel) {
+    const patterns = [
+        new RegExp(`<link[^>]+rel=["']${rel}["'][^>]+href=["']([^"']*)["']`, 'i'),
+        new RegExp(`<link[^>]+href=["']([^"']*)["'][^>]+rel=["']${rel}["']`, 'i'),
+    ];
+    for (const re of patterns) {
+        const m = re.exec(html);
+        if (m) return cleanText(m[1]);
+    }
+    return '';
 }
 
 /**
@@ -228,6 +262,24 @@ function cleanText(str) {
     return decodeHtmlEntities(String(str ?? ''))
         .replace(/\s+/g, ' ')
         .trim();
+}
+
+/**
+ * Resolve a possibly-relative asset URL against the page it came from.
+ *
+ * Publishers emit `/media/x.jpg` and `//cdn.example.com/x.jpg` for og:image
+ * often enough to matter. Requiring the value to already start with `http` —
+ * which the older scraper in server.js does — throws those away for nothing.
+ */
+function absoluteUrl(src, pageUrl) {
+    const raw = String(src ?? '').trim();
+    if (!raw) return '';
+    try {
+        const resolved = new URL(raw, pageUrl);
+        return /^https?:$/.test(resolved.protocol) ? resolved.toString() : '';
+    } catch {
+        return '';
+    }
 }
 
 /** Split prose into fact-sized statements the model can cite by number. */
@@ -299,6 +351,12 @@ async function buildFactSheet(candidate, { allCandidates = [], logger = console 
         quotes: [],
         corroborating_sources: findCorroborators(candidate, allCandidates),
         confidence: 'headline_only',
+        // The outlet's own picture for this story. Carried on the sheet because
+        // this is the one place that already holds the source page HTML —
+        // fetching it a second time later would double our request load on
+        // every outlet for something we had in hand and threw away.
+        image: '',
+        image_stage: '',
     };
 
     // Whatever the source page yields, the RSS lede is itself verified text
@@ -333,6 +391,10 @@ async function buildFactSheet(candidate, { allCandidates = [], logger = console 
     const body = (ld?.articleBody && ld.articleBody.length > 200) ? ld.articleBody : paragraphs;
     const lede = ld?.description || meta?.description || candidate.description || '';
 
+    // og:image before JSON-LD: it is what the outlet chose to represent the
+    // story publicly, whereas the LD `image` is sometimes a section banner.
+    const imageStage = meta?.image ? 'og' : (ld?.image ? 'jsonld' : '');
+
     const sheet = {
         ...base,
         headline: ld?.headline || meta?.title || base.headline,
@@ -342,6 +404,8 @@ async function buildFactSheet(candidate, { allCandidates = [], logger = console 
         lede,
         key_facts: toKeyFacts([lede, body].filter(Boolean).join(' ')),
         quotes: extractQuotes(body),
+        image: absoluteUrl(meta?.image || ld?.image || '', url),
+        image_stage: imageStage,
     };
 
     if ((ld?.articleBody && ld.articleBody.length > 400) || body.length >= 1200) {
@@ -410,6 +474,8 @@ module.exports = {
     extractJsonLdNewsArticle,
     extractMetaFacts,
     extractBodyParagraphs,
+    jsonLdImageUrl,
+    absoluteUrl,
     toKeyFacts,
     extractQuotes,
     findCorroborators,

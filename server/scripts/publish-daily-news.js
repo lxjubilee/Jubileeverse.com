@@ -5,22 +5,27 @@
  *
  *   harvest  ~60 RSS feeds -> score -> dedupe -> quota-allocate to the target
  *   facts    fetch each source page -> JSON-LD / OG / <p> -> numbered fact sheet
- *   compose  ONE Claude call per article -> 9 fields + 3 image prompts
- *   images   3 x FLUX per article across the LAN GPU lanes -> safety scan
- *   publish  images -> article.md -> day index.json -> latest.json  (to R2)
+ *   compose  ONE Claude call per article -> 8 fields
+ *   images   download the outlet's own photograph -> validate -> 1600x900 WebP
+ *   publish  image -> article.md -> day index.json -> latest.json  (to R2)
  *
- * Runs on a LAN host. The GPUs at 10.0.0.52 are not reachable from the UAT or
- * production VPSes, so this is a scheduled script rather than a tick inside
- * server.js; the VPSes only read the result from cdn.jubileeverse.com.
+ * The pictures were three FLUX renders per article until the sourcing switch.
+ * They are now the photograph the originating outlet ran with the story: for
+ * news that is simply the better picture — it shows the real place and the real
+ * people, and cannot invent a building that was never there — and it costs a
+ * download rather than an hour of GPU time. Resolution, validation and
+ * normalisation all live in lib/news-image-source.js.
  *
  * Usage:
  *   node scripts/publish-daily-news.js --dry-run
- *   node scripts/publish-daily-news.js --target 10
+ *   node scripts/publish-daily-news.js --target 60 --max-new 15
  *   node scripts/publish-daily-news.js --date 2026-07-31 --force
  *
  * Flags:
- *   --dry-run        harvest, dedupe and fact-extract only. No LLM, no upload.
- *   --target N       articles to publish (default 60, or NEWS_TARGET)
+ *   --dry-run        harvest, dedupe, fact-extract and resolve image URLs.
+ *                    No LLM call, no download, no upload.
+ *   --target N       articles for the DAY (default 60, or NEWS_TARGET)
+ *   --max-new N      cap on NEW articles for this run (default: the target)
  *   --date YYYY-MM-DD  publish into a specific PST day folder
  *   --force          re-upload even when R2 already has identical bytes
  *   --no-images      compose and publish text only
@@ -28,8 +33,7 @@
  *   --repair         rebuild the day manifest from the objects in R2, then stop
  *   --to-webp        re-encode the day's published PNGs as WebP, then stop
  *   --prune a,b,c    delete those article folders from the day (needs --yes)
- *   --deadline M     abandon remaining work after M minutes (default: 3 per
- *                    article — 180 at the default target, floor of 90)
+ *   --deadline M     abandon remaining work after M minutes
  *   --concurrency N  parallel compose calls in real-time mode (default 3)
  */
 
@@ -45,9 +49,7 @@ const Sources = require('../lib/news-sources');
 const Facts = require('../lib/source-facts');
 const Composer = require('../lib/article-composer');
 const Images = require('../lib/news-images');
-const Safety = require('../lib/image-safety');
-const Judge = require('../lib/image-judge');
-const Comfy = require('../lib/comfy-client');
+const ImageSource = require('../lib/news-image-source');
 
 // ── Args and environment ─────────────────────────────────────────────────────
 
@@ -80,17 +82,16 @@ const DEFAULT_TARGET = 60;
 /**
  * Wall-clock budget, in minutes per article.
  *
- * The images are the long pole: three renders per article across the live GPU
- * lanes, plus a safety scan per wave. A flat deadline would silently become a
- * cap on the day — at three images each, a bigger target needs proportionally
- * more time or the last wave is abandoned and every article publishes with a
- * hero and nothing else. Three minutes per article is what the 30-article day
- * was given (90 minutes), kept per-article so the budget follows the target.
- *
- * The floor keeps small runs generous: `--target 5` still gets a sane window.
+ * Was 3 minutes with a 90 minute floor, sized for three GPU renders and a
+ * safety scan per article — the 2026-08-02 run spent 112 minutes on images
+ * alone and still abandoned a wave. A run is now bound by the compose calls;
+ * the picture is one HTTP download. A minute per article with a 30 minute floor
+ * is generous against that, and the smaller number matters twice over: the
+ * stale-lock threshold is derived from it, so an oversized deadline meant a
+ * crashed run held the lock for three hours and blocked its successor.
  */
-const DEADLINE_MIN_PER_ARTICLE = 3;
-const DEADLINE_FLOOR_MIN = 90;
+const DEADLINE_MIN_PER_ARTICLE = 1;
+const DEADLINE_FLOOR_MIN = 30;
 
 const TARGET = Number(arg('target', process.env.NEWS_TARGET || DEFAULT_TARGET));
 
@@ -104,6 +105,9 @@ const OPTIONS = {
     prune: arg('prune', null),
     yes: has('yes'),
     target: TARGET,
+    // Per-RUN cap, distinct from the per-DAY target. Defaults to the target so
+    // a single-run day behaves exactly as it always has.
+    maxNew: Number(arg('max-new', process.env.NEWS_MAX_NEW || TARGET)),
     date: arg('date', null),
     deadlineMin: Number(
         arg('deadline', Math.max(DEADLINE_FLOOR_MIN, TARGET * DEADLINE_MIN_PER_ARTICLE)),
@@ -111,18 +115,19 @@ const OPTIONS = {
     concurrency: Number(arg('concurrency', 3)),
 };
 
-// Images stage to LOCAL temp, not server/.tmp. The repo sits on a mapped
-// network drive, and writing ~1.5MB PNGs there only to have PowerShell read
-// them straight back is both slow and needlessly dependent on the share being
-// healthy. The lock stays in the repo so a second checkout can see it.
-const STAGE_ROOT = path.join(os.tmpdir(), 'jv-news-images');
+// Images no longer touch the disk. They were staged to local temp only so the
+// NudeNet folder-scanner could read them, and that scan existed because a
+// generative model can produce anything; a photograph already published on an
+// outlet's own front page is a different risk class. Buffer straight to R2.
 const LOCK_FILE = path.join(__dirname, '..', '.tmp', 'news-publish.lock');
 
 const LOG_DIR = path.join(__dirname, '..', 'logs', 'news');
 
-// Floor for "is this a real image object". WebP renders land well above this;
-// anything smaller is a truncated upload.
-const MIN_IMAGE_BYTES = 8 * 1024;
+// Floor for "is this a real image object". Shared with the publish layer on
+// purpose: two independently-chosen floors meant an image could clear the one
+// that let it upload and fail the one that put it in the manifest, which reads
+// as an article mysteriously holding itself back as a draft.
+const MIN_IMAGE_BYTES = News.MIN_IMAGE_BYTES;
 
 /**
  * Log to stdout and to a dated file.
@@ -254,6 +259,7 @@ async function buildFactSheets(stories, allCandidates) {
     log('extracting facts from source pages...');
     const out = [];
     const tally = { full: 0, partial: 0, headline_only: 0 };
+    const stages = {};
     for (const story of stories) {
         const sheet = await Facts.buildFactSheet(story, { allCandidates, logger: { log() {}, warn() {} } });
         // Corroborators found during the same-event collapse are already
@@ -263,10 +269,39 @@ async function buildFactSheets(stories, allCandidates) {
             sheet.corroborating_sources.push(...story.corroborators.filter(c => !seen.has(c.url)));
         }
         tally[sheet.confidence]++;
-        out.push({ story, sheet });
+
+        // Resolve the picture HERE, where the source page HTML is already in
+        // hand. Doing it later would mean fetching every outlet a second time
+        // for something we were holding and discarded.
+        const picks = ImageSource.resolveImageCandidates(story, sheet);
+        const pick = picks[0] || { url: null, stage: 'none' };
+        stages[pick.stage] = (stages[pick.stage] || 0) + 1;
+
+        out.push({ story, sheet, imagePick: pick, imagePicks: picks });
     }
     log(`  confidence: ${JSON.stringify(tally)}`);
+    log(`  image candidates: ${JSON.stringify(stages)}`);
     return out;
+}
+
+/**
+ * Put the stories we can illustrate in front of the ones we cannot.
+ *
+ * An article with no picture is held back as a draft, so composing one spends
+ * an Opus call on something the reader will never see. This does not DROP the
+ * imageless stories — a resolvable URL is not a guarantee the bytes are usable,
+ * so they stay in the list as fallback behind the reserve.
+ *
+ * Deliberately a stable partition rather than a re-sort: the quota allocation
+ * upstream already balanced topics, and re-scoring here would undo that.
+ */
+function preferIllustratable(sheets) {
+    const withImage = sheets.filter(s => s.imagePick?.url);
+    const without = sheets.filter(s => !s.imagePick?.url);
+    if (without.length) {
+        log(`  ${withImage.length} with a picture, ${without.length} without (held behind the reserve)`);
+    }
+    return [...withImage, ...without];
 }
 
 // ── Composition ──────────────────────────────────────────────────────────────
@@ -293,17 +328,28 @@ async function composeRealtime(sheets, recentTitles, target = OPTIONS.target) {
     let failed = 0;
     let cursor = 0;
 
+    // Slots are claimed BEFORE the call, not counted after it.
+    //
+    // Counting completions instead let every in-flight worker finish past the
+    // limit: at a concurrency of 3 a cap of 15 produced 17 articles, and all 17
+    // published. That is two Opus calls nobody asked for and two articles over
+    // the run's quota, every run. A failed composition hands its slot back, so
+    // the target is still reached when some calls fail.
+    let claimed = 0;
+
     const worker = async () => {
         for (;;) {
+            if (claimed >= target) return;
             const item = sheets[cursor++];
             if (!item) return;
-            if (results.filter(r => r.fields).length >= target) return;
+            claimed++;
             try {
                 attempted++;
                 const r = await Composer.composeArticle(composeInput(item, recentTitles));
                 results.push({ ...item, fields: r.fields, usage: r.usage });
                 log(`  [${results.filter(x => x.fields).length}/${target}] ${r.fields.title.slice(0, 62)}`);
             } catch (e) {
+                claimed--;
                 failed++;
                 log(`  skip (${e.kind || 'error'}): ${item.story.title.slice(0, 50)} — ${e.message.slice(0, 90)}`);
                 if (attempted >= 10 && failed / attempted >= 0.5) {
@@ -317,7 +363,9 @@ async function composeRealtime(sheets, recentTitles, target = OPTIONS.target) {
     };
 
     await Promise.all(Array.from({ length: Math.max(1, OPTIONS.concurrency) }, worker));
-    return results.filter(r => r.fields);
+    // Belt and braces: the claim counter makes an overshoot impossible, and
+    // this makes it un-publishable if it ever happens anyway.
+    return results.filter(r => r.fields).slice(0, target);
 }
 
 /** Compose everything through the Batches API at half price. */
@@ -345,7 +393,7 @@ async function composeBatched(sheets, recentTitles, target = OPTIONS.target) {
 // ── Publication ──────────────────────────────────────────────────────────────
 
 /** Assemble the article record the R2 layer expects. */
-function toArticle({ story, sheet, fields }, slug, date) {
+function toArticle({ story, sheet, fields, imagePick, imagePicks }, slug, date) {
     const articleId = `${R2.pstDateString(date)}__${slug}`;
     return {
         slug,
@@ -366,254 +414,291 @@ function toArticle({ story, sheet, fields }, slug, date) {
         date_published: R2.pstDateString(date),
         date_updated: new Date().toISOString(),
         image_set_id: Images.mintImageSetId(articleId),
-        image_prompts: fields.image_prompts,
+        // Where the picture comes from, carried so the publish step does not
+        // have to re-derive it and so the manifest can record the provenance.
+        // The list, not just the head: a feed thumbnail that fails the size
+        // gate must not cost the article a picture the source page is serving.
+        image_pick: imagePick || { url: null, stage: 'none' },
+        image_picks: imagePicks || (imagePick?.url ? [imagePick] : []),
+        // The outlet gets the credit for its own photograph. Stored on the
+        // article rather than rendered — see the note in buildIndexEntry.
+        image_credit: sheet.source_name || '',
         // headline-only stories are held back from the feed: thin sourcing is
         // not something to lead with.
         status: sheet.confidence === 'headline_only' ? 'draft' : 'published',
     };
 }
 
-/** Stage a buffer to disk so the safety scanner (a folder tool) can see it. */
-function stageImage(dir, filename, buffer) {
-    fs.mkdirSync(dir, { recursive: true });
-    const dest = path.join(dir, filename);
-    fs.writeFileSync(dest, buffer);
-    return dest;
-}
-
 /**
- * Retry rounds for the supporting and symbolic images.
- *
- * Lower than the hero's. A missing supporting image costs the article one
- * illustration further down the page and the next run backfills it; a missing
- * hero costs the article its place in the feed, which is worth escalating for.
- */
-const SUPPORTING_ROUNDS = Number(process.env.NEWS_SUPPORTING_ROUNDS || 2);
-
-/**
- * Hold an article back when its hero never cleared the gates.
+ * Hold an article back when no usable picture could be sourced.
  *
  * Drafting reuses the mechanism that already holds back thin-sourced stories,
  * so nothing new appears on the reader's side: the article simply does not
  * enter the feed. The text is still written and still published, so a later run
- * that produces a usable hero can promote it without recomposing anything.
+ * that resolves a picture can promote it without recomposing anything.
  */
-function draftForFailedHero(byArticle, drafted, article, reason) {
+function draftForMissingImage(byArticle, drafted, article, reason) {
     drafted.add(article.slug);
     const record = byArticle.get(article.slug);
     if (!record || record.article.status === 'draft') return;
     record.article.status = 'draft';
-    record.article.image_status = 'quality_failed';
+    record.article.image_status = 'pending';
     log(`  ${article.slug} -> draft (${reason})`);
 }
 
 /**
- * Run counters for the night's image quality, reported at the end.
+ * Per-run tally of where pictures came from and why they were refused.
  *
- * These are the numbers the final bake-off compares profiles on, so they are
- * collected on every run rather than only under an evaluation flag.
+ * Reported at the end and published to status.json, because "how many articles
+ * got a real photograph, and what stopped the rest" is the one number that says
+ * whether this pipeline is working. A silent drop rate is how you discover six
+ * weeks later that one outlet has been serving its logo the whole time.
  */
-function createQualityReport() {
-    const rows = [];
+function createSourcingReport() {
+    const stages = {};
+    const rejects = {};
     return {
-        record(job, result) {
-            rows.push({
-                slug: job.article.slug,
-                n: job.n,
-                rounds: result.rounds?.length || 0,
-                rendered: (result.rounds || []).reduce((s, r) => s + (r.rendered || 0), 0),
-                structuralPassed: (result.rounds || []).reduce((s, r) => s + (r.structuralPassed || 0), 0),
-                judgeScore: result.image?.rubric?.score ?? null,
-                structuralScore: result.image?.structural?.score ?? null,
-                accepted: Boolean(result.image),
-                reason: result.reason,
-            });
+        accepted(stage) { stages[stage] = (stages[stage] || 0) + 1; },
+        rejected(reason) {
+            const key = String(reason || 'unknown').replace(/\(.*/, '').trim().slice(0, 40);
+            rejects[key] = (rejects[key] || 0) + 1;
         },
-        rows: () => rows,
-        summary() {
-            const heroes = rows.filter(r => r.n === 1);
-            const accepted = rows.filter(r => r.accepted);
-            const judged = accepted.filter(r => r.judgeScore != null);
-            const mean = (xs) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
-            return {
-                images: rows.length,
-                accepted: accepted.length,
-                rendered: rows.reduce((s, r) => s + r.rendered, 0),
-                structuralPassRate: rows.reduce((s, r) => s + r.rendered, 0)
-                    ? Math.round(100 * rows.reduce((s, r) => s + r.structuralPassed, 0)
-                        / rows.reduce((s, r) => s + r.rendered, 0))
-                    : null,
-                retried: rows.filter(r => r.rounds > 1).length,
-                heroesFailed: heroes.filter(r => !r.accepted).length,
-                meanJudgeScore: mean(judged.map(r => r.judgeScore)),
-                meanStructuralScore: mean(accepted.filter(r => r.structuralScore != null).map(r => r.structuralScore)),
-            };
-        },
+        stages: () => stages,
+        rejects: () => rejects,
+        total() { return Object.values(stages).reduce((a, b) => a + b, 0); },
     };
 }
 
 /**
- * Render, screen, and upload every image, then publish the markdown.
+ * Source, validate, and upload one picture per article, then publish.
  *
- * Jobs are ordered by image number across all articles, so every article's hero
- * renders before any article's second image. Combined with publishing after
- * each wave, an article goes live with a hero image within minutes and a slow
- * GPU only delays the supporting images.
+ * Replaces the three-wave GPU render loop. There is no wave structure left to
+ * have: one image per article, and a download that takes a second rather than
+ * a render that takes a minute, so everything runs in one bounded pass.
+ *
+ * Concurrency is per-host rather than global. Sixty articles a day already puts
+ * real load on a handful of outlets, and firing every download at once is how a
+ * publisher decides to start refusing us.
  */
 async function publishAll(articles, date) {
-    const lanes = OPTIONS.noImages ? [] : await Comfy.liveLanes();
-    if (!OPTIONS.noImages) {
-        log(lanes.length
-            ? `image lanes up: ${lanes.length}`
-            : 'no ComfyUI lane reachable — publishing text now, images on the next run');
+    const byArticle = new Map(articles.map(a => [a.slug, { article: a, images: [] }]));
+    const drafted = new Set();
+    const report = createSourcingReport();
+
+    if (OPTIONS.noImages) {
+        log('--no-images: publishing text only');
+        await publishWave(byArticle, date);
+        return byArticle;
     }
 
-    const byArticle = new Map(articles.map(a => [a.slug, { article: a, images: [] }]));
     const deadline = Date.now() + OPTIONS.deadlineMin * 60000;
+    const tracker = ImageSource.createImageTracker({ denylist: await loadImageDenylist() });
 
-    // Articles whose hero never cleared the quality gates. They still publish —
-    // as drafts, with their text intact — rather than shipping a defective
-    // photograph or leaving the reader an empty card.
-    const drafted = new Set();
-    const quality = createQualityReport();
+    log(`sourcing ${articles.length} image(s) from the original outlets`);
 
-    for (let n = 1; n <= (lanes.length ? Images.IMAGES_PER_ARTICLE : 0); n++) {
-        if (Date.now() > deadline) { log(`deadline reached — abandoning image wave ${n}; the next run fills it in`); break; }
-        log(`image wave ${n}/${Images.IMAGES_PER_ARTICLE}`
-            + (n === 1 ? ` (best-of-${Judge.HERO_CANDIDATES})` : ''));
-        // An image problem must never cost us the articles. Anything thrown by
-        // rendering, screening, or uploading ends this wave and falls through
-        // to publishing whatever text and images we already have.
-        try {
+    // Serialise per host, run distinct hosts in parallel. A story's picture
+    // nearly always lives on the outlet's own CDN, so this naturally spreads
+    // the work while never hammering one publisher.
+    const byHost = new Map();
+    for (const article of articles) {
+        const url = article.image_pick?.url;
+        if (!url) {
+            report.rejected('no image url');
+            draftForMissingImage(byArticle, drafted, article, 'no image url on the feed item or source page');
+            continue;
+        }
+        const host = hostOf(url);
+        if (!byHost.has(host)) byHost.set(host, []);
+        byHost.get(host).push(article);
+    }
 
-        const stageDir = path.join(STAGE_ROOT, R2.pstDateString(date), `wave${n}`);
-        fs.rmSync(stageDir, { recursive: true, force: true });
-
-        // Drafted articles are not worth more GPU time: a draft is held back
-        // from the feed, so its supporting images would never be seen.
-        const wanted = articles.filter(a => !(n > 1 && drafted.has(a.slug)));
-
-        const jobs = wanted.map(a => {
-            const prompts = Images.normalizePrompts(a.image_prompts, a);
-            return { article: a, n, ...prompts[n - 1] };
-        });
-
-        // One shared pool rather than a lane-per-worker loop: every article's
-        // candidates queue together, so a lane never idles waiting for the
-        // slowest sibling of the article currently in front of it.
-        const pool = Comfy.createLanePool(lanes);
-        const staged = [];
-
-        await Promise.all(jobs.map(async (job) => {
-            if (Date.now() > deadline) return;
-            const imageId = Images.mintImageId(job.article.articleId, n);
-            const key = News.buildNewsImageKey(job.article, imageId, date);
-
-            // Skip-if-present: the single biggest robustness win. A re-run
-            // after a crash costs almost no GPU time.
-            if (!OPTIONS.force) {
-                const existing = await R2.headObject(key);
-                if (existing && existing.size > Comfy.MIN_PNG_BYTES) {
-                    byArticle.get(job.article.slug).images.push({
-                        n, role: job.role, url: R2.cdnUrl(key), safety: 'previously-cleared',
-                    });
-                    return;
-                }
-            }
-
-            try {
-                // Both quality gates, the escalating retry, and the selection
-                // all live in lib/image-judge.js so the admin regeneration
-                // button runs this exact path rather than a parallel copy.
-                const result = await Judge.produceImage({
-                    prompt: job.prompt,
-                    articleId: job.article.articleId,
-                    article: job.article,
-                    n,
-                    candidates: n === 1 ? Judge.HERO_CANDIDATES : 1,
-                    maxRounds: n === 1 ? Judge.MAX_ROUNDS : SUPPORTING_ROUNDS,
-                    render: (prompt, seed) => {
-                        if (Date.now() > deadline) throw new Error('deadline reached');
-                        return pool.submit(lane => Comfy.generateImage(prompt, { lane, seed }));
-                    },
-                    logger: { log, warn: log },
-                });
-
-                quality.record(job, result);
-
-                if (!result.image) {
-                    // A deadline is not a quality verdict. Leave the article as
-                    // it is and let the next run fill the image in.
-                    if (Date.now() > deadline) return;
-                    log(`  ${job.article.slug} #${n}: ${result.reason}`);
-                    if (n === 1) draftForFailedHero(byArticle, drafted, job.article, result.reason);
-                    return;
-                }
-
-                const filename = `${imageId}.png`;
-                stageImage(stageDir, filename, result.image.buffer);
-                staged.push({ job, imageId, filename, buffer: result.image.buffer, key, quality: result });
-            } catch (e) {
-                log(`  image ${job.article.slug} #${n}: ${e.message.slice(0, 80)}`);
-            }
-        }));
-
-        if (!staged.length) { log('  nothing rendered in this wave'); continue; }
-
-        // One scan per wave, not per image: each invocation opens a WinRM
-        // session and cold-starts Python on the GPU box.
-        const { verdicts, scanned } = await Safety.screen(stageDir, staged.map(s => s.filename));
-        log(`  safety: ${scanned ? 'scanned' : 'not scanned'}, ${staged.length} staged`);
-
-        for (const s of staged) {
-            const verdict = verdicts.get(s.filename) || { safe: false, flags: [] };
-            if (!verdict.safe) {
-                log(`  withheld ${s.job.article.slug} #${n}: ${verdict.flags.join('/') || verdict.error}`);
+    await Promise.all([...byHost.values()].map(async (queue) => {
+        for (const article of queue) {
+            if (Date.now() > deadline) {
+                log(`  deadline reached — ${article.slug} keeps its text and waits for the next run`);
+                draftForMissingImage(byArticle, drafted, article, 'deadline');
                 continue;
             }
             try {
-                // Encode only now: the classifier read the staged PNGs, and
-                // re-encoding before that would hand it a format it has never
-                // been exercised against for no gain.
-                const webp = await Images.toWebp(s.buffer);
-                const up = await News.publishNewsImage(s.job.article, {
-                    imageId: s.imageId, buffer: webp, n, date, force: OPTIONS.force,
-                });
-                byArticle.get(s.job.article.slug).images.push({
-                    n, role: s.job.role, url: up.url, safety: verdict.skipped ? 'unscanned' : 'safe',
-                    // Carried into the manifest so a published image can be
-                    // traced back to the marks that let it through.
-                    quality_score: s.quality?.image?.rubric?.score ?? null,
-                    structural_score: s.quality?.image?.structural?.score ?? null,
-                    rounds: s.quality?.rounds?.length ?? 1,
-                });
+                const image = await sourceOneImage(article, date, tracker, report);
+                if (image) byArticle.get(article.slug).images.push(image);
+                else draftForMissingImage(byArticle, drafted, article, 'no usable picture');
             } catch (e) {
-                log(`  upload failed ${s.job.article.slug} #${n}: ${e.message.slice(0, 80)}`);
+                report.rejected(e.message);
+                log(`  ${article.slug}: ${e.message.slice(0, 90)}`);
+                draftForMissingImage(byArticle, drafted, article, 'image fetch failed');
             }
         }
+    }));
 
-        fs.rmSync(stageDir, { recursive: true, force: true });
-        } catch (e) {
-            log(`  image wave ${n} aborted: ${e.message.slice(0, 120)}`);
-        }
+    await publishWave(byArticle, date);
 
-        // Publish after every wave. Wave one puts the article live with a hero
-        // image; later waves re-render the markdown to embed the new images.
-        await publishWave(byArticle, date);
+    const repeats = tracker.repeats();
+    if (repeats.length) {
+        log(`  ${repeats.length} image url(s) claimed by more than one article — house images, most likely:`);
+        for (const url of repeats.slice(0, 5)) log(`    ${url.slice(0, 110)}`);
     }
 
-    if (!lanes.length) await publishWave(byArticle, date);
-
-    if (quality.rows().length) {
-        const s = quality.summary();
-        log(`image quality: ${s.accepted}/${s.images} accepted from ${s.rendered} renders `
-            + `| structural pass ${s.structuralPassRate}% | retried ${s.retried} `
-            + `| heroes failed ${s.heroesFailed} | mean judge ${s.meanJudgeScore ?? 'n/a'} `
-            + `| mean structural ${s.meanStructuralScore ?? 'n/a'}`);
-    }
-    if (drafted.size) log(`drafted for want of a usable hero: ${[...drafted].join(', ')}`);
+    log(`images: ${report.total()}/${articles.length} sourced ${JSON.stringify(report.stages())}`);
+    if (Object.keys(report.rejects()).length) log(`  refused: ${JSON.stringify(report.rejects())}`);
+    if (drafted.size) log(`drafted for want of a picture: ${drafted.size}`);
 
     return byArticle;
+}
+
+/** Hostname, or '' — the key the per-host queues are built on. */
+function hostOf(url) {
+    try { return new URL(url).hostname; } catch { return ''; }
+}
+
+/**
+ * Outlets caught serving one house image across many stories.
+ *
+ * Persisted to R2 rather than kept in memory so the finding compounds: an
+ * outlet identified on Monday is refused on Tuesday without spending the
+ * downloads to rediscover it. Best effort — a missing file is not a failure.
+ */
+async function loadImageDenylist() {
+    try {
+        const list = await R2.getObjectJson(`${News.NEWS_PREFIX}/_image-denylist.json`);
+        return Array.isArray(list?.urls) ? list.urls : [];
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Download, validate, normalize and upload one article's picture.
+ *
+ * @returns {Promise<object|null>} the manifest image record, or null with the
+ *   reason already recorded in the report.
+ */
+async function sourceOneImage(article, date, tracker, report) {
+    const picks = article.image_picks?.length
+        ? article.image_picks
+        : [article.image_pick].filter(p => p?.url);
+    if (!picks.length) return null;
+
+    const imageId = Images.mintImageId(article.articleId, 1, Images.SOURCED_SALT);
+    const key = News.buildNewsImageKey(article, imageId, date);
+
+    // Skip-if-present. A re-run after a crash costs one HEAD per article
+    // instead of re-downloading from every outlet we already asked.
+    if (!OPTIONS.force) {
+        const existing = await R2.headObject(key);
+        if (existing && existing.size > News.MIN_IMAGE_BYTES) {
+            report.accepted(picks[0].stage);
+            return {
+                n: 1, role: 'hero', url: R2.cdnUrl(key), safety: 'previously-cleared',
+                source_url: picks[0].url, stage: picks[0].stage, credit: article.image_credit || '',
+            };
+        }
+    }
+
+    // Walk the candidates. A thumbnail in the feed must not cost the article
+    // the full-size picture the source page is serving.
+    let lastReason = 'no candidate url';
+    for (const pick of picks) {
+        const claim = tracker.claim(pick.url);
+        if (!claim.ok) { lastReason = claim.reason; continue; }
+
+        let buffer;
+        let contentType;
+        try {
+            ({ buffer, contentType } = await ImageSource.fetchImage(pick.url));
+        } catch (e) {
+            lastReason = e.message;
+            continue;
+        }
+
+        const verdict = await ImageSource.validateSourcedImage(buffer, { contentType, url: pick.url });
+        if (!verdict.ok) {
+            lastReason = verdict.reason;
+            log(`  ${article.slug}: ${pick.stage} rejected — ${verdict.reason}`
+                + (picks.indexOf(pick) < picks.length - 1 ? ', trying the next candidate' : ''));
+            continue;
+        }
+
+        const hash = await ImageSource.imageHash(buffer);
+        const dup = tracker.claimHash(hash);
+        if (!dup.ok) { lastReason = dup.reason; continue; }
+
+        const webp = await ImageSource.normalizeSourcedImage(buffer);
+        const up = await News.publishNewsImage(article, {
+            imageId, buffer: webp, n: 1, date, force: OPTIONS.force,
+        });
+
+        report.accepted(pick.stage);
+        return {
+            n: 1,
+            role: 'hero',
+            url: up.url,
+            safety: 'sourced',
+            // Provenance, carried into the manifest: which outlet's picture
+            // this is, where it came from, and how we found it.
+            source_url: pick.url,
+            stage: pick.stage,
+            credit: article.image_credit || '',
+            phash: hash,
+            original_width: verdict.meta?.width ?? null,
+            original_height: verdict.meta?.height ?? null,
+            entropy: await ImageSource.imageEntropy(buffer),
+        };
+    }
+
+    report.rejected(lastReason);
+    log(`  ${article.slug}: no usable picture from ${picks.length} candidate(s) — ${lastReason}`);
+    return null;
+}
+
+/**
+ * Patch a published article.md to match a picture that arrived after it.
+ *
+ * The manifest and the frontmatter are two records of the same facts, and a
+ * rebuild reads the frontmatter. Updating only the manifest looks like it
+ * works — the article appears on the site immediately — and is then silently
+ * undone by the next `--repair`, which is exactly what happened the first time
+ * this path filled six articles in.
+ *
+ * A targeted patch rather than a re-render: rebuilding the markdown needs the
+ * composed fields, and those exist only at compose time.
+ */
+async function patchPublishedMarkdown(prefix, entry, image, { promote }) {
+    const key = `${prefix}${entry.file}`;
+    const raw = await R2.getObjectText(key);
+    if (!raw) return false;
+
+    const file = image.url.split('/').pop();
+    const setField = (text, field, value) => (
+        new RegExp(`^${field}:.*$`, 'm').test(text)
+            ? text.replace(new RegExp(`^${field}:.*$`, 'm'), `${field}: ${value}`)
+            : text.replace(/^(image_file:.*)$/m, `$1\n${field}: ${value}`)
+    );
+
+    let next = raw;
+    next = setField(next, 'image_file', `images/${file}`);
+    next = setField(next, 'image_status', 'generated');
+    next = setField(next, 'image_source_url', image.source_url || '');
+    next = setField(next, 'image_stage', image.stage || '');
+    next = setField(next, 'image_credit', `"${String(image.credit || '').replace(/"/g, '\\"')}"`);
+    if (promote) next = setField(next, 'status', 'published');
+
+    // Put the hero back in the body if it was written without one. The reader
+    // strips body images anyway, but the file is also the human-readable record
+    // of what was published.
+    if (!/!\[[^\]]*\]\([^)]*\/images\//.test(next)) {
+        next = next.replace(/\n---\n\n/, `\n---\n\n![${(entry.title || '').replace(/[[\]]/g, '')}](${image.url})\n\n`);
+    }
+
+    if (next === raw) return false;
+    await R2.putObject({
+        key,
+        body: next,
+        contentType: 'text/markdown; charset=utf-8',
+        cacheControl: 'public, max-age=300',
+        metadata: { article_slug: entry.slug, topic: entry.topic || '' },
+    });
+    return true;
 }
 
 /**
@@ -639,58 +724,103 @@ async function publishWave(byArticle, date) {
 }
 
 /**
- * Fill in images for articles already published today.
+ * Fill in pictures for articles already published today.
  *
- * This is what a second run of the day does once the article target is met:
- * no new stories, no model calls, just the images a previous run could not
- * finish because the GPU was busy, the deadline hit, or the safety scanner was
- * unreachable. Skip-if-present makes it nearly free when there is nothing to do.
+ * This is what a later run of the day does once the article target is met: no
+ * new stories, no model calls, just the pictures an earlier run could not get
+ * because the outlet was slow, the deadline hit, or the download failed. It
+ * re-resolves from the stored `source_url` — the outlet is still the only place
+ * the right photograph exists, and asking it again is the whole job.
+ *
+ * It emphatically does NOT generate anything. This function used to call the
+ * GPU directly, bypassing every gate, and paired with an hourly trigger it
+ * would quietly re-illustrate the entire corpus with renders once the
+ * expectation dropped to one image.
  */
 async function backfillImages(manifest, date) {
-    const pending = (manifest?.articles || []).filter(a => (a.images?.length ?? 0) < Images.IMAGES_PER_ARTICLE);
-    if (!pending.length) { log('  every article already has its full image set'); return; }
+    const pending = (manifest?.articles || [])
+        .filter(a => (a.images?.length ?? 0) < News.EXPECTED_IMAGES);
+    if (!pending.length) { log('  every article already has its picture'); return; }
+    if (OPTIONS.noImages) { log('  --no-images: leaving them for the next run'); return; }
 
-    log(`  ${pending.length} article(s) missing images`);
-    const lanes = OPTIONS.noImages ? [] : await Comfy.liveLanes();
-    if (!lanes.length) { log('  no ComfyUI lane reachable — leaving them for the next run'); return; }
+    log(`  ${pending.length} article(s) without a picture`);
+    const tracker = ImageSource.createImageTracker({ denylist: await loadImageDenylist() });
+    const report = createSourcingReport();
+    let filled = 0;
 
-    // The prompts live in the article's markdown frontmatter only as a set id,
-    // so regenerate from the stored title. Prompts are not re-derived from the
-    // model: that would cost a composition call to redo work already paid for.
     for (const entry of pending) {
+        if (!entry.source_url) { log(`  ${entry.slug}: no source url recorded`); continue; }
+
         const article = {
             slug: entry.slug,
             articleId: entry.id,
             title: entry.title,
             topic: entry.topic,
             image_set_id: entry.image_set_id,
+            image_credit: entry.source_name || '',
+            image_picks: [],
         };
-        const have = new Set((entry.images || []).map(i => i.n));
-        const prompts = Images.normalizePrompts(null, article);
 
-        for (let n = 1; n <= Images.IMAGES_PER_ARTICLE; n++) {
-            if (have.has(n)) continue;
-            const imageId = Images.mintImageId(entry.id, n);
-            const key = News.buildNewsImageKey(article, imageId, date);
-            if (await R2.headObject(key)) continue;
-            try {
-                const r = await Comfy.generateImage(prompts[n - 1].prompt, {
-                    lane: lanes[(n - 1) % lanes.length],
-                    seed: Images.seedFor(entry.id, n),
-                });
-                const stageDir = path.join(STAGE_ROOT, R2.pstDateString(date), 'backfill');
-                const filename = `${imageId}.png`;
-                stageImage(stageDir, filename, r.buffer);
-                const { verdicts } = await Safety.screen(stageDir, [filename]);
-                fs.rmSync(stageDir, { recursive: true, force: true });
-                if (!verdicts.get(filename)?.safe) { log(`  withheld ${entry.slug} #${n}`); continue; }
-                await News.publishNewsImage(article, { imageId, buffer: await Images.toWebp(r.buffer), n, date });
-                log(`  filled ${entry.slug} #${n}`);
-            } catch (e) {
-                log(`  ${entry.slug} #${n}: ${e.message.slice(0, 80)}`);
-            }
+        try {
+            // Re-fetch the source page and re-run the ladder. The fact sheet is
+            // long gone, so this rebuilds just enough of one to resolve a URL.
+            const html = await Facts.fetchSourcePage(entry.source_url);
+            const meta = html ? Facts.extractMetaFacts(html) : null;
+            const ld = html ? Facts.extractJsonLdNewsArticle(html) : null;
+            article.image_picks = ImageSource.resolveImageCandidates({}, {
+                source_url: entry.source_url,
+                image: Facts.absoluteUrl(meta?.image || ld?.image || '', entry.source_url),
+                image_stage: meta?.image ? 'og' : (ld?.image ? 'jsonld' : ''),
+            });
+
+            if (!article.image_picks.length) { log(`  ${entry.slug}: still no picture at the source`); continue; }
+
+            const image = await sourceOneImage(article, date, tracker, report);
+            if (!image) continue;
+
+            // Manifest shape, not the publish shape: entries carry `file`
+            // relative to the day prefix, and rewriteNewsDayIndex checks that
+            // path against storage before it will keep the image.
+            const file = `${entry.slug}/images/${image.url.split('/').pop()}`;
+            entry.images = [{
+                n: 1,
+                role: 'hero',
+                id: image.url.split('/').pop().replace(/\.(webp|png)$/, ''),
+                file,
+                safety: image.safety,
+                image_source_url: image.source_url,
+                image_stage: image.stage,
+                image_credit: image.credit,
+                image_phash: image.phash,
+            }];
+            entry.image_file = file;
+            entry.image_status = 'generated';
+            // Mirror the provenance to the top level the way buildIndexEntry
+            // does. rewriteNewsDayIndex spreads the entry as-is, so setting it
+            // only inside images[] leaves the manifest reporting an unknown
+            // source for every article this path filled in.
+            entry.image_source_url = image.source_url;
+            entry.image_stage = image.stage;
+            entry.image_credit = image.credit;
+
+            // Promote out of draft — but only if the picture was the ONLY thing
+            // holding it back. A headline-only story is thin sourcing, and no
+            // photograph changes that.
+            const promote = entry.status === 'draft' && entry.fact_confidence !== 'headline_only';
+            if (promote) entry.status = 'published';
+
+            // The markdown has to agree, or the next repair reverts all of this.
+            await patchPublishedMarkdown(News.newsDayPrefix(date), entry, image, { promote });
+
+            filled++;
+            log(`  filled ${entry.slug} (${image.stage})`);
+        } catch (e) {
+            log(`  ${entry.slug}: ${e.message.slice(0, 80)}`);
         }
     }
+
+    log(`  filled ${filled}/${pending.length}`);
+    Facts.clearPageCache();
 
     // Re-derive image state from storage so the manifest matches reality.
     await News.rewriteNewsDayIndex(manifest.articles, { date });
@@ -745,15 +875,54 @@ async function repairManifest(date) {
         const fm = parseFrontmatter(raw);
         const articleId = fm.id || `${R2.pstDateString(date)}__${rec.slug}`;
 
-        // Match each stored image back to its slot by re-deriving the id, so
-        // ordering comes from the derivation and never from key sort order.
-        const images = [];
-        for (let n = 1; n <= Images.IMAGES_PER_ARTICLE; n++) {
-            const id = Images.mintImageId(articleId, n);
-            const ext = rec.images.get(id);
-            if (ext) {
-                images.push({ n, role: Images.ROLES[n - 1], url: R2.cdnUrl(`${prefix}${rec.slug}/images/${id}.${ext}`) });
-            }
+        // Match each stored image back to its slot, so ordering comes from the
+        // match and never from key sort order. Deliberately NOT bare derivation:
+        // see matchStoredImages for what that costs.
+        const images = Images.matchStoredImages(articleId, rec.images, {
+            imageFile: fm.image_file || '',
+            expected: News.EXPECTED_IMAGES,
+        }).map(m => ({
+            n: m.n,
+            role: m.role,
+            url: R2.cdnUrl(`${prefix}${rec.slug}/images/${m.id}.${m.ext}`),
+            // Provenance is in the frontmatter precisely so a rebuild from
+            // storage keeps it. Dropping it here would quietly strip the
+            // record of whose photograph this is from every article the repair
+            // touched — which is the one field a takedown request needs.
+            credit: fm.image_credit || '',
+            source_url: fm.image_source_url || '',
+            stage: fm.image_stage || (fm.image_source_url ? 'sourced' : ''),
+        }));
+
+        // Loud, because the consequence is an article dropping out of the feed.
+        if (!images.length && rec.images.size) {
+            log(`  WARN ${rec.slug}: ${rec.images.size} image object(s) present but none could be`
+                + ' matched to a slot — the article will be held as a draft');
+        }
+
+        // A draft with a picture is a story that was held back for want of one
+        // and has since got it. Pinning it to draft because that is what the
+        // frontmatter said when it was written makes the repair destructive
+        // rather than self-healing: a later run fills the image in, and the
+        // next repair takes the article straight back off the site.
+        //
+        // Thin sourcing is the one reason a picture cannot undo, so
+        // headline_only stays exactly where it is.
+        const heldBackOnly = fm.status === 'draft'
+            && images.length
+            && fm.fact_confidence !== 'headline_only';
+        if (heldBackOnly) {
+            log(`  ${rec.slug}: promoting — held as a draft but has a picture now`);
+            // Correct the frontmatter too, or every future repair re-derives
+            // the same promotion from the same stale record. Making the file
+            // agree is what stops the drift, rather than compensating for it
+            // on each pass.
+            await patchPublishedMarkdown(
+                prefix,
+                { file: `${rec.slug}/article.md`, slug: rec.slug, title: fm.title, topic: fm.topic },
+                images[0],
+                { promote: true },
+            );
         }
 
         entries.push(News.buildIndexEntry({
@@ -771,10 +940,11 @@ async function repairManifest(date) {
             date_published: fm.date_published || R2.pstDateString(date),
             date_updated: fm.date_updated || new Date().toISOString(),
             image_set_id: fm.image_set_id || '',
-            status: fm.status === 'draft' ? 'draft' : 'published',
+            image_credit: fm.image_credit || '',
+            status: (fm.status === 'draft' && !heldBackOnly) ? 'draft' : 'published',
         }, { images, date }));
 
-        log(`  ${rec.slug}: ${images.length}/3 images`);
+        log(`  ${rec.slug}: ${images.length}/${News.EXPECTED_IMAGES} images`);
     }
 
     await News.rewriteNewsDayIndex(entries, { date });
@@ -1004,9 +1174,18 @@ async function main() {
     // retry missing images.
     const todayManifest = await News.readNewsDayIndex(date);
     const alreadyPublished = (todayManifest?.articles || []).filter(a => a.status === 'published').length;
-    const remaining = Math.max(0, OPTIONS.target - alreadyPublished);
+    const toTarget = Math.max(0, OPTIONS.target - alreadyPublished);
+
+    // Two separate limits, because the day target alone cannot express a
+    // schedule. Four runs a day at `--target 15` publishes 15 and then three
+    // runs find the target met and do nothing; `--target 60` four times has no
+    // per-run cap at all and the first run tries to do the whole day.
+    const remaining = Math.min(OPTIONS.maxNew, toTarget);
     if (alreadyPublished) {
-        log(`already published today: ${alreadyPublished}/${OPTIONS.target} — ${remaining} to go`);
+        log(`already published today: ${alreadyPublished}/${OPTIONS.target} — ${toTarget} to go`);
+    }
+    if (remaining < toTarget) {
+        log(`this run is capped at ${OPTIONS.maxNew} new article(s)`);
     }
 
     if (!remaining && !OPTIONS.dryRun) {
@@ -1027,9 +1206,10 @@ async function main() {
             duration_min: Number(((Date.now() - started) / 60000).toFixed(1)),
             host: os.hostname(),
             target: OPTIONS.target,
+            max_new: OPTIONS.maxNew,
             published: pub.length,
             composed: 0,
-            with_full_images: full,
+            with_images: full,
             missing_images: pub.length - full,
             shortfall: 0,
             index_url: R2.cdnUrl(News.buildNewsDayIndexKey(date)),
@@ -1040,18 +1220,30 @@ async function main() {
     const { selected, all, shortfall } = await selectStories(date, remaining || OPTIONS.target);
     if (!selected.length) { log('no stories to publish today'); return; }
 
-    const sheets = await buildFactSheets(selected, all);
+    const sheets = preferIllustratable(await buildFactSheets(selected, all));
 
     if (OPTIONS.dryRun) {
         log('');
         log('DRY RUN — selected stories:');
-        sheets.forEach(({ story, sheet }, i) => {
+        sheets.forEach(({ story, sheet, imagePick }, i) => {
             log(`${String(i + 1).padStart(3)}. [${String(story.score.total).padStart(3)}] ${sheet.confidence.padEnd(13)} `
                 + `${story.topic.padEnd(19)} ${story.sourceName.padEnd(22)} ${story.title.slice(0, 56)}`);
-            log(`     facts=${sheet.key_facts.length} quotes=${sheet.quotes.length} corroborators=${sheet.corroborating_sources.length}`);
+            log(`     facts=${sheet.key_facts.length} quotes=${sheet.quotes.length} `
+                + `corroborators=${sheet.corroborating_sources.length} `
+                + `image=${imagePick.stage}${imagePick.url ? ` ${imagePick.url.slice(0, 70)}` : ''}`);
         });
+
+        // The number that decides whether this design pays for itself: every
+        // story we cannot illustrate is an Opus call spent on an article that
+        // publishes as a draft nobody sees.
+        const stages = {};
+        for (const s of sheets) stages[s.imagePick.stage] = (stages[s.imagePick.stage] || 0) + 1;
+        const withImage = sheets.filter(s => s.imagePick.url).length;
+        const rate = sheets.length ? Math.round((100 * withImage) / sheets.length) : 0;
         log('');
-        log(`would compose ${Math.min(sheets.length, OPTIONS.target)} articles. No LLM calls made, nothing uploaded.`);
+        log(`image URL resolution: ${withImage}/${sheets.length} (${rate}%) ${JSON.stringify(stages)}`);
+        log(`would compose ${Math.min(sheets.length, remaining || OPTIONS.target)} articles. `
+            + 'No LLM calls made, nothing downloaded, nothing uploaded.');
         return;
     }
 
@@ -1118,10 +1310,23 @@ async function main() {
     const withImages = published.filter(a => a.image_status === 'generated').length;
     const missingImages = published.length - withImages;
     const drafts = (manifest?.articles || []).length - published.length;
+
+    // Where the day's pictures came from. `with_full_images` alone stopped
+    // being a signal once an article carried one image: it is now either 0 or
+    // the whole published count, and says nothing about whether the sourcing
+    // ladder is still reaching the outlets it used to.
+    const byStage = {};
+    for (const a of published) {
+        if (a.image_status !== 'generated') continue;
+        const stage = a.image_stage || 'unknown';
+        byStage[stage] = (byStage[stage] || 0) + 1;
+    }
+
     log('');
     log(`done in ${((Date.now() - started) / 60000).toFixed(1)} min`);
-    log(`  ${manifest?.articles?.length || 0} in the manifest, ${published.length} published, ${withImages} with a full image set`);
-    if (drafts > 0) log(`  ${drafts} held as draft (sourcing too thin to lead with, or images pending)`);
+    log(`  ${manifest?.articles?.length || 0} in the manifest, ${published.length} published, ${withImages} with a picture`);
+    if (withImages) log(`  image sources: ${JSON.stringify(byStage)}`);
+    if (drafts > 0) log(`  ${drafts} held as draft (sourcing too thin to lead with, or no picture found)`);
     if (shortfall > 0) log(`  shortfall ${shortfall} against a target of ${OPTIONS.target}`);
     log(`  ${R2.cdnUrl(News.buildNewsDayIndexKey(date))}`);
 
@@ -1139,9 +1344,11 @@ async function main() {
         duration_min: Number(((Date.now() - started) / 60000).toFixed(1)),
         host: os.hostname(),
         target: OPTIONS.target,
+        max_new: OPTIONS.maxNew,
         published: published.length,
         composed: composed.length,
-        with_full_images: withImages,
+        with_images: withImages,
+        images_by_stage: byStage,
         missing_images: missingImages,
         shortfall,
         index_url: R2.cdnUrl(News.buildNewsDayIndexKey(date)),

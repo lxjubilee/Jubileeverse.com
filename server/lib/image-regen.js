@@ -2,16 +2,15 @@
 /**
  * lib/image-regen.js — Admin-triggered regeneration of one published image.
  *
- * The daily pipeline renders every image unattended, and FLUX occasionally
- * returns something an editor cannot ship: six fingers, two heads, a melted
- * face. This is the manual escape hatch — an admin points at an article and
- * gets a fresh hero image for it, through the same renderer, the same safety
- * scanner, and the same storage the pipeline uses.
- *
- * Two article kinds are published, and both are covered:
+ * The manual escape hatch when a published image is wrong. Two article kinds
+ * are published, and the remedy for each is now a different thing:
  *
  *   news       news/<YYYY>/<MM>/<DD>/<slug>/…   day manifest is index.json
+ *              RE-FETCHES the outlet's own photograph. No GPU involved, and
+ *              deliberately no way to put a generated image on a news article.
  *   category   articles/<category>/…            manifest is articles.json
+ *              RENDERS a fresh hero, which is still right here: these are
+ *              devotional pieces with no source photograph to go and get.
  *
  * Three rules shape the implementation:
  *
@@ -234,54 +233,130 @@ async function findNewsEntry(slug, dateHint) {
     throw new RegenError('not_found', `No published news article with the slug "${slug}".`, 404);
 }
 
-/** Regenerate a news article's hero image and republish it. */
+/**
+ * Re-fetch a news article's picture from the outlet that published the story.
+ *
+ * This used to render a fresh hero on the GPU. It cannot any more: news images
+ * are the outlet's own photograph, and a single admin click that put a FLUX
+ * render back on a published news article would quietly undo the guarantee the
+ * whole sourcing change exists to make.
+ *
+ * What it does instead is the useful half of the same button — go back to the
+ * source and pick the picture up again. That is the actual remedy when a story
+ * published without one, or when the outlet has since swapped its lead image.
+ *
+ * Unlike the render path this needs no GPU, so it works from the VPSes too.
+ */
 async function regenerateNewsHero(slug, { dateHint, salt, logger }) {
+    const ImageSource = require('./news-image-source');
+    const Facts = require('./source-facts');
+
     const { date, entry } = await findNewsEntry(slug, dateHint);
     const articleId = entry.id || `${R2.pstDateString(date)}__${slug}`;
 
-    // The body gives the prompt its detail; a missing one is not fatal.
-    let body = '';
-    try {
-        const prefix = News.newsDayPrefix(date);
-        body = (await R2.getObjectText(`${prefix}${entry.file}`)) || '';
-    } catch { /* headline and summary are enough */ }
+    if (!entry.source_url) {
+        throw new RegenError('no_source', `"${slug}" has no source URL recorded, so there is nothing to re-fetch.`, 422);
+    }
 
-    const prompt = buildHeroPrompt({
-        title: entry.title,
-        summary: entry.summary || entry.marketing_summary,
-        category: entry.topic || entry.category,
-        body: body.replace(/^---[\s\S]*?---/, ''),
+    const html = await Facts.fetchSourcePage(entry.source_url);
+    if (!html) {
+        throw new RegenError('source_unreachable', `Could not load ${entry.source_url}.`, 502);
+    }
+
+    const meta = Facts.extractMetaFacts(html);
+    const ld = Facts.extractJsonLdNewsArticle(html);
+    const pick = ImageSource.resolveImageUrl({}, {
+        source_url: entry.source_url,
+        image: Facts.absoluteUrl(meta?.image || ld?.image || '', entry.source_url),
+        image_stage: meta?.image ? 'og' : (ld?.image ? 'jsonld' : ''),
     });
+    if (!pick.url) {
+        throw new RegenError('no_image_at_source', 'The source page no longer offers a usable image.', 422);
+    }
 
-    const { webp, safety, seed, ms, quality } = await renderScreened(prompt, {
-        articleId, salt, logger,
-        // The judge scores relevance, so it needs the story, not just the pixels.
-        article: { title: entry.title, topic: entry.topic || entry.category, summary: entry.summary },
-    });
+    const { buffer, contentType } = await ImageSource.fetchImage(pick.url);
+    const verdict = await ImageSource.validateSourcedImage(buffer, { contentType, url: pick.url });
+    if (!verdict.ok) {
+        throw new RegenError('image_rejected', `The source image was rejected: ${verdict.reason}.`, 422);
+    }
+    const webp = await ImageSource.normalizeSourcedImage(buffer);
 
-    // A fresh id, so the URL differs from the one the CDN is caching.
-    const imageId = Images.mintImageId(articleId, HERO_N, salt);
+    // A fresh id, so the URL differs from the one the CDN is caching. The salt
+    // is what makes the replacement self-invalidating rather than something to
+    // purge; matchStoredImages recovers it from the frontmatter on a rebuild.
+    const imageId = Images.mintImageId(articleId, HERO_N, `${Images.SOURCED_SALT}:${salt}`);
     const upload = await News.publishNewsImage(entry, { imageId, buffer: webp, n: HERO_N, date, force: true });
-
-    // Point the manifest at the new file. Only image fields are touched; the
-    // article's own text, status and slug are left exactly as published.
-    const images = Array.isArray(entry.images) ? [...entry.images] : [];
     const rel = upload.key.slice(News.newsDayPrefix(date).length);
+
+    // Repoint the stored markdown too. The manifest and the article's own
+    // frontmatter are two records of the same fact, and a rebuild reads the
+    // frontmatter — leaving them disagreeing is how a repair silently reverts
+    // an image that was deliberately replaced.
+    await repointNewsMarkdown(date, entry, rel, logger);
+
+    // Only image fields are touched; the article's text, status and slug are
+    // left exactly as published.
+    const images = Array.isArray(entry.images) ? [...entry.images] : [];
     const heroIndex = images.findIndex(img => img.n === HERO_N);
-    const heroRecord = { n: HERO_N, role: 'hero', id: imageId, file: rel, safety };
+    const heroRecord = {
+        n: HERO_N,
+        role: 'hero',
+        id: imageId,
+        file: rel,
+        safety: 'sourced',
+        image_source_url: pick.url,
+        image_stage: pick.stage,
+        image_credit: entry.source_name || '',
+    };
     if (heroIndex === -1) images.unshift(heroRecord); else images[heroIndex] = heroRecord;
 
     await News.upsertNewsDayIndex({
         ...entry,
         image_file: rel,
         image_status: 'generated',
+        image_source_url: pick.url,
+        image_stage: pick.stage,
+        image_credit: entry.source_name || '',
         images,
         date_updated: new Date().toISOString(),
     }, { date });
 
-    logger.log(`[image-regen] news ${slug} -> ${upload.url} (seed ${seed}, ${ms}ms, ${safety}, `
-        + `judge ${quality.judge ?? 'n/a'}, structural ${quality.structural ?? 'n/a'}, ${quality.rounds} round(s))`);
-    return { url: upload.url, safety, kind: 'news', slug, quality };
+    logger.log(`[image-regen] news ${slug} -> ${upload.url} (re-sourced from ${pick.stage}, `
+        + `${verdict.meta.width}x${verdict.meta.height} original)`);
+    return { url: upload.url, safety: 'sourced', kind: 'news', slug, stage: pick.stage };
+}
+
+/**
+ * Swap the hero image path inside a published article.md.
+ *
+ * A targeted substitution rather than a re-render: rebuilding the markdown
+ * needs the composed fields, which only exist at compose time. Best effort —
+ * the manifest is authoritative for display, so a failure here is worth logging
+ * but not worth failing the replacement over.
+ */
+async function repointNewsMarkdown(date, entry, newRelPath, logger) {
+    try {
+        const prefix = News.newsDayPrefix(date);
+        const key = `${prefix}${entry.file}`;
+        const raw = await R2.getObjectText(key);
+        if (!raw) return;
+
+        const newFile = newRelPath.split('/').pop();
+        const next = raw
+            .replace(/^image_file:.*$/m, `image_file: images/${newFile}`)
+            .replace(/images\/[0-9A-Za-z]{12}\.(webp|png)/g, `images/${newFile}`);
+        if (next === raw) return;
+
+        await R2.putObject({
+            key,
+            body: next,
+            contentType: 'text/markdown; charset=utf-8',
+            cacheControl: 'public, max-age=300',
+            metadata: { article_slug: entry.slug },
+        });
+    } catch (e) {
+        logger.log?.(`[image-regen] could not repoint markdown for ${entry.slug}: ${e.message.slice(0, 80)}`);
+    }
 }
 
 // ── Category bundle articles ─────────────────────────────────────────────────

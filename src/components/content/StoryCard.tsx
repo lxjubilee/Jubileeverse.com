@@ -4,7 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import RegenerateImageButton from '@/components/admin/RegenerateImageButton';
 import { handleImgError, resolveImageUrl } from '@/lib/api';
-import { storeSelectedArticle, trackView, storyHref, trackingIdOf, regenTargetOf } from '@/lib/article';
+import {
+  storeSelectedArticle, trackView, storyHref, trackingIdOf, regenTargetOf, canRegenerateImage,
+} from '@/lib/article';
 import { useAuth } from '@/lib/auth';
 import { postReaction, type ReactionCounts, type ReactionType } from '@/lib/reactions';
 import type { Story } from '@/lib/types';
@@ -27,6 +29,8 @@ interface Props {
   onHide?: (id: string | number) => void;
   /** Where the card links. Defaults to `/article/<id>`. */
   href?: string;
+  /** Admin-only regenerate-image control on the thumbnail. Default true. */
+  showRegenerate?: boolean;
 }
 
 const PREFS_KEY = 'jubileeVersePrefs';
@@ -78,6 +82,7 @@ export default function StoryCard({
   showActions = false,
   onHide,
   href,
+  showRegenerate = true,
 }: Props) {
   const router = useRouter();
   const target = href ?? storyHref(story);
@@ -88,6 +93,12 @@ export default function StoryCard({
   // An admin regeneration swaps the picture in place; until then this is the
   // published one exactly as before.
   const [freshImg, setFreshImg] = useState<string | null>(null);
+
+  // `canRegenerateImage` excludes news: its picture comes from the originating
+  // outlet, so there is nothing to regenerate. `showRegenerate` remains an
+  // additional per-surface opt-out.
+  const regenTarget = regenTargetOf(story);
+  const canRegenerate = showRegenerate && canRegenerateImage(regenTarget);
   const img = freshImg ?? resolveImageUrl(story);
   const title = story.headline || story.title || '';
   const label = category || story.topic || story.category || '';
@@ -181,7 +192,9 @@ export default function StoryCard({
         </div>
       ) : null}
       <div className="content-card-image">
-        <RegenerateImageButton target={regenTargetOf(story)} onRegenerated={setFreshImg} />
+        {canRegenerate ? (
+          <RegenerateImageButton target={regenTarget} onRegenerated={setFreshImg} />
+        ) : null}
         {img ? (
           <img src={img} alt={title} loading="lazy" onError={handleImgError} />
         ) : (

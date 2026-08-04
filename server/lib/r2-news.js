@@ -37,12 +37,36 @@ const STATUS_SCHEMA    = 'jv.news.status/1';
 const SLUGS_SCHEMA     = 'jv.news.slugs/1';
 const ARTICLE_SCHEMA   = 'jv.news.article/1';
 
-// Published image format. WebP is ~10x smaller than the PNG ComfyUI returns,
-// which matters at 90 images a day. Legacy .png objects still resolve because
-// keys are read from the manifest, never rebuilt from an assumed extension.
+// Published image format. WebP is ~10x smaller than the source JPEG most
+// outlets serve. Legacy .png objects still resolve because keys are read from
+// the manifest, never rebuilt from an assumed extension.
 const IMAGE_EXT          = 'webp';
 const IMAGE_CONTENT_TYPE = 'image/webp';
 const DEFAULT_WRITER   = 'JubileeVerse Newsroom';
+
+/**
+ * Images a complete article carries.
+ *
+ * One: the photograph the originating outlet ran with the story. It was three
+ * while the pipeline rendered its own illustrations, but the reader only ever
+ * saw the first — `toReaderBody` in src/lib/news.ts strips every image out of
+ * the body — so the other two were GPU time spent on files nobody opened.
+ *
+ * This is what `image_status: generated` means, so it has to be a constant
+ * rather than a literal 3 repeated in three places: left at 3, every article
+ * would report `partial` forever and the run status would never read `ok`.
+ */
+const EXPECTED_IMAGES = 1;
+
+/**
+ * Floor for "this object is a real image rather than a truncated upload".
+ *
+ * Deliberately low. The previous 10KB floor was calibrated against 1344x768
+ * photographic renders, and a real photograph that happens to compress well
+ * lands under it — at which point the image uploads, the manifest filters it
+ * out, and the article silently drops to draft with nothing logged.
+ */
+const MIN_IMAGE_BYTES = 2 * 1024;
 
 const MARKDOWN_CONTENT_TYPE = 'text/markdown; charset=utf-8';
 const JSON_CONTENT_TYPE     = 'application/json; charset=utf-8';
@@ -286,6 +310,12 @@ function buildNewsMarkdown(article, { images = [], date = new Date() } = {}) {
         `image_set_id: ${article.image_set_id || ''}`,
         `image_status: ${article.image_status || 'pending'}`,
         `image_file: ${hero ? `images/${hero.url.split('/').pop()}` : ''}`,
+        // Whose photograph this is and where it came from. In the article
+        // itself as well as the manifest, so a corpus rebuilt from storage
+        // alone still knows its own provenance.
+        `image_credit: ${fmValue(hero?.credit || article.image_credit || '')}`,
+        `image_source_url: ${hero?.source_url || ''}`,
+        `image_stage: ${hero?.stage || ''}`,
         `summary: ${fmValue(article.summary || '')}`,
         `marketing_summary: ${fmValue(article.marketing_summary || '')}`,
         `status: ${article.status || 'draft'}`,
@@ -343,7 +373,7 @@ async function publishNewsImage(article, { imageId, buffer, n, date = new Date()
 
     if (!force) {
         const existing = await headObject(key);
-        if (existing && existing.size > 10 * 1024) {
+        if (existing && existing.size > MIN_IMAGE_BYTES) {
             return { key, url: cdnUrl(key), bytes: existing.size, skipped: true };
         }
     }
@@ -402,7 +432,7 @@ function buildIndexEntry(article, { images = [], date = new Date() } = {}) {
     const rel = (url) => `${slug}/images/${url.split('/').pop()}`;
 
     let imageStatus = 'pending';
-    if (ordered.length >= 3) imageStatus = 'generated';
+    if (ordered.length >= EXPECTED_IMAGES) imageStatus = 'generated';
     else if (ordered.length > 0) imageStatus = 'partial';
 
     return {
@@ -427,6 +457,18 @@ function buildIndexEntry(article, { images = [], date = new Date() } = {}) {
         image_set_id: article.image_set_id || '',
         image_status: imageStatus,
         image_file: hero ? rel(hero.url) : '',
+        // Provenance for the hero, at the top level so a consumer does not have
+        // to walk `images[]` to answer "whose photograph is this?".
+        //
+        // Stored, not rendered. The front end reads image_file, images[].n and
+        // status and nothing else, so adding these changes no pixel — but a
+        // republished press photograph needs an auditable trail back to the
+        // outlet it came from, and a takedown needs to be answerable without
+        // re-scraping. Rendering a visible credit line is a UI decision.
+        image_credit: hero?.credit || article.image_credit || '',
+        image_source_url: hero?.source_url || '',
+        image_stage: hero?.stage || '',
+        image_phash: hero?.phash || '',
         images: ordered.map(i => ({
             n: i.n,
             role: i.role || '',
@@ -434,6 +476,10 @@ function buildIndexEntry(article, { images = [], date = new Date() } = {}) {
             id: i.url.split('/').pop().replace(/\.(webp|png)$/, ''),
             file: rel(i.url),
             safety: i.safety || 'unknown',
+            ...(i.source_url ? { image_source_url: i.source_url } : {}),
+            ...(i.stage ? { image_stage: i.stage } : {}),
+            ...(i.credit ? { image_credit: i.credit } : {}),
+            ...(i.phash ? { image_phash: i.phash } : {}),
         })),
     };
 }
@@ -522,14 +568,15 @@ async function rewriteNewsDayIndex(entries, { date = new Date() } = {}) {
         // image queue forever.
         const images = (entry.images || []).filter(img => {
             const key = `${prefix}${img.file}`;
-            return present.has(key) && present.get(key) > 10 * 1024;
+            return present.has(key) && present.get(key) > MIN_IMAGE_BYTES;
         });
         const hero = images.find(i => i.n === 1) || images[0] || null;
         kept.push({
             ...entry,
             images,
             image_file: hero ? hero.file : '',
-            image_status: images.length >= 3 ? 'generated' : images.length ? 'partial' : 'pending',
+            image_status: images.length >= EXPECTED_IMAGES ? 'generated'
+                : images.length ? 'partial' : 'pending',
             status: hero ? (entry.status === 'draft' ? 'draft' : 'published') : 'draft',
         });
     }
@@ -639,6 +686,8 @@ module.exports = {
     NEWS_SLUGS_KEY,
     IMAGE_EXT,
     IMAGE_CONTENT_TYPE,
+    EXPECTED_IMAGES,
+    MIN_IMAGE_BYTES,
     DEFAULT_WRITER,
     newsDayPrefix,
     newsArticlePrefix,

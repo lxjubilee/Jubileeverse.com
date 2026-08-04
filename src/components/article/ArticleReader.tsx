@@ -13,7 +13,7 @@ import RelatedStories from '@/components/article/RelatedStories';
 import RelatedArticlesGrid from '@/components/article/RelatedArticlesGrid';
 import ReviewerTools from '@/components/article/ReviewerTools';
 import RegenerateImageButton from '@/components/admin/RegenerateImageButton';
-import { regenTargetFor, trackView } from '@/lib/article';
+import { canRegenerateImage, regenTargetFor, trackView } from '@/lib/article';
 import styles from './ArticleReader.module.css';
 
 const FALLBACK_IMG =
@@ -143,6 +143,7 @@ export default function ArticleReader({
 
   const categoryLabel = TOPIC_LABELS[category] || category;
   const publishedOn = date ? formatDate(date) : '';
+  const regenTarget = regenTargetFor(id, date);
 
   return (
     <>
@@ -155,12 +156,16 @@ export default function ArticleReader({
           className={styles.heroImage}
           onError={(e) => ((e.target as HTMLImageElement).src = FALLBACK_IMG)}
         />
-        {/* Offset so it clears the Back button in the same corner. */}
-        <RegenerateImageButton
-          target={regenTargetFor(id, date)}
-          onRegenerated={setFreshImage}
-          offset
-        />
+        {/* Offset so it clears the Back button in the same corner. Hidden on
+            news, whose picture comes from the originating outlet and so has
+            nothing to regenerate; category articles still render theirs. */}
+        {canRegenerateImage(regenTarget) ? (
+          <RegenerateImageButton
+            target={regenTarget}
+            onRegenerated={setFreshImage}
+            offset
+          />
+        ) : null}
         <button
           className={styles.backBtn}
           onClick={() => {

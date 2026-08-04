@@ -72,34 +72,6 @@ Return the indices of the facts you actually used in facts_used.
 
 Warm, direct, and unsentimental. You are writing for adults who follow the news and hold their faith seriously. Respect both. Avoid sermon cadence, avoid triumphalism, avoid political partisanship. Report on people of every position with the same dignity.`;
 
-/**
- * Frozen image-prompt contract. Also cached. The rules here exist because
- * generated imagery for a family publication fails in predictable ways.
- */
-const IMAGE_CONTRACT = `# Image prompts
-
-Write exactly three image prompts for this article. They will be rendered by a photorealistic image model and published alongside the article, so they must be safe, specific, and clearly connected to the story.
-
-Each prompt gets a role:
-- hero: the human moment at the centre of the story. A person or people, mid-action, in a real setting.
-- supporting: the environment or context. The building, the street, the landscape, the room. May include people at a distance.
-- symbolic: the theological metaphor from your Faith-Based Relevance Analysis, rendered as a concrete scene. No faces, no recognizable individuals.
-
-Every prompt must:
-- Be 3 to 4 sentences of concrete visual description. Name the subject, the setting, the lighting, the camera framing, and the mood.
-- Differ from the other two in subject, environment, camera angle, and colour palette. Three variations of one composition is a failure.
-- Describe ordinary, recognisable American or international settings that a Christian family would find unremarkable: homes, churches, offices, streets, schools, farmland, hospitals, courtrooms.
-- Show people with natural, relaxed hands, clearly visible and correctly formed with five fingers, when hands appear at all.
-- End with the exact sentence: "Photorealistic, cinematic lighting, natural skin tones, 16:9."
-
-Never include:
-- Real identifiable public figures, or any attempt at a specific living person's likeness.
-- Text, logos, watermarks, signage with readable words, or user-interface elements.
-- Weapons in use, injury, blood, bodies, distress imagery, or anything depicting violence.
-- Revealing clothing, romantic or suggestive framing, or children in any state of undress.
-- Religious iconography presented as an object of worship, or depictions of God or Jesus's face.
-- Overused stock clichés: glowing light beams from clouds, silhouetted figures on hilltops with arms raised, open Bibles on wooden tables in shafts of light, praying hands in close-up, generic diverse-team-around-a-laptop compositions.`;
-
 /** JSON Schema for the structured response. */
 function composeSchema() {
     return {
@@ -107,7 +79,7 @@ function composeSchema() {
         additionalProperties: false,
         required: [
             'title', 'slug', 'introduction', 'body', 'marketing_summary',
-            'faith_relevance_analysis', 'scripture_refs', 'facts_used', 'image_prompts',
+            'faith_relevance_analysis', 'scripture_refs', 'facts_used',
         ],
         properties: {
             title: { type: 'string', description: 'Headline, under 90 characters, no colon-subtitle pattern.' },
@@ -125,19 +97,6 @@ function composeSchema() {
                 type: 'array',
                 items: { type: 'integer' },
                 description: 'Indices from the numbered FACT SHEET that this article actually relies on.',
-            },
-            image_prompts: {
-                type: 'array',
-                items: {
-                    type: 'object',
-                    additionalProperties: false,
-                    required: ['role', 'prompt'],
-                    properties: {
-                        role: { type: 'string', enum: ['hero', 'supporting', 'symbolic'] },
-                        prompt: { type: 'string' },
-                    },
-                },
-                description: 'Exactly three, one per role, in the order hero, supporting, symbolic.',
             },
         },
     };
@@ -179,9 +138,13 @@ function buildComposeParams(input, { model = DEFAULT_MODEL, effort = DEFAULT_EFF
             effort,
             format: { type: 'json_schema', schema: composeSchema() },
         },
+        // The cache breakpoint sat on the image-prompt contract, which meant the
+        // cached prefix was HOUSE_STYLE + that block. Removing the block without
+        // moving the breakpoint would have left HOUSE_STYLE uncached and made
+        // every article pay full price for ~1,100 tokens — a saving that reads
+        // as a regression on the bill.
         system: [
-            { type: 'text', text: HOUSE_STYLE },
-            { type: 'text', text: IMAGE_CONTRACT, cache_control: { type: 'ephemeral' } },
+            { type: 'text', text: HOUSE_STYLE, cache_control: { type: 'ephemeral' } },
         ],
         messages: [{ role: 'user', content: buildComposeUserContent(input) }],
     };
@@ -280,17 +243,6 @@ function validateComposed(obj, { factSheet, minWords = WORD_FLOOR, maxWords = WO
 
     if (!/\b[1-3]?\s?[A-Z][a-z]+\.?\s+\d+:\d+/.test(obj.faith_relevance_analysis)) {
         errors.push('faith analysis has no Book Chapter:Verse citation');
-    }
-
-    const prompts = Array.isArray(obj.image_prompts) ? obj.image_prompts : [];
-    if (prompts.length !== 3) {
-        errors.push(`expected 3 image prompts, got ${prompts.length}`);
-    } else {
-        const roles = prompts.map(p => p.role);
-        if (new Set(roles).size !== 3) errors.push(`image prompt roles not distinct: ${roles.join(', ')}`);
-        prompts.forEach((p, i) => {
-            if (!p.prompt || p.prompt.length < 80) errors.push(`image prompt ${i} is too thin`);
-        });
     }
 
     // Grounding: a "full" fact sheet that the article claims not to have used
@@ -552,7 +504,6 @@ async function composeBatch(requests, {
 module.exports = {
     DEFAULT_MODEL,
     HOUSE_STYLE,
-    IMAGE_CONTRACT,
     WORD_FLOOR,
     WORD_CEILING,
     ComposeError,

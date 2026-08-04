@@ -196,9 +196,13 @@ describe('manifest entry', () => {
         expect(e.status).toBe('published');
     });
 
-    test('partial image sets are flagged, not hidden', () => {
+    test('one sourced image is a complete article, not a partial one', () => {
+        // EXPECTED_IMAGES is 1: the outlet's own photograph is the whole set.
+        // Were this still measured against 3, every article would report
+        // `partial` forever and the run status would never read `ok`.
         const e = N.buildIndexEntry(base, { images: [img(1, 'aB3xK9mQ2pLz')], date: DAY });
-        expect(e.image_status).toBe('partial');
+        expect(N.EXPECTED_IMAGES).toBe(1);
+        expect(e.image_status).toBe('generated');
         expect(e.status).toBe('published');
     });
 
