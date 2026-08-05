@@ -3,23 +3,31 @@
 /**
  * DELETE ACCOUNT — confirmation dialog.
  *
+ * A plain yes/no question. There is no password field and no type-your-address
+ * field: the only thing asked for is a deliberate answer. What that costs is
+ * written down at POST /api/auth/account/delete in server.js — the session alone
+ * now authorises an irreversible action — and the decision to accept that cost
+ * was a product one, so do not re-add the fields here without changing the
+ * endpoint back too.
+ *
  * Deletion is immediate and irreversible: there is no grace period and no undo.
- * The copy therefore has two jobs that pull against each other — be kind about a
- * person leaving, and be completely unambiguous that nothing comes back. Warmth
- * lives in the framing; the facts are stated flat.
+ * One sentence therefore has to survive any future trim of this copy — that it
+ * cannot be undone. A confirm dialog someone clicks through on reflex is worth
+ * nothing if it never said what it was confirming.
  *
- * The user's Jubilee ID (sso.jubileeinspire.com) is a SEPARATE, family-wide
- * account and is deliberately not touched. Saying so is not a legal footnote —
- * without it, "delete my account" reads as "remove me from every Jubilee site",
- * and the user finds out otherwise by still being able to sign in elsewhere.
+ * The dialog deliberately says nothing about the Jubilee ID
+ * (sso.jubileeinspire.com), which is a separate family-wide account and is NOT
+ * deleted here. That is a product decision about how much a confirm popup should
+ * carry, not an oversight: a reader who deletes their JubileeVerse account can
+ * still sign in to the other Jubilee sites, and will discover that by doing it.
  *
- * POST /api/auth/account/delete { password, confirmEmail, reason? } -> { success }
+ * POST /api/auth/account/delete { reason? } -> { success }
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import { api } from '@/lib/api';
-import { canConfirmDeletion, deleteAccountErrorMessage } from './deleteAccount';
+import { deleteAccountErrorMessage } from './deleteAccount';
 import { useDialogA11y } from '@/hooks/useDialogA11y';
 import styles from './settings.module.css';
 
@@ -47,18 +55,13 @@ export default function DeleteAccountDialog({
   onDeleted,
   returnFocusTo,
 }: Props) {
-  const [password, setPassword] = useState('');
-  const [typedEmail, setTypedEmail] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
 
   // Two-phase visibility. The parent mounts this component only while the dialog
-  // is open — Modal's closed state is opacity:0 with pointer-events:none, which
-  // leaves its children in the DOM, focusable, and inside aria-hidden="true". A
-  // password field living there permanently is both an axe violation and
-  // something password managers offer to fill on a page with no login form.
-  // Mounting Modal already closed and flipping it open on the next frame keeps
-  // the 0.2s fade without keeping the form alive.
+  // is open, and Modal's closed state is opacity:0 with pointer-events:none —
+  // mounting it already closed and flipping it open on the next frame is what
+  // keeps the 0.2s fade despite that mount/unmount lifecycle.
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     const id = requestAnimationFrame(() => setVisible(true));
@@ -66,7 +69,10 @@ export default function DeleteAccountDialog({
   }, []);
 
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const passwordRef = useRef<HTMLInputElement | null>(null);
+  // Opening focus goes to No, not Yes. On a dialog whose confirm button is armed
+  // from the first frame, a stray Enter or Space arriving with the keystroke that
+  // opened it would otherwise land straight on the irreversible action.
+  const noRef = useRef<HTMLButtonElement | null>(null);
   // Guards a double-click: onClick fires again before the setDeleting re-render
   // lands, and a second POST would be a second irreversible action.
   const inFlight = useRef(false);
@@ -74,7 +80,7 @@ export default function DeleteAccountDialog({
   useDialogA11y(rootRef, {
     labelledBy: TITLE_ID,
     describedBy: DESC_ID,
-    initialFocusRef: passwordRef,
+    initialFocusRef: noRef,
     returnFocusTo,
   });
 
@@ -85,28 +91,24 @@ export default function DeleteAccountDialog({
     setTimeout(onClose, 200);
   }, [deleting, onClose]);
 
-  const canConfirm = canConfirmDeletion({ password, typedEmail, accountEmail, deleting });
-
   const handleDelete = useCallback(async () => {
-    if (inFlight.current || !canConfirm) return;
+    if (inFlight.current) return;
     inFlight.current = true;
     setDeleting(true);
     setError('');
     try {
-      const data = await api.post<DeleteResponse>('/api/auth/account/delete', {
-        password,
-        confirmEmail: typedEmail.trim(),
-      });
+      const data = await api.post<DeleteResponse>('/api/auth/account/delete', {});
       onDeleted({ newsletterUnsubscribed: data?.newsletterUnsubscribed });
       // Deliberately no setDeleting(false): the parent replaces this whole view.
     } catch (err) {
       setError(deleteAccountErrorMessage(err));
-      setPassword('');
-      passwordRef.current?.focus();
       inFlight.current = false;
       setDeleting(false);
+      // Back to the safe button, which is also where the new error message is
+      // announced from — nothing has been deleted and the choice is open again.
+      noRef.current?.focus();
     }
-  }, [canConfirm, password, typedEmail, onDeleted]);
+  }, [onDeleted]);
 
   return (
     <Modal
@@ -117,102 +119,43 @@ export default function DeleteAccountDialog({
         <div className={styles.dialogActions}>
           <button
             type="button"
+            ref={noRef}
             className={`${styles.btn} ${styles.btnOutline}`}
             onClick={requestClose}
             disabled={deleting}
           >
-            Keep my account
+            No, keep my account
           </button>
           <button
             type="button"
             className={`${styles.btn} ${styles.btnDanger}`}
             onClick={() => void handleDelete()}
-            disabled={!canConfirm}
+            disabled={deleting}
             aria-describedby={DESC_ID}
           >
-            {deleting ? 'Deleting...' : 'Delete my account permanently'}
+            {deleting ? 'Deleting...' : 'Yes, delete it'}
           </button>
         </div>
       }
     >
       <div ref={rootRef} className={styles.deleteDialogBody}>
         <h2 id={TITLE_ID} className={styles.deleteDialogTitle}>
-          Delete your JubileeVerse account
+          Delete this account?
         </h2>
 
         <p id={DESC_ID} className={styles.deleteLede}>
-          We&rsquo;re sorry to see you go, and we&rsquo;re grateful for the time you spent here.
-          Please read this before you continue — <strong>this cannot be undone.</strong>
+          Are you sure you want to delete
+          {accountEmail ? (
+            <>
+              {' '}
+              <strong className={styles.confirmEmailValue}>{accountEmail}</strong>
+            </>
+          ) : (
+            ' your JubileeVerse account'
+          )}
+          ? Your profile, your saved stations, your reactions and your reading history all go with
+          it, and <strong>this cannot be undone.</strong>
         </p>
-
-        <div className={styles.deleteWarning}>
-          <p className={styles.deleteListTitle}>What we delete, immediately and permanently</p>
-          <ul className={styles.deleteList}>
-            <li>Your profile — your name, your email address, and your role</li>
-            <li>Your saved radio stations and the stations you follow</li>
-            <li>Your reactions and your reading history</li>
-            <li>Your newsletter subscription</li>
-            <li>Every device you are currently signed in on</li>
-          </ul>
-          <p className={styles.deleteLede}>
-            There is no waiting period and no way to bring it back. We do not keep a copy for you.
-          </p>
-        </div>
-
-        <div className={styles.jubileeIdNote}>
-          <p className={styles.deleteListTitle}>What this does not do</p>
-          <ul className={styles.keepsList}>
-            <li>
-              <strong>Your Jubilee ID stays.</strong> Your sign-in for the wider Jubilee family is a
-              separate account, so you will still be able to sign in to other Jubilee sites with the
-              same email and password.
-            </li>
-            <li>
-              If you ever want to come back, you can create a new JubileeVerse account with the same
-              Jubilee ID — it will simply start over from nothing.
-            </li>
-          </ul>
-        </div>
-
-        {/* Bare label/input: settings.module.css styles them via the descendant
-            selectors `.formGroup label` and `.formGroup input`, and `input[readonly]`
-            already carries the muted treatment used while a request is in flight. */}
-        <div className={styles.formGroup}>
-          <label htmlFor="deleteConfirmPassword">Your password</label>
-          <input
-            id="deleteConfirmPassword"
-            ref={passwordRef}
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            readOnly={deleting}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <p className={styles.hint}>The password you use to sign in.</p>
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="deleteConfirmEmail">Type your email address to confirm</label>
-          <input
-            id="deleteConfirmEmail"
-            // Not type="email": a browser validation bubble on a confirmation field
-            // is noise, and iOS autocapitalise/autocorrect would break the match.
-            type="text"
-            inputMode="email"
-            autoComplete="off"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            value={typedEmail}
-            readOnly={deleting}
-            onChange={(e) => setTypedEmail(e.target.value)}
-            aria-describedby="deleteConfirmEmailHint"
-          />
-          <p id="deleteConfirmEmailHint" className={styles.hint}>
-            Type <strong className={styles.confirmEmailValue}>{accountEmail}</strong> to enable the
-            button below.
-          </p>
-        </div>
 
         {/* Always rendered so the live region is registered before it has text —
             a region that mounts WITH content is raced by some screen readers. */}

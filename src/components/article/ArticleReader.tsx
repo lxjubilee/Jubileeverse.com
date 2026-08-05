@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import ReactionBar from '@/components/content/ReactionBar';
 import ReadAloud from '@/components/article/ReadAloud';
 import TranslateArticle from '@/components/article/TranslateArticle';
 import ShareStory from '@/components/article/ShareStory';
@@ -93,12 +92,9 @@ export default function ArticleReader({
   image,
   category = '',
   sourceName = '',
-  sourceUrl = '',
   isCurrentEvent = false,
   faithCommentary = '',
-  author = '',
   date = '',
-  footerNote,
   showReviewerTools = true,
 }: ArticleReaderProps) {
   const router = useRouter();
@@ -204,7 +200,6 @@ export default function ArticleReader({
             </div>
             <h1 className={styles.heroTitle}>{displayTitle}</h1>
             <div className={styles.metaBottom}>
-              {author ? <span>{author}</span> : null}
               {publishedOn ? <time dateTime={date.slice(0, 10)}>{publishedOn}</time> : null}
               <span>{estimateReadTime(body)} min read</span>
             </div>
@@ -241,16 +236,6 @@ export default function ArticleReader({
                 </>
               )}
             </div>
-
-            <ReactionBar articleId={reactionId} articleType={articleType} />
-
-            {sourceUrl ? (
-              <a className={styles.sourceLink} href={sourceUrl} target="_blank" rel="noopener noreferrer">
-                Read the original source →
-              </a>
-            ) : null}
-
-            {footerNote ? <p className={styles.footerNote}>{footerNote}</p> : null}
           </div>
 
           <aside className={styles.sidebar}>
@@ -274,9 +259,9 @@ export default function ArticleReader({
           </aside>
         </div>
 
-        <div className={styles.container} style={{ maxWidth: 'var(--max-width)' }}>
-          <RelatedArticlesGrid currentId={id} category={category} />
-        </div>
+        {/* Widths and gutters live in the grid's own module so its heading, rule
+            and first card line up with the reader above. */}
+        <RelatedArticlesGrid currentId={id} category={category} />
       </main>
     </>
   );

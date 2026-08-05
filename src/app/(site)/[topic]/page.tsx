@@ -112,7 +112,6 @@ export default async function RootSegmentPage({
         date={article.date}
         // The reviewer endpoints act on backend rows; a CDN article has none.
         showReviewerTools={false}
-        footerNote="Facts are drawn from the published report linked above. The commentary is written with AI assistance for the JubileeVerse Newsroom."
       />
     );
   }

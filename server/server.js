@@ -25,6 +25,7 @@ const GenerationService = require('./lib/generation-service');
 const { buildMaterializedPath, getDescendantIds, validateNodeConfig, cascadePathUpdate } = require('./lib/taxonomy');
 const { logAuditEvent }                                                                   = require('./lib/audit');
 const { createRevision, applyRollback, computeDiff }                                      = require('./lib/content-objects');
+const { passwordResetEmail }                                                              = require('./lib/email-templates');
 const { buildKey, getPublicUrl, getPresignedUploadUrl }                                   = require('./lib/storage');
 const { publishCurrentEventArticle }                                                      = require('./lib/r2-content');
 const { initializeQdrant, getQdrant }                                                      = require('./lib/qdrant-init');
@@ -44,14 +45,25 @@ const emailTransporter = process.env.SMTP_HOST
         auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
     })
     : null;
-async function sendEmail(to, subject, html) {
-    if (!emailTransporter || !to) return;
+/**
+ * Best-effort transactional send. Swallows its own failures by design: callers are
+ * request handlers whose response must not depend on the mail server, and for
+ * password reset a thrown error would leak whether an address is registered.
+ *
+ * `text` is optional only for backwards compatibility — always pass it. An
+ * HTML-only message scores worse with spam filters and is unreadable in
+ * text-only clients, which for a reset mail means a locked-out user stays out.
+ */
+async function sendEmail(to, subject, html, text) {
+    if (!emailTransporter || !to) return false;
     try {
         await emailTransporter.sendMail({
             from: process.env.SMTP_FROM || 'noreply@jubileeverse.com',
             to, subject, html,
+            ...(text ? { text } : {}),
         });
-    } catch (e) { console.error('[email]', e.message); }
+        return true;
+    } catch (e) { console.error('[email]', e.message); return false; }
 }
 
 /**
@@ -1257,14 +1269,21 @@ const loginLimiter = rateLimit({
 // Account deletion re-verifies a password, so it is a credential-guessing surface —
 // but it must NOT share loginLimiter's bucket. That one is keyed per-IP across all of
 // /api/auth/login, so ten mistyped sign-ins would block a legitimate deletion and a
-// few deletion attempts would lock the user out of signing in. Its 15min/10 is also
-// too loose for a surface that, in SSO mode, proxies guesses to the Identity Authority.
+// few deletion attempts would lock the user out of signing in.
+//
+// The window matches loginLimiter's deliberately. This endpoint is strictly harder
+// to attack than login — it needs a valid session token AND the correct password AND
+// the account's own email typed out — so a tighter budget buys little. It costs a
+// lot, though: an earlier 5/hour setting locked out any user who mistyped their
+// password a few times, and made the contract suite (which needs ~11 attempts)
+// impossible to run to completion, so the destructive half never executed and
+// "all tests passed" meant nothing.
 const accountDeleteLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000,
-    max: 5,
+    windowMs: 15 * 60 * 1000,
+    max: 20,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: 'Too many account deletion attempts. Please try again in an hour.' },
+    message: { error: 'Too many account deletion attempts. Please try again in a few minutes.' },
     skip: () => NODE_ENV === 'test',
 });
 const backOfficeLimiter = rateLimit({
@@ -3336,13 +3355,11 @@ const {
 const ssoDelegationActive = () => AUTH_LOGIN_MODE === 'sso' && ssoEnabled();
 
 // ── Account deletion ─────────────────────────────────────────────────────────
-// Gated on an explicit env var, mirroring AUTH_LOGIN_MODE above: rollback is
-// "unset + restart", no redeploy. While off, both delete endpoints answer 501
-// with the exact string the settings page already shows, so the flag-off state
-// is behaviourally identical to today.
-const ACCOUNT_DELETION_ENABLED =
-    (process.env.ACCOUNT_DELETION_ENABLED || 'false').toLowerCase() === 'true';
-
+// Deliberately NOT behind a feature flag: a user deleting their own account is
+// ordinary product behaviour, not something to be switched on per environment.
+// The only gate is _tombstoneReady below, and that is a correctness guard rather
+// than a toggle — it needs no configuration and is satisfied automatically.
+//
 // Set by the boot probe below runMigrations(). The migration loop swallows any
 // error whose message contains 'already exists' OR 'does not exist', so a failed
 // CREATE TABLE would otherwise leave the server running with no tombstone table —
@@ -3354,6 +3371,9 @@ const {
     hashIdentity: _tombstoneHash,
     purgeUserAccount,
 } = require('./lib/account-deletion');
+
+// Like/dislike keyed by article slug — see lib/slug-reactions.js.
+const slugReactions = require('./lib/slug-reactions');
 
 /**
  * Is this identity tombstoned? Returns { deleted_at } or null.
@@ -10629,8 +10649,26 @@ app.post('/api/auth/register', ah(async (req, res) => {
     const display = (name || '').trim() || [first, last].filter(Boolean).join(' ');
 
     // The client checks GET /api/auth/lookup before showing the form, but that is a
-    // UX affordance, not a control — it can be skipped, stale, or raced. Re-ask the
-    // authority here so an address it already knows can never be registered afresh.
+    // UX affordance, not a control — it can be skipped, stale, or raced. Re-ask both
+    // stores here so an address either one already knows can never be registered
+    // afresh.
+    //
+    // Our own table goes first, and is decisive on its own: jv_users.email is
+    // UNIQUE, so for an address it already holds the INSERT below can only ever end
+    // in a 23505. Asking here rather than letting it fail there matters most in
+    // 'sso' mode, where the provision call would otherwise run FIRST and mint a
+    // Jubilee ID carrying the password just typed, while the local account still
+    // expects the old one — an identity split that only manual repair could undo.
+    // Accounts predating delegation are exactly the ones at risk: they migrate to
+    // the authority lazily, on their owner's next sign-in, so until then the
+    // authority answers "no such identity" for a person who plainly has an account.
+    const { rows: localExisting } = await pgPool.query(
+        `SELECT 1 FROM jv_users WHERE email = $1`, [emailNorm]
+    );
+    if (localExisting.length > 0) {
+        return res.status(409).json({ error: 'That email already has a Jubilee ID. Please sign in instead.', existingIdentity: true });
+    }
+
     // Fails OPEN: an unreachable authority must not halt registration, and the
     // provision call immediately below still catches a genuine collision.
     if (ssoDelegationActive()) {
@@ -10695,7 +10733,10 @@ app.post('/api/auth/register', ah(async (req, res) => {
         });
     } catch (e) {
         await client.query('ROLLBACK').catch(() => {});
-        if (e.code === '23505') return res.status(409).json({ error: 'Email already registered' });
+        // The pre-check above catches this in every ordinary case; reaching here means
+        // the address was claimed in the moment between that SELECT and this INSERT.
+        // Same answer, so a racing signup lands on "sign in instead" too.
+        if (e.code === '23505') return res.status(409).json({ error: 'That email already has a Jubilee ID. Please sign in instead.', existingIdentity: true });
         res.status(500).json({ error: 'Registration failed' });
     } finally {
         client.release();
@@ -11123,11 +11164,25 @@ app.post('/api/auth/login', loginLimiter, ah(async (req, res) => {
     }
 
     if (!user) {
-        // The tombstone is joined here rather than queried separately so the local
-        // path costs no extra round-trip. A hard delete already removes the row, so
-        // this looks redundant — but /api/admin/directory/grant-access re-inserts by
-        // email, and a row restored that way must not become a working login until
-        // the tombstone is deliberately cleared.
+        // The join is FROM jv_users, so it only reports a tombstone when a row
+        // still exists. That is deliberate, and it is worth being precise about
+        // what it does and does not cover:
+        //
+        //   COVERED — /api/admin/directory/grant-access re-inserts by email
+        //   without clearing the tombstone. Such a row must not become a working
+        //   login until an administrator deliberately reinstates it.
+        //
+        //   NOT COVERED — a plain hard delete. The row is gone, so this returns
+        //   no rows at all and the caller gets the generic 401 below. That is the
+        //   correct answer rather than a gap: the delete took the password hash
+        //   with it, so there is nothing left to authenticate against, and
+        //   answering 410 to an unauthenticated request would turn login into a
+        //   "was this account deleted?" oracle — the same leak /api/auth/lookup
+        //   is deliberately kept free of.
+        //
+        // In SSO mode the 410 IS reachable, because the authority verifies the
+        // password before upsertUserFromSso throws ACCOUNT_DELETED, so the answer
+        // is credential-gated by then.
         const { rows: [row] } = await pgPool.query(
             `SELECT u.*, d.deleted_at AS _tombstoned_at
                FROM jv_users u
@@ -11198,24 +11253,40 @@ app.post('/api/auth/login', loginLimiter, ah(async (req, res) => {
 // GET /api/auth/lookup?email= — does a Jubilee ID already exist for this email?
 //
 // Drives the email-first signup: an existing identity is offered "sign in" rather
-// than a doomed registration form. In 'sso' mode this asks the shared authority;
-// otherwise it checks our own table. Deliberately FAILS OPEN (exists:false) when
-// the authority is unreachable so signup is never blocked — a genuine collision is
-// still caught later at registration. `available` tells the client whether the
-// answer is authoritative. GET so it stays CSRF-exempt.
+// than a doomed registration form. Both stores count, in either mode.
+//
+// Our own table is checked FIRST and answers on its own, because it is the one
+// that can veto a registration: jv_users.email is UNIQUE. In 'sso' mode the shared
+// authority is the usual source of truth, but it is not the only one — accounts
+// created before delegation was switched on migrate to it lazily, on their owner's
+// next sign-in, so asking only the authority would wave a returning member of that
+// group into the signup form and then into a 409 they can do nothing about.
+//
+// is_active is deliberately not a filter: a disabled row still occupies the
+// address, and "sign in" leads to an explanation of why it is disabled, which is a
+// better answer than a form that cannot be submitted. A DELETED account is a
+// different case and stays absent here — deletion removes the row, so its owner
+// can register again, which is what the tombstone-clearing in the register route
+// is for.
+//
+// Only the authority leg FAILS OPEN (exists:false) when it is unreachable, so an
+// outage never blocks signup — a genuine collision is still caught at registration.
+// `available` tells the client whether the answer is authoritative. GET so it stays
+// CSRF-exempt.
 app.get('/api/auth/lookup', ah(async (req, res) => {
     const email = String(req.query.email || '').trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
         return res.status(400).json({ error: 'A valid email is required.' });
     }
+    const { rows } = await pgPool.query(
+        `SELECT 1 FROM jv_users WHERE email = $1`, [email]
+    );
+    if (rows.length > 0) return res.json({ exists: true, available: true });
     if (ssoDelegationActive()) {
         const found = await ssoLookup(email);
         return res.json({ exists: found.ok ? found.exists : false, available: found.ok });
     }
-    const { rows } = await pgPool.query(
-        `SELECT 1 FROM jv_users WHERE email = $1 AND is_active = 1`, [email]
-    );
-    res.json({ exists: rows.length > 0, available: true });
+    res.json({ exists: false, available: true });
 }));
 
 // GET /api/auth/me — cookie-first, Bearer fallback (S12: includes entitlements + has_cms_access)
@@ -11230,12 +11301,13 @@ app.get('/api/auth/me', ah(async (req, res) => {
         const entitlements  = _parseJsonb(user.entitlements, ['jubileeverse_cms']);
         const cms_roles     = _parseJsonb(user.cms_roles, []);
         const has_cms_access = entitlements.includes('jubileeverse_cms') || PRIVILEGED_ROLES.includes(user.role);
-        // Surfaced so the settings page can render an honestly-disabled Delete
-        // Account button instead of letting someone type their password into a
-        // form that was always going to 501. Back-office accounts are excluded
-        // for the same reason the endpoint refuses them.
-        const can_delete_account =
-            ACCOUNT_DELETION_ENABLED && _tombstoneReady && !PRIVILEGED_ROLES.includes(user.role);
+        // Mirrors exactly what POST /api/auth/account/delete will accept, so the
+        // button is never enabled into a request that cannot succeed. In normal
+        // operation this is always true; it only goes false if the tombstone
+        // table is unavailable, which would make deletion unsafe rather than
+        // merely unavailable. Role is deliberately not a factor — back-office
+        // accounts may delete themselves too.
+        const can_delete_account = _tombstoneReady;
         return { ...user, permissions, entitlements, cms_roles, has_cms_access, can_delete_account };
     }
     // Try cookie session first
@@ -11557,14 +11629,25 @@ async function _reverifyPasswordForDeletion(user, password) {
 // POST /api/auth/account/delete — permanently delete the caller's own account.
 //
 // POST rather than DELETE: RFC 9110 gives a DELETE body no defined semantics and
-// permits intermediaries to strip it. The request crosses the Next rewrite and a
-// production reverse proxy, and a silently-dropped body would turn "password
-// required" into a 400 the user cannot act on. Not a risk worth taking on the one
-// endpoint that destroys data.
+// permits intermediaries to strip it, and this request crosses the Next rewrite
+// and a production reverse proxy. `reason` would be the thing silently dropped.
+//
+// WHAT AUTHORISES THIS. A live session, the rate limiter, and nothing else. The
+// settings dialog now asks a plain yes/no question, so password and confirmEmail
+// arrive only from callers that still choose to send them. That is a deliberate
+// product decision and it has a cost worth stating plainly: whoever holds a valid
+// session — a borrowed unlocked laptop, a stolen bearer token, an XSS payload —
+// can destroy the account outright, with no second factor and no undo.
+// Re-verification used to be the thing standing in the way of all three.
+//
+// A cross-site POST is NOT in that list: requireCsrf covers every /api/ route
+// when a session cookie is present and this one is not exempt, so the empty body
+// this endpoint now accepts still cannot be forged from another origin.
+//
+// If the trade is ever revisited, the guards below are still here: make them
+// unconditional again and put the fields back in DeleteAccountDialog.tsx. Do not
+// do one without the other.
 app.post('/api/auth/account/delete', accountDeleteLimiter, ah(async (req, res) => {
-    if (!ACCOUNT_DELETION_ENABLED) {
-        return res.status(501).json({ error: 'Account deletion is not available at this time.' });
-    }
     if (!_tombstoneReady) {
         return res.status(503).json({ error: 'Account deletion is temporarily unavailable. Please try again later.' });
     }
@@ -11573,10 +11656,16 @@ app.post('/api/auth/account/delete', accountDeleteLimiter, ah(async (req, res) =
     if (!actor) return;
 
     const { password, confirmEmail, reason } = req.body || {};
+    // Both proofs are OPTIONAL now, but they are not ignored: a caller that sends
+    // one still has it checked, and still fails on a bad one. Omitting a field and
+    // getting it wrong must not amount to the same thing — otherwise every caller
+    // that kept the guard would be one typo away from discovering it was decorative.
+    const gavePassword = password !== undefined && password !== null && password !== '';
+    const gaveConfirmEmail = confirmEmail !== undefined && confirmEmail !== null && confirmEmail !== '';
     // Type-check before use: a non-string would throw inside scryptSync and surface
     // as a 500 for what is really a malformed request.
-    if (typeof password !== 'string' || typeof confirmEmail !== 'string' || !password || !confirmEmail.trim()) {
-        return res.status(400).json({ error: 'Your password and your email address are both required.' });
+    if ((gavePassword && typeof password !== 'string') || (gaveConfirmEmail && typeof confirmEmail !== 'string')) {
+        return res.status(400).json({ error: 'Invalid request.' });
     }
     if (reason !== undefined && reason !== null && (typeof reason !== 'string' || reason.length > 500)) {
         return res.status(400).json({ error: 'Invalid reason.' });
@@ -11591,27 +11680,37 @@ app.post('/api/auth/account/delete', accountDeleteLimiter, ah(async (req, res) =
     // session is stale or forged. Do not confirm whether an id exists.
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-    // confirmEmail is COMPARED against the session's own account, never used as a
-    // lookup key. Turning it into one would make this endpoint an IDOR: anyone
-    // could delete any account by typing its address. Do not "simplify" it.
-    if (confirmEmail.trim().toLowerCase() !== String(user.email).toLowerCase()) {
+    // confirmEmail, when sent, is COMPARED against the session's own account and is
+    // never used as a lookup key. Turning it into one would make this endpoint an
+    // IDOR: anyone could delete any account by typing its address. Note the account
+    // deleted below is the token subject either way — that is what makes dropping
+    // the field safe. Do not "simplify" this into a selector.
+    if (gaveConfirmEmail && confirmEmail.trim().toLowerCase() !== String(user.email).toLowerCase()) {
         return res.status(400).json({ error: 'The email you typed does not match the email on this account.' });
     }
 
-    const verified = await _reverifyPasswordForDeletion(user, password);
-    if (!verified.ok) return res.status(verified.status).json({ error: verified.error });
-
-    // Back-office accounts cannot be self-deleted. Three reasons: the last-admin
-    // quorum lives on the admin endpoint and duplicating it here invites drift;
-    // combined with audit pseudonymization a privileged self-delete becomes an
-    // anti-forensics tool; and back-office accounts are organisational property.
-    if (PRIVILEGED_ROLES.includes(user.role)) {
-        return res.status(403).json({
-            error: 'Accounts with back-office access cannot be deleted here. Please ask an administrator.',
-            requiresAdmin: true,
-        });
+    if (gavePassword) {
+        const verified = await _reverifyPasswordForDeletion(user, password);
+        if (!verified.ok) return res.status(verified.status).json({ error: verified.error });
     }
 
+    // Any account may delete itself, back-office roles included. This was a
+    // deliberate product decision, taken with two consequences understood and
+    // accepted — record them here so a future reader does not mistake their
+    // absence for an oversight:
+    //
+    //   1. NO LAST-ADMIN QUORUM. The admin endpoint holds an advisory lock and
+    //      refuses to remove the final active administrator; this path does not.
+    //      The last admin can therefore delete themselves and lock the
+    //      organisation out of its own back office, recoverable only by editing
+    //      jv_users directly. To close this, take the same
+    //      pg_advisory_xact_lock('jv_users:admin_quorum') + COUNT(*) check used
+    //      by DELETE /api/admin/users/:id.
+    //   2. THE ACTOR'S OWN TRAIL IS PSEUDONYMIZED. purgeUserAccount rewrites
+    //      jv_audit_log.actor_id to DELETED_ACTOR and nulls ip_address /
+    //      user_agent, so a privileged user deleting their account also makes
+    //      every action they ever took unattributable. To close this, skip the
+    //      pseudonymization step when PRIVILEGED_ROLES.includes(user.role).
     const client = await pgPool.connect();
     let result;
     try {
@@ -11738,16 +11837,44 @@ app.post('/api/auth/forgot-password', ah(async (req, res) => {
     );
     if (!user) return res.json(successResponse);
 
+    // Single source of truth for the TTL: the row's expiry and the figure quoted in
+    // the email are derived from it, so they cannot drift apart and promise the
+    // reader an hour on a link that died in fifteen minutes.
+    const RESET_TTL_MINUTES = 60;
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const expiresAt = new Date(Date.now() + RESET_TTL_MINUTES * 60 * 1000);
 
     await pgPool.query(
         `INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`,
         [user.id, resetToken, expiresAt]
     );
 
-    const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
-    console.log(`[PasswordReset] Reset link for ${user.email}: ${resetUrl}`);
+    // PUBLIC_WEB_URL, not APP_BASE_URL: /reset-password is a Next.js page, and
+    // APP_BASE_URL points at this Express process, which 404s on it — in dev they
+    // are different ports. APP_BASE_URL cannot simply be repointed either, since it
+    // also drives the OIDC callback and the secure-cookie switch above. Falls back
+    // through APP_BASE_URL to the request host so a bare local run still works,
+    // though behind the reverse proxy that last resort is the internal host.
+    const baseUrl = (
+        process.env.PUBLIC_WEB_URL ||
+        process.env.APP_BASE_URL ||
+        `${req.protocol}://${req.get('host')}`
+    ).replace(/\/+$/, '');
+    const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+
+    const mail = passwordResetEmail({ resetUrl, expiresInMinutes: RESET_TTL_MINUTES });
+    // Deliberately awaited. sendEmail swallows its own failures, so nothing here can
+    // reject and leak account existence, but awaiting means an SMTP stall is visible
+    // as a slow response rather than a resolved promise nobody is holding.
+    const delivered = await sendEmail(user.email, mail.subject, mail.html, mail.text);
+
+    // Logged either way. With SMTP unconfigured sendEmail is a no-op and this line is
+    // the only route to a working reset; when a send fails it is the difference
+    // between a diagnosable problem and a user who is simply stuck, since the
+    // response above cannot admit anything went wrong.
+    console.log(
+        `[PasswordReset] ${delivered ? 'sent to' : 'NOT SENT (see [email] above) —'} ${user.email}: ${resetUrl}`
+    );
 
     res.json(successResponse);
 }));
@@ -11902,6 +12029,76 @@ app.get('/api/reactions/user', async (req, res) => {
         if (row) reactions[p.key] = row.reaction_type;
     }
     res.json({ success: true, reactions });
+});
+
+// -----------------------------------------------------------------------------
+// Reactions keyed by article SLUG (jv_article_slug_reactions).
+//
+// The three endpoints above key on an INTEGER article_id, which CDN news
+// articles do not have — the feed had to hash each slug into a synthetic integer
+// to store anything at all. These keep the slug itself, which is what the site
+// already routes on. The rules live in lib/slug-reactions.js so they can be
+// tested without a database; the handlers below only do HTTP.
+//
+// The older endpoints stay exactly as they are: they still serve the prayer,
+// music, radio and devotional namespaces, which are genuinely integer-keyed.
+// -----------------------------------------------------------------------------
+
+// POST /api/reactions/slug — set (or withdraw) this reader's reaction. Auth required.
+app.post('/api/reactions/slug', async (req, res) => {
+    const token = (req.headers.authorization || '').replace('Bearer ', '');
+    const payload = authVerifyJWT(token);
+    if (!payload) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { slug, reaction } = req.body || {};
+    if (!slugReactions.isValidSlug(slug)) {
+        return res.status(400).json({ error: 'A valid article slug is required' });
+    }
+    if (!slugReactions.isValidReaction(reaction)) {
+        return res.status(400).json({ error: "reaction must be 'like' or 'dislike'" });
+    }
+
+    try {
+        const result = await slugReactions.setReaction(pgPool, {
+            userId: payload.userId,
+            slug,
+            reaction,
+        });
+        res.json({ success: true, ...result });
+    } catch (err) {
+        console.error('[reactions/slug] set failed:', err.message);
+        res.status(500).json({ error: 'Could not save your reaction' });
+    }
+});
+
+// GET /api/reactions/slug/counts?slugs=a,b — public totals for a page of cards.
+app.get('/api/reactions/slug/counts', async (req, res) => {
+    try {
+        const counts = await slugReactions.countsForSlugs(pgPool, req.query.slugs);
+        res.json({ success: true, counts });
+    } catch (err) {
+        console.error('[reactions/slug] counts failed:', err.message);
+        res.status(500).json({ error: 'Could not load reaction counts' });
+    }
+});
+
+// GET /api/reactions/slug/user?slugs=a,b — this reader's own reactions.
+// A signed-out reader gets an empty map rather than a 401: the card grid asks
+// for this on every page load, and "nobody is signed in" is not an error.
+app.get('/api/reactions/slug/user', async (req, res) => {
+    const token = (req.headers.authorization || '').replace('Bearer ', '');
+    const payload = authVerifyJWT(token);
+    if (!payload) return res.json({ success: true, reactions: {} });
+
+    try {
+        const reactions = await slugReactions.userReactionsForSlugs(
+            pgPool, payload.userId, req.query.slugs
+        );
+        res.json({ success: true, reactions });
+    } catch (err) {
+        console.error('[reactions/slug] user lookup failed:', err.message);
+        res.status(500).json({ error: 'Could not load your reactions' });
+    }
 });
 
 // =============================================================================
@@ -17062,6 +17259,9 @@ async function runMigrations() {
         )`,
         `CREATE INDEX IF NOT EXISTS idx_article_reactions_article ON article_reactions(article_id, article_type)`,
         `CREATE INDEX IF NOT EXISTS idx_article_reactions_user ON article_reactions(user_id)`,
+        // Reactions keyed by article slug. The DDL is owned by the module that
+        // reads and writes the table, so the two cannot drift apart.
+        ...slugReactions.CREATE_SLUG_REACTIONS_SQL,
         // Article view/click tracking table
         `CREATE TABLE IF NOT EXISTS article_views (
             id          SERIAL PRIMARY KEY,
@@ -19683,9 +19883,6 @@ app.put('/api/admin/users/:id', async (req, res) => {
 // apart on what "deleted" means.
 app.delete('/api/admin/users/:id', express.json(), async (req, res) => {
     const actor = await requireRole(req, res, 'admin'); if (!actor) return;
-    if (!ACCOUNT_DELETION_ENABLED) {
-        return res.status(501).json({ error: 'Account deletion is not available at this time.' });
-    }
     if (!_tombstoneReady) {
         return res.status(503).json({ error: 'Account deletion is temporarily unavailable. Please try again later.' });
     }

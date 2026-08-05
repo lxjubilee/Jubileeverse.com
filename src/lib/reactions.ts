@@ -64,3 +64,70 @@ export async function postReaction(
   );
   return { reaction: data.reaction, counts: data.counts || { likes: 0, dislikes: 0 } };
 }
+
+/* ---------------------------------------------------------------------------
+ * Slug-keyed reactions (jv_article_slug_reactions).
+ *
+ * The endpoints above key on an INTEGER article_id, which CDN news articles do
+ * not have — the feed hashes each slug into a synthetic integer purely to have
+ * something to send. The endpoints below store the slug itself, which is what
+ * the site already routes on, so a reaction can be read back and understood.
+ *
+ *   POST /api/reactions/slug              { slug, reaction }   (Bearer required)
+ *                                         -> { success, reaction, counts }
+ *   GET  /api/reactions/slug/counts?slugs=a,b   -> { success, counts:{ slug:{likes,dislikes} } }
+ *   GET  /api/reactions/slug/user?slugs=a,b     -> { success, reactions:{ slug:'like' } }
+ * ------------------------------------------------------------------------- */
+
+/**
+ * The identifier a reaction is stored against.
+ *
+ * News articles carry a real `slug`. The published category articles do not, but
+ * their `id` is already `<category>__<slug>` — unique, stable and the same shape
+ * — so it serves as the slug for them. Both are accepted by the backend's slug
+ * pattern, which allows the double underscore.
+ */
+export function reactionSlugOf(story: Pick<Story, 'slug' | 'id'>): string {
+  return story.slug || String(story.id ?? '');
+}
+
+/** Public like/dislike totals for a page of cards. */
+export async function fetchSlugCounts(
+  slugs: string[],
+): Promise<Record<string, ReactionCounts>> {
+  if (slugs.length === 0) return {};
+  const data = await api.get<{ success: boolean; counts: Record<string, ReactionCounts> }>(
+    `/api/reactions/slug/counts?slugs=${encodeURIComponent(slugs.join(','))}`,
+    { auth: false },
+  );
+  return data.counts || {};
+}
+
+/**
+ * The signed-in reader's own reactions. Slugs they have not reacted to are
+ * absent from the map rather than present as null.
+ */
+export async function fetchUserSlugReactions(
+  slugs: string[],
+): Promise<Record<string, ReactionType>> {
+  if (slugs.length === 0) return {};
+  const data = await api.get<{ success: boolean; reactions: Record<string, ReactionType> }>(
+    `/api/reactions/slug/user?slugs=${encodeURIComponent(slugs.join(','))}`,
+  );
+  return data.reactions || {};
+}
+
+/**
+ * Set this reader's reaction to one article. Pressing the reaction they already
+ * hold withdraws it, and the response comes back with `reaction: null`.
+ */
+export async function postSlugReaction(
+  slug: string,
+  reaction: ReactionType,
+): Promise<{ reaction: ReactionType | null; counts: ReactionCounts }> {
+  const data = await api.post<{ reaction: ReactionType | null; counts: ReactionCounts }>(
+    '/api/reactions/slug',
+    { slug, reaction },
+  );
+  return { reaction: data.reaction, counts: data.counts || { likes: 0, dislikes: 0 } };
+}

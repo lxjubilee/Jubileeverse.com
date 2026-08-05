@@ -1,0 +1,130 @@
+/* The end-of-article grid lines up with the reader above it: same max-width and
+   side padding as ArticleReader's .layout, so the heading, the rule under it and
+   the first card in every row share the article's left edge. */
+.section {
+  max-width: var(--max-width);
+  margin: var(--space-2xl) auto 0;
+  padding: 0 var(--space-lg) var(--space-2xl);
+}
+
+/* The rule sits under the whole row, so "View All" rides above it on the right. */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding-bottom: var(--space-sm);
+  margin-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.title {
+  font-size: var(--font-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.viewAll {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--font-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.viewAll:hover {
+  color: var(--accent-gold);
+}
+
+.viewAll svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.15s;
+}
+
+.viewAll.open svg {
+  transform: rotate(180deg);
+}
+
+/* Deliberately not the global .content-grid: that one centres a row of fixed
+   300px cards, which both pushes the first card away from the article's edge
+   and leaves the row short of the right one. Five fluid columns with the lead
+   card across two fills the width exactly — four cards to a row on a wide
+   screen, as in the reference. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* The lead card is simply the first one, so it is selected by position rather
+   than by a class StoryCard would have to carry. */
+.grid > :first-child {
+  grid-column: span 2;
+}
+
+/* The global card is a fixed 300x304 tile. Here it fills whatever track it
+   lands in and takes its height from its content; the grid stretches every
+   card in a row to the tallest, so the row stays even. */
+.grid :global(.content-card) {
+  flex: initial;
+  width: auto;
+  height: auto;
+}
+
+/* Single-track cards keep the 16:9 picture. The lead card is two tracks plus
+   the 12px gap wide, and ~3.63:1 is what keeps its picture exactly as tall as
+   its neighbours' — the gap's share of that width barely shifts as the columns
+   resize, so the tops of the card bodies stay in line at every viewport. */
+.grid > :first-child :global(.content-card-image) {
+  aspect-ratio: 3.63;
+}
+
+/* Bylines sit on the baseline of the row however long the titles run — the
+   lead card's one-liner lines up with the two-line titles beside it. Only when
+   the byline ends the card: with a reactions row under it, that row is already
+   the one pinned to the bottom. */
+.grid :global(.content-card-meta:last-child) {
+  margin-top: auto;
+}
+
+/* Shed a column at a time, keeping the lead card double-width until it would
+   leave its neighbour too narrow to read; below that every card is a full-width
+   banner with its 16:9 picture back. */
+@media (max-width: 1400px) {
+  .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .grid > :first-child {
+    grid-column: auto;
+  }
+
+  .grid > :first-child :global(.content-card-image) {
+    aspect-ratio: 16 / 9;
+  }
+}

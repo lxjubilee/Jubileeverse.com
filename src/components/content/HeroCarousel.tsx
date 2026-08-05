@@ -92,6 +92,10 @@ export default function HeroCarousel({ stories, status, onRetry }: Props) {
         const img = resolveImageUrl(story);
         const title = story.headline || story.title || '';
         const excerpt = story.excerpt ? `${story.excerpt.substring(0, 200)}...` : '';
+        // The badge names the story's section (Finance, Entertainment, …) the
+        // same way StoryCard does. A story that carries neither gets no badge
+        // rather than an empty gold chip or an invented label.
+        const label = story.topic || story.category || '';
         return (
           <div
             key={story.id}
@@ -100,7 +104,7 @@ export default function HeroCarousel({ stories, status, onRetry }: Props) {
           >
             {img ? <img src={img} alt={title} onError={handleImgError} /> : null}
             <div className={styles.heroOverlay}>
-              <span className={styles.heroRank}>#{i + 1}</span>
+              {label ? <span className={styles.heroCategory}>{label}</span> : null}
               <h2 className={styles.heroTitle}>{title}</h2>
               {excerpt ? <p className={styles.heroExcerpt}>{excerpt}</p> : null}
               <button

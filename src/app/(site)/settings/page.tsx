@@ -13,24 +13,27 @@
  *  - Security: change password (current / new / confirm) with a live strength
  *              meter.
  *  - Account : Back to Home, Sign Out (with confirm), and a Danger Zone whose
- *              Delete Account opens a confirmation dialog requiring the account
- *              password AND the account email typed out. Deletion is a HARD
+ *              Delete Account opens a yes/no confirmation dialog — no password
+ *              and no typed address, the live session is the whole of the
+ *              authorisation. Deletion is a HARD
  *              delete: no grace period, no undo. The user's Jubilee ID
  *              (sso.jubileeinspire.com) is NOT deleted and keeps working on the
- *              other Jubilee family sites. On success the page replaces itself
- *              with a farewell panel instead of redirecting — see the `deleted`
- *              flag in the auth guard below, without which the user is bounced
- *              to /signin the instant isAuthenticated flips false.
+ *              other Jubilee family sites, though the UI no longer says so. On
+ *              success the page confirms the deletion and then hands over to
+ *              /signin — see the `deleted` flag, which both suppresses the auth
+ *              guard's own redirect and drives that hand-over.
  *
  * API (exact methods/paths/bodies from the original + the unchanged backend):
  *   GET  /api/auth/me                -> { success, user }
  *   PUT  /api/auth/profile           { name, email }            -> { success, user, token? }
  *   PUT  /api/auth/change-password   { currentPassword, newPassword } -> { success, message }
- *   POST /api/auth/account/delete    { password, confirmEmail } -> { success, deleted }
+ *   POST /api/auth/account/delete    {}                         -> { success, deleted }
  *
- * `user.can_delete_account` from /api/auth/me reflects the server-side feature
- * flag and the caller's role; when false the Danger Zone button renders disabled
- * rather than letting someone type a password into a form that will 501.
+ * `user.can_delete_account` from /api/auth/me mirrors what the endpoint will
+ * accept. It is true in normal operation and goes false only if the deletion
+ * tombstone table is unavailable, in which case deleting would be unsafe rather
+ * than merely unavailable. Role is not a factor — back-office accounts may
+ * delete themselves too. There is no feature flag: this is ordinary behaviour.
  *
  * `api` auto-attaches the Authorization: Bearer <token> header. After a profile
  * save we call useAuth().refresh() so the shared header avatar/initials and the
@@ -50,6 +53,15 @@ import styles from './settings.module.css';
 
 type TabName = 'profile' | 'security' | 'account';
 type ToastType = 'success' | 'error';
+
+/**
+ * How long the "account deleted" confirmation stays up before /signin takes over.
+ * Long enough to be read, short enough that nobody thinks the page has stalled.
+ * The manual link is there for the case where this never fires at all — browsers
+ * throttle timers in a background tab, and a deleted account is a bad thing to be
+ * stranded on.
+ */
+const DELETED_REDIRECT_MS = 2000;
 
 interface MeResponse {
   success?: boolean;
@@ -156,14 +168,25 @@ export default function SettingsPage() {
   // --- Auth guard -----------------------------------------------------------
   useEffect(() => {
     // A completed deletion signs the user out on purpose, so `isAuthenticated`
-    // goes false a moment later. Without this bail-out the guard would fire and
-    // replace the farewell panel with /signin — inviting someone who just deleted
-    // their account to sign back into it.
+    // goes false a moment later. The bail-out still matters even though we now
+    // send them to /signin ourselves: this guard would get there first, with
+    // ?redirect=/settings attached, and bounce whoever signs in next straight
+    // back to the settings page of an account that no longer exists.
     if (deleted) return;
     if (!isLoading && !isAuthenticated) {
       router.replace('/signin?redirect=/settings');
     }
   }, [isLoading, isAuthenticated, router, deleted]);
+
+  // --- After a deletion: confirm, then hand over to /signin -----------------
+  // window.location rather than router.replace, for the same reason the link in
+  // the panel below is a plain anchor — a full document load is what discards the
+  // React tree and the auth context along with it.
+  useEffect(() => {
+    if (!deleted) return;
+    const id = setTimeout(() => window.location.assign('/signin'), DELETED_REDIRECT_MS);
+    return () => clearTimeout(id);
+  }, [deleted]);
 
   // Apply a user record to both the header card and the editable form fields.
   const applyUser = useCallback((user: AuthUser) => {
@@ -349,26 +372,18 @@ export default function SettingsPage() {
       <main className={styles.settingsPage}>
         <div className={`${styles.settingsCard} ${styles.farewellCard}`}>
           <h1 className={styles.farewellTitle}>Your account has been deleted</h1>
-          <p className={styles.farewellBody}>
-            Everything we held for you on JubileeVerse is gone. Thank you for the time you spent
-            here — you are welcome back whenever you wish.
+          <p className={styles.farewellBody} role="status">
+            Taking you to the sign-in page&hellip;
           </p>
-          <p className={styles.farewellBody}>
-            Your Jubilee ID is untouched, so you can still sign in to other Jubilee sites with the
-            same email.
-          </p>
-          <p className={styles.farewellVerse}>
-            &ldquo;The Lord bless you and keep you; the Lord make his face shine on you.&rdquo;
-            &mdash; Numbers 6:24-25
-          </p>
-          {/* A plain anchor, not next/link, on purpose: the full document load
-              discards the React tree so no component is left holding a stale user,
-              and it stops the auth context's periodic refresh() from polling an
-              account that no longer exists. A client-side navigation would keep
-              both alive, which is exactly what we are trying to avoid here. */}
+          {/* A plain anchor, not next/link, and it matches how the timer above
+              leaves: the full document load discards the React tree so no
+              component is left holding a stale user, and it stops the auth
+              context's periodic refresh() from polling an account that no longer
+              exists. A client-side navigation would keep both alive, which is
+              exactly what we are trying to avoid here. */}
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a href="/" className={`${styles.btn} ${styles.btnOutline} ${styles.farewellLink}`}>
-            Return to JubileeVerse
+          <a href="/signin" className={`${styles.btn} ${styles.btnOutline} ${styles.farewellLink}`}>
+            Go to sign in
           </a>
         </div>
       </main>
@@ -629,8 +644,8 @@ export default function SettingsPage() {
       )}
 
       {/* Mounted only while open. Modal hides itself with opacity + pointer-events
-          rather than display:none, so leaving it mounted would keep a password
-          field in the DOM, focusable, inside aria-hidden="true". */}
+          rather than display:none, so leaving it mounted would keep the confirm
+          buttons in the DOM, focusable, inside aria-hidden="true". */}
       {deleteOpen && (
         <DeleteAccountDialog
           accountEmail={headerEmail}

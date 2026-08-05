@@ -20,6 +20,44 @@
   grid-column: 1 / -1;
 }
 
+/* Featured cards in the Current Events grid: a large card two card columns wide
+   plus the gap between them (300 + 12 + 300 = 612), so a row is still a whole
+   number of columns wide and the hero above stays snapped to the same edges.
+
+   They exist ONLY at the five-per-row layout — from 1568px up, where
+   .content-grid is at its full 1548px (5 x 300 + 4 x 12). Below that the grid's
+   own max-width ladder drops it to four columns and this class goes inert:
+   every card is a plain 300px one, exactly as the feed looked before.
+
+   page.tsx moves the large card one place to the right on each successive row
+   and back to the left after four, and every row fills the width to the pixel:
+
+     row 1   large(1+2) + 3 normal          612 + 3x300 + 3x12       = 1548
+     row 2   normal + large(2+3) + 2 normal 300 + 612 + 2x300 + 3x12 = 1548
+     row 3   2 normal + large(3+4) + normal 2x300 + 612 + 300 + 3x12 = 1548
+     row 4   3 normal + large(4+5)          3x300 + 612 + 3x12       = 1548
+
+   Every row holds four cards either way, so the wrap points never move and the
+   columns stay aligned down the whole feed.
+
+   Nothing here is tied to a device — the grid is measured in CSS pixels, so
+   zooming out (or a wider screen) buys back the fifth column and the large
+   cards return, while zooming in drops a column and they all go normal. */
+@media (min-width: 1568px) {
+  .feed > .featured {
+    flex: 0 0 612px;
+    width: 612px;
+    max-width: 100%;
+  }
+
+  /* 612 wide against the neighbours' 300x169 picture — the gap's 12px included,
+     so the large card is no taller than the cards beside it and the tops of
+     every card body in the row line up. */
+  .feed > .featured :global(.content-card-image) {
+    aspect-ratio: 3.6267;
+  }
+}
+
 .heroBento {
   display: grid;
   grid-template-columns: 2fr 1fr;
@@ -67,7 +105,9 @@
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
 }
 
-.heroRank {
+/* Gold badge above the hero headline, naming the story's section. `uppercase`
+   is what makes a raw topic ("finance") read as a label. */
+.heroCategory {
   display: inline-flex;
   align-items: center;
   gap: 4px;

@@ -106,6 +106,10 @@ const ACCOUNT_DELETE_SWEEP = Object.freeze([
     { table: 'jv_radio_follows', column: 'user_id', key: 'id', mode: 'delete' },
     { table: 'article_reactions', column: 'user_id', key: 'id', mode: 'delete',
       note: 'user_id NOT NULL + UNIQUE(user_id,article_id,article_type) — cannot null or share' },
+    { table: 'jv_article_slug_reactions', column: 'user_id', key: 'id', mode: 'delete',
+      note: 'the slug-keyed successor to article_reactions; user_id NOT NULL + '
+          + 'UNIQUE(user_id,article_slug) — cannot null or share. jv_-prefixed, so unlike '
+          + 'article_reactions it is unambiguously this app\'s table.' },
 
     // ── null: nullable, non-identifying once cleared ─────────────────────────
     { table: 'article_views', column: 'user_id', key: 'id', mode: 'null',

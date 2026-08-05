@@ -1,21 +1,21 @@
 'use strict';
 /**
- * The Delete Account confirmation gate.
+ * The Delete Account failure copy.
  *
- * Two failure modes this guards against, both of which strand a user who has
- * already decided:
+ * The dialog asks one yes/no question, so there is no longer a confirmation gate
+ * to test — the typed-address match that used to live here went with the field it
+ * armed. What remains is the harder half: what the user is told when an
+ * irreversible action does NOT happen.
  *
- *   1. A raw string comparison rejects a pasted address carrying a trailing
- *      space, and rejects an iOS-autocapitalised first letter. The destructive
- *      button simply stays dead with no explanation. The confirmation exists to
- *      prove deliberateness, not typing accuracy, and the backend trims and
- *      lowercases before comparing anyway.
- *   2. The degenerate case: if the account email has not loaded yet, an empty
- *      target must not be satisfied by an empty input — that would arm the
- *      button before the page knows whose account it is showing.
+ * The rule every case below enforces is that the message answers "did it
+ * half-happen?" without being asked. A person who has just pressed "Yes, delete
+ * it" and seen an error assumes the worst, and a message that only describes the
+ * fault leaves them there. The unmapped-status case matters most: it is the one
+ * that fires for a status nobody anticipated, which is exactly when a bare
+ * "Network error" would be read as "something happened and I don't know what".
  *
  * The module is TypeScript in src/, so the test transpiles the real file rather
- * than restating the predicate. It is deliberately JSX-free for exactly this.
+ * than restating the strings. It is deliberately JSX-free for exactly this.
  */
 
 const fs = require('fs');
@@ -36,73 +36,21 @@ function loadModule() {
     return module.exports;
 }
 
-const { canConfirmDeletion, deleteAccountErrorMessage } = loadModule();
-
-const base = {
-    password: 'hunter2',
-    typedEmail: 'lauren@example.com',
-    accountEmail: 'lauren@example.com',
-    deleting: false,
-};
-
-describe('canConfirmDeletion', () => {
-    test('an exact match with a password enables the button', () => {
-        expect(canConfirmDeletion(base)).toBe(true);
-    });
-
-    test('an empty password never enables the button', () => {
-        expect(canConfirmDeletion({ ...base, password: '' })).toBe(false);
-    });
-
-    test('a trailing space on the pasted email still matches', () => {
-        expect(canConfirmDeletion({ ...base, typedEmail: 'lauren@example.com ' })).toBe(true);
-    });
-
-    test('a leading space still matches', () => {
-        expect(canConfirmDeletion({ ...base, typedEmail: '  lauren@example.com' })).toBe(true);
-    });
-
-    test('an iOS-autocapitalised first letter still matches', () => {
-        expect(canConfirmDeletion({ ...base, typedEmail: 'Lauren@example.com' })).toBe(true);
-    });
-
-    test('a fully upper-cased address still matches', () => {
-        expect(canConfirmDeletion({ ...base, typedEmail: 'LAUREN@EXAMPLE.COM' })).toBe(true);
-    });
-
-    test('a one-character-off address does not match', () => {
-        expect(canConfirmDeletion({ ...base, typedEmail: 'lauren@exampl.com' })).toBe(false);
-    });
-
-    test('another account holder\'s address does not match', () => {
-        expect(canConfirmDeletion({ ...base, typedEmail: 'someone.else@example.com' })).toBe(false);
-    });
-
-    test('an empty input does not satisfy an unloaded account email', () => {
-        expect(canConfirmDeletion({ ...base, typedEmail: '', accountEmail: '' })).toBe(false);
-    });
-
-    test('whitespace-only input does not satisfy an unloaded account email', () => {
-        expect(canConfirmDeletion({ ...base, typedEmail: '   ', accountEmail: '   ' })).toBe(false);
-    });
-
-    test('the button is disarmed while a deletion is in flight', () => {
-        expect(canConfirmDeletion({ ...base, deleting: true })).toBe(false);
-    });
-});
+const { deleteAccountErrorMessage } = loadModule();
 
 describe('deleteAccountErrorMessage', () => {
     test.each([
-        [401, /password/i],
-        [400, /does not match/i],
+        [401, /session has expired/i],
         [403, /editorial access/i],
-        [409, /no password set/i],
-        [501, /not available/i],
-        [503, /could not confirm/i],
         [500, /nothing was deleted/i],
         [502, /nothing was deleted/i],
+        [503, /nothing has been deleted/i],
     ])('status %i produces an actionable message', (status, pattern) => {
         expect(deleteAccountErrorMessage({ status })).toMatch(pattern);
+    });
+
+    test('401 no longer blames a password — there is no password field', () => {
+        expect(deleteAccountErrorMessage({ status: 401 })).not.toMatch(/password/i);
     });
 
     test('a thrown non-ApiError falls back to the house string', () => {
@@ -113,6 +61,21 @@ describe('deleteAccountErrorMessage', () => {
     test('429 prefers the server message, which carries the retry window', () => {
         expect(deleteAccountErrorMessage({ status: 429, message: 'Try again in an hour.' }))
             .toBe('Try again in an hour.');
+    });
+
+    test('429 without a server message still says something useful', () => {
+        expect(deleteAccountErrorMessage({ status: 429 })).toMatch(/wait a few minutes/i);
+    });
+
+    test('an unmapped status is not left to the network fallback', () => {
+        // 400 is unreachable from the dialog now, and that is the point: a status
+        // this file does not know about must still answer the only question the
+        // user is asking, rather than falling through to 'Network error'.
+        for (const status of [400, 409, 418]) {
+            const msg = deleteAccountErrorMessage({ status });
+            expect(msg).not.toBe('Network error');
+            expect(msg).toMatch(/nothing has been deleted/i);
+        }
     });
 
     test('every non-success message reassures that nothing was deleted', () => {

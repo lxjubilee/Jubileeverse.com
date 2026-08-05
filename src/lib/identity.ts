@@ -1,11 +1,12 @@
 /**
  * Jubilee ID lookup — "does an identity already exist for this email?"
  *
- * Backed by GET /api/auth/lookup, which asks the shared Identity Authority when
- * SSO delegation is on and falls back to our own users table otherwise. Used to
- * make the auth screens honest: send a first-time visitor to sign-up instead of
- * letting them guess at a password, and send an existing Jubilee ID to sign-in
- * instead of a registration form that would only 409.
+ * Backed by GET /api/auth/lookup, which checks our own users table first and, in
+ * SSO mode, asks the shared Identity Authority when we hold no row of our own.
+ * Either store is enough to answer "yes". Used to make the auth screens honest:
+ * send a first-time visitor to sign-up instead of letting them guess at a
+ * password, and send an existing account to sign-in instead of a registration
+ * form that would only 409.
  */
 import { api } from './api';
 

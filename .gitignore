@@ -5,6 +5,12 @@
 
 # next.js
 /.next/
+# alternate dev build dirs, used via NEXT_DIST_DIR (see next.config.mjs).
+# Globbed rather than named: this repo is on an SMB share, where a killed dev
+# server leaves its `trace` file held open by the FILE SERVER, and nothing local
+# can delete it — the only way back is a dist dir that has never been used, so
+# these accumulate a suffix at a time.
+/.next-dev*/
 /out/
 next-env.d.ts
 
@@ -52,3 +58,4 @@ yarn-error.log*
 # Dev-server logs (next.log, api.log and their rotations). These reach tens of
 # megabytes within a session and are pure noise in history.
 /.tmp/
+/dev-api.log

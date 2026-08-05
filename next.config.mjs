@@ -9,6 +9,12 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3107';
 const nextConfig = {
   reactStrictMode: true,
 
+  // Build output directory. Defaults to .next, so production builds are
+  // unaffected. Override with NEXT_DIST_DIR when .next itself is unusable —
+  // this repo lives on an SMB share, where a crashed dev server can leave
+  // .next/trace held open by the file server and nothing local can clear it.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
+
   // Content images (cached_image_path, image_url, etc.) are produced and served
   // by the Express backend under /images. We render them with plain <img>, so no
   // optimizer round-trip is needed.

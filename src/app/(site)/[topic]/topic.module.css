@@ -40,3 +40,35 @@
 .compactGrid :global(.content-card-title) {
   margin-bottom: 4px;
 }
+
+/*
+ * Featured cards — the same rhythm the home feed uses (see featuredLayout.ts):
+ * a large card two card columns wide plus the gap between them
+ * (300 + 12 + 300 = 612), moving one place to the right on each successive row.
+ *
+ * Only at the five-per-row layout, from 1568px up, where .content-grid is at its
+ * full 1548px. Below that the grid's own max-width ladder drops it to four
+ * columns and this class goes inert: every card is a plain 300px one, exactly as
+ * the portal looked before.
+ *
+ *   row 1   large(1+2) + 3 normal          612 + 3x300 + 3x12       = 1548
+ *   row 2   normal + large(2+3) + 2 normal 300 + 612 + 2x300 + 3x12 = 1548
+ *   row 3   2 normal + large(3+4) + normal 2x300 + 612 + 300 + 3x12 = 1548
+ *   row 4   3 normal + large(4+5)          3x300 + 612 + 3x12       = 1548
+ *
+ * The card's HEIGHT is left to .compactGrid above, so a large card is exactly as
+ * tall as its neighbours here too — only its width and image crop change.
+ */
+@media (min-width: 1568px) {
+  .compactGrid > .featured {
+    flex: 0 0 612px;
+    width: 612px;
+    max-width: 100%;
+  }
+
+  /* 612 wide against the neighbours' 300x169 picture — the gap's 12px included,
+     so the tops of every card body in the row line up. */
+  .compactGrid > .featured :global(.content-card-image) {
+    aspect-ratio: 3.6267;
+  }
+}
