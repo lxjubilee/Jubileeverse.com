@@ -1,14 +1,25 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import RegenerateImageButton from '@/components/admin/RegenerateImageButton';
 import { handleImgError, resolveImageUrl } from '@/lib/api';
 import {
   storeSelectedArticle, trackView, storyHref, trackingIdOf, regenTargetOf, canRegenerateImage,
 } from '@/lib/article';
 import { useAuth } from '@/lib/auth';
-import { postReaction, type ReactionCounts, type ReactionType } from '@/lib/reactions';
+import {
+  onPrefsChanged,
+  readPrefs,
+  setTopicPref,
+  topicSlugOf,
+} from '@/lib/feedPrefs';
+import {
+  postSlugReaction,
+  reactionSlugOf,
+  type ReactionCounts,
+  type ReactionType,
+} from '@/lib/reactions';
 import type { Story } from '@/lib/types';
 
 interface Props {
@@ -17,12 +28,10 @@ interface Props {
   category?: string;
   /** Opt-in like/dislike footer. Defaults to false so other pages are unaffected. */
   showReactions?: boolean;
-  /** Seed counts (from a batched fetchCounts on the parent). */
+  /** Seed counts, keyed by slug, from a batched fetchSlugCounts on the parent. */
   initialCounts?: ReactionCounts;
-  /** The signed-in user's existing reaction (from a batched fetchUserReactions). */
+  /** The signed-in reader's stored reaction (batched fetchUserSlugReactions). */
   initialMine?: ReactionType | null;
-  /** Which backend reaction namespace this story belongs to. */
-  articleType?: 'current_event' | 'article';
   /** Opt-in hide (✕) + "more" menu (follow/block/share). Default false. */
   showActions?: boolean;
   /** Called when the reader hides this story. */
@@ -31,34 +40,15 @@ interface Props {
   href?: string;
   /** Admin-only regenerate-image control on the thumbnail. Default true. */
   showRegenerate?: boolean;
+  /**
+   * Extra class on the card root, alongside `content-card`. The home feed uses
+   * it to mark the featured cards it renders at double width.
+   */
+  className?: string;
 }
 
-const PREFS_KEY = 'jubileeVersePrefs';
-const PREFS_CHANGED_EVENT = 'jubilee:prefs-changed';
-
-/** Add a topic slug to following/blocked in localStorage["jubileeVersePrefs"]. */
-function updatePrefs(kind: 'follow' | 'block', slug: string) {
-  if (!slug) return;
-  try {
-    const data = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
-    const following = new Set<string>(Array.isArray(data.following) ? data.following : []);
-    const blocked = new Set<string>(Array.isArray(data.blocked) ? data.blocked : []);
-    if (kind === 'follow') {
-      following.add(slug);
-      blocked.delete(slug);
-    } else {
-      blocked.add(slug);
-      following.delete(slug);
-    }
-    localStorage.setItem(
-      PREFS_KEY,
-      JSON.stringify({ following: [...following], blocked: [...blocked] }),
-    );
-    window.dispatchEvent(new CustomEvent(PREFS_CHANGED_EVENT));
-  } catch {
-    /* ignore */
-  }
-}
+/** How long the ⋯ menu's confirmation line stays on the card. */
+const FLASH_MS = 2200;
 
 /**
  * Standard content card used in feeds/grids. Clicking stashes the story and
@@ -69,7 +59,8 @@ function updatePrefs(kind: 'follow' | 'block', slug: string) {
  * a news id parses as a category slug there.
  *
  * When `showReactions` is true it renders a like/dislike footer wired to
- * /api/reactions. Reaction clicks stop propagation so they never open the
+ * /api/reactions/slug, which stores the reaction against the reader and the
+ * article's slug. Reaction clicks stop propagation so they never open the
  * article; posting requires sign-in (otherwise routes to /signin).
  */
 export default function StoryCard({
@@ -78,17 +69,21 @@ export default function StoryCard({
   showReactions = false,
   initialCounts,
   initialMine = null,
-  articleType = 'current_event',
   showActions = false,
   onHide,
   href,
   showRegenerate = true,
+  className,
 }: Props) {
   const router = useRouter();
   const target = href ?? storyHref(story);
-  // Reactions and views are stored against an INTEGER article_id, so a slug id
-  // cannot be used directly. CDN news supplies a stable hashed integer.
+  // Views are stored against an INTEGER article_id, so a slug id cannot be used
+  // directly there; CDN news supplies a stable hashed integer for that path.
   const trackingId = trackingIdOf(story);
+  // Reactions, by contrast, are keyed by the article's own slug — see
+  // reactionSlugOf. Named apart from `slug` below, which is the TOPIC slug used
+  // by follow/block.
+  const reactionSlug = reactionSlugOf(story);
   const { isAuthenticated } = useAuth();
   // An admin regeneration swaps the picture in place; until then this is the
   // published one exactly as before.
@@ -102,13 +97,47 @@ export default function StoryCard({
   const img = freshImg ?? resolveImageUrl(story);
   const title = story.headline || story.title || '';
   const label = category || story.topic || story.category || '';
-  const slug = (story.topic || story.category || '').toLowerCase();
+  const slug = topicSlugOf(story);
 
   const [counts, setCounts] = useState<ReactionCounts>(
     initialCounts || { likes: 0, dislikes: 0 },
   );
   const [mine, setMine] = useState<ReactionType | null>(initialMine);
   const [menuOpen, setMenuOpen] = useState(false);
+  /** Short confirmation shown on the card — following a topic is otherwise invisible. */
+  const [flash, setFlash] = useState('');
+  /** Whether this card's topic is currently followed, so the menu can say so. */
+  const [isFollowing, setIsFollowing] = useState(false);
+
+  // Reflect the stored preference in the menu, and keep it right when the
+  // Personalize popup or another card changes the same topic.
+  useEffect(() => {
+    if (!slug) return;
+    const sync = () =>
+      setIsFollowing(readPrefs().following.some((s) => s.toLowerCase() === slug));
+    sync();
+    return onPrefsChanged(sync);
+  }, [slug]);
+
+  useEffect(() => {
+    if (!flash) return;
+    const t = setTimeout(() => setFlash(''), FLASH_MS);
+    return () => clearTimeout(t);
+  }, [flash]);
+
+  // The parent fetches counts and the reader's stored reaction in one batch for
+  // the whole grid, so both arrive AFTER the cards have first rendered. Seeding
+  // useState alone would freeze every card at zero with no reaction showing —
+  // the initial value is only read on mount. Re-running on identity means a
+  // reader's own click is not overwritten by a re-render carrying the same
+  // props.
+  useEffect(() => {
+    if (initialCounts) setCounts(initialCounts);
+  }, [initialCounts]);
+
+  useEffect(() => {
+    setMine(initialMine);
+  }, [initialMine]);
 
   const stop = (e: React.MouseEvent) => e.stopPropagation();
 
@@ -117,12 +146,55 @@ export default function StoryCard({
     onHide?.(story.id);
   };
 
-  const share = (e: React.MouseEvent) => {
+  const topicName = label || 'topic';
+
+  /** Follow is a toggle: tapping it while already following clears the choice. */
+  const follow = (e: React.MouseEvent) => {
+    stop(e);
+    setMenuOpen(false);
+    if (!slug) return;
+    if (isFollowing) {
+      setTopicPref('clear', slug);
+      setFlash(`Unfollowed ${topicName}`);
+    } else {
+      setTopicPref('follow', slug);
+      setFlash(`Following ${topicName}`);
+    }
+  };
+
+  const block = (e: React.MouseEvent) => {
+    stop(e);
+    setMenuOpen(false);
+    if (slug) setTopicPref('block', slug);
+    onHide?.(story.id);
+  };
+
+  /**
+   * Share, and say so. Every outcome used to be swallowed: on desktop the
+   * clipboard fallback usually runs and gave the reader nothing to indicate it
+   * had worked, and on an insecure origin neither API exists so the button did
+   * nothing at all, silently.
+   */
+  const share = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setMenuOpen(false);
     const url = `${window.location.origin}${target}`;
-    if (navigator.share) navigator.share({ url, title }).catch(() => {});
-    else navigator.clipboard?.writeText(url).catch(() => {});
+    try {
+      if (navigator.share) {
+        await navigator.share({ url, title });
+        return; // The OS sheet is its own confirmation.
+      }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        setFlash('Link copied');
+        return;
+      }
+      setFlash('Sharing unavailable');
+    } catch (err) {
+      // Dismissing the OS share sheet is a cancellation, not a failure.
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setFlash('Could not share');
+    }
   };
 
   const open = () => {
@@ -138,9 +210,12 @@ export default function StoryCard({
       router.push('/signin');
       return;
     }
+    if (!reactionSlug) return;
     try {
-      const res = await postReaction(trackingId, articleType, reaction);
+      const res = await postSlugReaction(reactionSlug, reaction);
       setCounts(res.counts);
+      // null when the reader pressed the reaction they already held, which
+      // withdraws it.
       setMine(res.reaction);
     } catch {
       /* best-effort */
@@ -148,7 +223,12 @@ export default function StoryCard({
   };
 
   return (
-    <article className="content-card" onClick={open}>
+    <article className={`content-card${className ? ` ${className}` : ''}`} onClick={open}>
+      {flash ? (
+        <div className="content-card-flash" role="status" aria-live="polite">
+          {flash}
+        </div>
+      ) : null}
       {showActions ? (
         <div className="content-card-actions" onClick={stop}>
           <button
@@ -179,11 +259,11 @@ export default function StoryCard({
             </button>
             {menuOpen ? (
               <div className="content-card-menu" onClick={stop}>
-                <button type="button" onClick={(e) => { stop(e); setMenuOpen(false); updatePrefs('follow', slug); }}>
-                  Follow {label || 'topic'}
+                <button type="button" onClick={follow} aria-pressed={isFollowing}>
+                  {isFollowing ? `✓ Following ${topicName}` : `Follow ${topicName}`}
                 </button>
-                <button type="button" onClick={(e) => { stop(e); setMenuOpen(false); updatePrefs('block', slug); onHide?.(story.id); }}>
-                  Block {label || 'topic'}
+                <button type="button" onClick={block}>
+                  Block {topicName}
                 </button>
                 <button type="button" onClick={share}>Share</button>
               </div>

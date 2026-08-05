@@ -3,32 +3,18 @@
 import { useEffect, useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import { useTaxonomyNav } from '@/hooks/useTaxonomyNav';
+import { readPrefs, writePrefs } from '@/lib/feedPrefs';
 import styles from './PersonalizePopup.module.css';
 
-const PREFS_KEY = 'jubileeVersePrefs';
-/** Same-tab signal so the home feed can re-read prefs when the popup saves. */
-export const PREFS_CHANGED_EVENT = 'jubilee:prefs-changed';
+/**
+ * Re-exported for existing importers. The definition lives in @/lib/feedPrefs,
+ * with the storage key and the slug derivation it has to agree with.
+ */
+export { PREFS_CHANGED_EVENT } from '@/lib/feedPrefs';
 
 interface Props {
   open: boolean;
   onClose: () => void;
-}
-
-interface FeedPrefs {
-  following: string[];
-  blocked: string[];
-}
-
-function readPrefs(): FeedPrefs {
-  try {
-    const data = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
-    return {
-      following: Array.isArray(data.following) ? data.following : [],
-      blocked: Array.isArray(data.blocked) ? data.blocked : [],
-    };
-  } catch {
-    return { following: [], blocked: [] };
-  }
 }
 
 /**
@@ -43,12 +29,20 @@ export default function PersonalizePopup({ open, onClose }: Props) {
   const taxonomyLinks = useTaxonomyNav();
   const [following, setFollowing] = useState<string[]>([]);
   const [blocked, setBlocked] = useState<string[]>([]);
+  /**
+   * Customized topics that are not in the nav list, captured once when the
+   * popup opens. Deriving this from `following`/`blocked` as they change would
+   * make a row disappear the moment the reader cleared it — exactly when they
+   * are still looking at it.
+   */
+  const [customized, setCustomized] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open) return;
     const prefs = readPrefs();
     setFollowing(prefs.following);
     setBlocked(prefs.blocked);
+    setCustomized([...new Set([...prefs.following, ...prefs.blocked])].filter(Boolean).sort());
   }, [open]);
 
   const toggleFollow = (slug: string) => {
@@ -63,17 +57,21 @@ export default function PersonalizePopup({ open, onClose }: Props) {
   };
 
   const save = () => {
-    try {
-      localStorage.setItem(
-        PREFS_KEY,
-        JSON.stringify({ following, blocked, ts: Date.now() }),
-      );
-      window.dispatchEvent(new CustomEvent(PREFS_CHANGED_EVENT));
-    } catch {
-      /* ignore — storage may be unavailable */
-    }
+    writePrefs({ following, blocked });
     onClose();
   };
+
+  /**
+   * Topics the reader has customized that this list would not otherwise show.
+   *
+   * The list above is the five-fold ministry nav, but the ⋯ menu on a news card
+   * follows and blocks by the story's own topic (finance, technology, health …)
+   * — a vocabulary with no overlap. Blocking one from a card therefore removed
+   * every card carrying it, leaving nothing to click to undo, and no entry here
+   * either: a one-way door. Surfacing them keeps every choice reversible.
+   */
+  const known = new Set(taxonomyLinks.map((l) => l.slug));
+  const extraSlugs = customized.filter((s) => !known.has(s));
 
   return (
     <Modal
@@ -126,7 +124,50 @@ export default function PersonalizePopup({ open, onClose }: Props) {
             );
           })
         )}
+
+        {extraSlugs.length > 0 ? (
+          <>
+            <p className={styles.help} style={{ marginTop: 14 }}>
+              Other topics you have chosen from a story&rsquo;s ⋯ menu.
+            </p>
+            {extraSlugs.map((slug) => {
+              const isFollowed = following.includes(slug);
+              const isBlocked = blocked.includes(slug);
+              return (
+                <div key={slug} className={styles.row}>
+                  <span className={styles.rowLabel}>{humanize(slug)}</span>
+                  <div className={styles.toggles}>
+                    <button
+                      type="button"
+                      className={`${styles.toggle} ${isFollowed ? styles.toggleFollowActive : ''}`}
+                      aria-pressed={isFollowed}
+                      onClick={() => toggleFollow(slug)}
+                    >
+                      {isFollowed ? 'Following' : 'Follow'}
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.toggle} ${isBlocked ? styles.toggleBlockActive : ''}`}
+                      aria-pressed={isBlocked}
+                      onClick={() => toggleBlock(slug)}
+                    >
+                      {isBlocked ? 'Blocked' : 'Block'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        ) : null}
       </div>
     </Modal>
   );
+}
+
+/** `church-us` -> `Church Us`. Only a fallback label for slugs with no nav entry. */
+function humanize(slug: string): string {
+  return slug
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 }

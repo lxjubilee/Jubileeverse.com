@@ -7,8 +7,15 @@ import WeatherCard from '@/components/home/WeatherCard';
 import FinanceCard from '@/components/home/FinanceCard';
 import SportsCard from '@/components/home/SportsCard';
 import StoryCard from '@/components/content/StoryCard';
-import { PREFS_CHANGED_EVENT } from '@/components/layout/PersonalizePopup';
 import { api, handleImgError, resolveImageUrl } from '@/lib/api';
+import {
+  addHidden,
+  onPrefsChanged,
+  readHidden,
+  readPrefs,
+  topicSlugOf,
+  type FeedPrefs,
+} from '@/lib/feedPrefs';
 import {
   storeSelectedArticle,
   trackView,
@@ -16,12 +23,12 @@ import {
   trackingIdOf,
 } from '@/lib/article';
 import { useAuth } from '@/lib/auth';
+import { isFeatured } from '@/lib/featuredLayout';
 import { interleaveFeed } from '@/lib/homeFeed';
 import {
-  articleTypeOf,
-  fetchCounts,
-  fetchUserReactions,
-  reactionKey,
+  fetchSlugCounts,
+  fetchUserSlugReactions,
+  reactionSlugOf,
   type ReactionCounts,
   type ReactionType,
 } from '@/lib/reactions';
@@ -51,29 +58,8 @@ interface PlacementResponse extends HomepagePlacement {
  */
 const SHOW_IN_FEED_CARDS = false;
 
-const PREFS_KEY = 'jubileeVersePrefs';
-
-interface FeedPrefs {
-  following: string[];
-  blocked: string[];
-}
-
-function readPrefs(): FeedPrefs {
-  try {
-    const data = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
-    return {
-      following: Array.isArray(data.following) ? data.following : [],
-      blocked: Array.isArray(data.blocked) ? data.blocked : [],
-    };
-  } catch {
-    return { following: [], blocked: [] };
-  }
-}
-
 /** Topic/category slug a story belongs to, lower-cased for matching. */
-function storySlug(story: Story): string {
-  return String(story.topic || story.category || '').toLowerCase();
-}
+const storySlug = topicSlugOf;
 
 export default function HomePage() {
   const router = useRouter();
@@ -117,8 +103,19 @@ export default function HomePage() {
   // Reactions (batched per page of the feed)
   const [counts, setCounts] = useState<Record<string, ReactionCounts>>({});
   const [mine, setMine] = useState<Record<string, ReactionType>>({});
-  /** Reaction keys already requested, so an appended page asks only for its own. */
-  const requestedReactions = useRef<Set<string>>(new Set());
+  /**
+   * Slugs whose PUBLIC totals have been requested, so an appended page asks only
+   * for its own. Nothing here depends on who is reading: the counts are the same
+   * for everybody, signed in or not.
+   */
+  const requestedCounts = useRef<Set<string>>(new Set());
+  /**
+   * Slugs whose PERSONAL reaction has been requested. Tracked apart from the
+   * totals because the answer belongs to whoever is signed in at the time — it
+   * is cleared on sign-in and sign-out so the next reader is asked afresh
+   * instead of inheriting the previous one's highlights.
+   */
+  const requestedMine = useRef<Set<string>>(new Set());
   /**
    * Which page each card arrived on.
    *
@@ -196,7 +193,8 @@ export default function HomePage() {
         setHasMore(Boolean(data.hasMore));
         // A full (re)load starts the window over, so let the reaction counts be
         // fetched afresh rather than kept from the previous page-0.
-        requestedReactions.current.clear();
+        requestedCounts.current.clear();
+        requestedMine.current.clear();
         pagesLoaded.current = 1;
         pageOfStory.current = new Map(topicCards.map((s) => [String(s.id), 0]));
         indexedStories.current = [...heroStories, ...sidebarStories, ...topicCards, ...categories];
@@ -290,12 +288,7 @@ export default function HomePage() {
 
     // Seed prefs + hidden stories before the feed renders.
     setPrefs(readPrefs());
-    try {
-      const rawHidden = localStorage.getItem('jubileeVerseHidden');
-      if (rawHidden) setHidden(new Set(JSON.parse(rawHidden) as string[]));
-    } catch {
-      /* ignore */
-    }
+    setHidden(readHidden());
 
     void loadPlacement();
   }, [loadPlacement]);
@@ -346,42 +339,85 @@ export default function HomePage() {
     };
   }, [loadPlacement]);
 
-  // ---- Reactions: one batched fetch for the whole feed ----------------------
+  // ---- Reactions -----------------------------------------------------------
+  //
+  // Two separate fetches, because the two halves answer to different things.
+  //
+  // The TOTALS are public: every reader sees the same number, so they are read
+  // without an Authorization header and without waiting to find out who — if
+  // anyone — is signed in. A like cast by one reader is therefore still on the
+  // card for a visitor who has never signed in at all.
+  //
+  // The PERSONAL reaction is the signed-in reader's own, and is the only part
+  // that highlights a button. Keeping it in the same effect as the totals is
+  // what used to make signing in on the page do nothing: the shared "already
+  // requested" set was full, so the effect returned early and the highlight
+  // only appeared after a full reload — and signing out left the previous
+  // reader's highlights on screen.
 
+  // Public totals — deliberately not keyed on `isAuthenticated`.
   useEffect(() => {
     const stories = [...feed, ...categoryCards];
     if (stories.length === 0) return;
-    // Keyed on the tracking id, which is what StoryCard posts a reaction with:
-    // the backend parses the key's id as an integer, so a slug or a
-    // `<category>__<slug>` id would come back with no counts at all.
+    // Keyed on the article's slug, which is what StoryCard posts a reaction
+    // with and what the reaction is stored against in the database.
     //
-    // Only keys we have not already asked about. This effect re-runs on every
+    // Only slugs we have not already asked about. This effect re-runs on every
     // appended page, and over a 30-day window re-requesting the whole feed each
-    // time would make the last page ask for ~1,800 keys and the run of pages
+    // time would make the last page ask for ~1,800 slugs and the run of pages
     // quadratic. Each page now costs one request for its own cards.
-    const keys = stories
-      .map((s) => reactionKey(trackingIdOf(s), articleTypeOf(s)))
-      .filter((k) => !requestedReactions.current.has(k));
-    if (keys.length === 0) return;
-    for (const k of keys) requestedReactions.current.add(k);
+    const slugs = stories
+      .map(reactionSlugOf)
+      .filter((s) => s && !requestedCounts.current.has(s));
+    if (slugs.length === 0) return;
+    for (const s of slugs) requestedCounts.current.add(s);
 
     let cancelled = false;
     (async () => {
       try {
-        const c = await fetchCounts(keys);
+        const c = await fetchSlugCounts(slugs);
         if (!cancelled) setCounts((prev) => ({ ...prev, ...c }));
       } catch {
         // Let a later page retry these rather than leaving them permanently
         // unfetched because one request failed.
-        for (const k of keys) requestedReactions.current.delete(k);
+        for (const s of slugs) requestedCounts.current.delete(s);
       }
-      if (isAuthenticated) {
-        try {
-          const r = await fetchUserReactions(keys);
-          if (!cancelled) setMine((prev) => ({ ...prev, ...r }));
-        } catch {
-          /* ignore */
-        }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [feed, categoryCards]);
+
+  // The reader's own reactions — what restores the highlighted Like/Dislike
+  // after a refresh, a new session or on a different device.
+  useEffect(() => {
+    // Signed out there is no personal selection to show, and none to guess at.
+    // Drop whatever the previous reader had highlighted rather than leaving it
+    // on the cards, and forget what was asked for so signing back in re-asks.
+    // The totals above are untouched, so the counts stay on screen.
+    if (!isAuthenticated) {
+      requestedMine.current.clear();
+      // Returning `prev` when it is already empty keeps this from re-rendering
+      // itself forever.
+      setMine((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+      return;
+    }
+
+    const stories = [...feed, ...categoryCards];
+    if (stories.length === 0) return;
+    const slugs = stories
+      .map(reactionSlugOf)
+      .filter((s) => s && !requestedMine.current.has(s));
+    if (slugs.length === 0) return;
+    for (const s of slugs) requestedMine.current.add(s);
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetchUserSlugReactions(slugs);
+        if (!cancelled) setMine((prev) => ({ ...prev, ...r }));
+      } catch {
+        for (const s of slugs) requestedMine.current.delete(s);
       }
     })();
     return () => {
@@ -391,18 +427,7 @@ export default function HomePage() {
 
   // ---- Personalization: re-read prefs when the popup saves ------------------
 
-  useEffect(() => {
-    const reread = () => setPrefs(readPrefs());
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === null || e.key === PREFS_KEY) reread();
-    };
-    window.addEventListener(PREFS_CHANGED_EVENT, reread);
-    window.addEventListener('storage', onStorage);
-    return () => {
-      window.removeEventListener(PREFS_CHANGED_EVENT, reread);
-      window.removeEventListener('storage', onStorage);
-    };
-  }, []);
+  useEffect(() => onPrefsChanged(() => setPrefs(readPrefs())), []);
 
   // Filter out blocked topics; surface followed topics first.
   const visibleFeed = useMemo(() => {
@@ -451,16 +476,7 @@ export default function HomePage() {
   };
 
   const hideStory = useCallback((id: string | number) => {
-    setHidden((prev) => {
-      const next = new Set(prev);
-      next.add(String(id));
-      try {
-        localStorage.setItem('jubileeVerseHidden', JSON.stringify([...next]));
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
+    setHidden((prev) => addHidden(id, prev));
   }, []);
 
   const subscribe = async () => {
@@ -515,22 +531,29 @@ export default function HomePage() {
         <div className="section-header">
           <h2 className="section-title">Current Events</h2>
         </div>
-        <div className="content-grid">
+        {/* `feed` only widens the featured cards; the column math, centring and
+            width caps stay with the shared .content-grid. */}
+        <div className={`content-grid ${styles.feed}`}>
           {loading && feed.length === 0
             ? Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="content-card skeleton" style={{ height: 304 }} />
+                // Two full rows in the featured pattern, so the skeletons stand
+                // exactly where the cards that replace them will.
+                <div
+                  key={i}
+                  className={`content-card skeleton${isFeatured(i) ? ` ${styles.featured}` : ''}`}
+                  style={{ height: 304 }}
+                />
               ))
-            : displayFeed.map((story) => {
-                const type = articleTypeOf(story);
-                const key = reactionKey(trackingIdOf(story), type);
+            : displayFeed.map((story, i) => {
+                const slug = reactionSlugOf(story);
                 return (
                   <StoryCard
                     key={story.id}
                     story={story}
+                    className={isFeatured(i) ? styles.featured : undefined}
                     showReactions
-                    articleType={type}
-                    initialCounts={counts[key]}
-                    initialMine={mine[key] ?? null}
+                    initialCounts={counts[slug]}
+                    initialMine={mine[slug] ?? null}
                     showActions
                     showRegenerate={false}
                     onHide={hideStory}
@@ -542,7 +565,15 @@ export default function HomePage() {
               uses so the grid never changes shape while it fills. */}
           {loadingMore
             ? Array.from({ length: 4 }).map((_, i) => (
-                <div key={`more-${i}`} className="content-card skeleton" style={{ height: 304 }} />
+                // Numbered on from the last real card, so the incoming row keeps
+                // the pattern rather than restarting it.
+                <div
+                  key={`more-${i}`}
+                  className={`content-card skeleton${
+                    isFeatured(displayFeed.length + i) ? ` ${styles.featured}` : ''
+                  }`}
+                  style={{ height: 304 }}
+                />
               ))
             : null}
 

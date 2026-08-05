@@ -67,9 +67,57 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* Themed scrollbar. Deliberately the same treatment as `.search-results` in
+   globals.css and the language dropdown: left to the platform this is a wide
+   light-grey bar with stepper arrows, which reads as a system control dropped
+   into a dark dialog — and it was the only part of the panel ignoring the
+   theme. Every modal in the app scrolls through here, so styling it once
+   covers all of them. */
 .body {
   padding: 18px 20px;
   overflow-y: auto;
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(230, 172, 0, 0.55) transparent;
+}
+
+.body::-webkit-scrollbar {
+  width: 10px;
+}
+
+/* Windows renders stepper arrows unless they're explicitly removed. */
+.body::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+.body::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px 0; /* keep the track clear of the header and footer rules */
+}
+
+.body::-webkit-scrollbar-thumb {
+  /* 3px transparent border + padding-box clip = a slim, inset pill */
+  background: linear-gradient(180deg, rgba(230, 172, 0, 0.75), rgba(230, 172, 0, 0.45));
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 8px;
+  min-height: 36px;
+}
+
+.body::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-gold);
+  background-clip: padding-box;
+}
+
+.body::-webkit-scrollbar-thumb:active {
+  background: var(--accent-gold-hover, var(--accent-gold));
+  background-clip: padding-box;
+}
+
+.body::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .footer {

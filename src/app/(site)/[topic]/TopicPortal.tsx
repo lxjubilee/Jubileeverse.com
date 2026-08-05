@@ -5,6 +5,15 @@ import { useEffect, useState } from 'react';
 import StoryCard from '@/components/content/StoryCard';
 import { api } from '@/lib/api';
 import type { SiteArticle } from '@/lib/articles';
+import { isFeatured } from '@/lib/featuredLayout';
+import {
+  addHidden,
+  onPrefsChanged,
+  readHidden,
+  readPrefs,
+  topicSlugOf,
+  type FeedPrefs,
+} from '@/lib/feedPrefs';
 import { NAMED_PORTAL_SLUGS as PORTAL_SLUGS } from '@/lib/portals';
 import type { Story } from '@/lib/types';
 import styles from './topic.module.css';
@@ -85,8 +94,20 @@ export default function TopicPortal({
 }) {
   const { topic } = useParams<{ topic: string }>();
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [prefs, setPrefs] = useState<FeedPrefs>({ following: [], blocked: [] });
   const isNamedPortal = !!topic && PORTAL_SLUGS.has(topic);
   const [portalStories, setPortalStories] = useState<Story[] | null>(null);
+
+  // The portal used to ignore both of these: a hidden card came back on reload,
+  // and blocking a topic here changed nothing that was visible.
+  useEffect(() => {
+    const sync = () => {
+      setPrefs(readPrefs());
+      setHidden(readHidden());
+    };
+    sync();
+    return onPrefsChanged(sync);
+  }, []);
 
   useEffect(() => {
     if (!topic || !PORTAL_SLUGS.has(topic)) return;
@@ -118,10 +139,19 @@ export default function TopicPortal({
   // the slug is only a fallback for categories that have no bundle.
   const title = categoryLabel || humanize(topic || '');
   const stories = isNamedPortal ? portalStories : articles.map(toStory);
-  const visible = (stories || []).filter((s) => !hidden.has(String(s.id)));
 
-  const hideStory = (id: string | number) =>
-    setHidden((prev) => new Set(prev).add(String(id)));
+  // Blocked topics are filtered out here as they are on the home feed — except
+  // this portal's own topic. The reader navigated here deliberately, and
+  // blanking the page they are looking at reads as the site breaking rather
+  // than as a preference being honoured.
+  const blocked = new Set(prefs.blocked.map((s) => s.toLowerCase()));
+  const visible = (stories || []).filter((s) => {
+    if (hidden.has(String(s.id))) return false;
+    const slug = topicSlugOf(s);
+    return !(slug && slug !== topic && blocked.has(slug));
+  });
+
+  const hideStory = (id: string | number) => setHidden((prev) => addHidden(id, prev));
 
   return (
     <>
@@ -141,12 +171,17 @@ export default function TopicPortal({
             {/* Published category cards run 10% shorter than the global card;
                 the named jubileeinspire portals keep the standard height. */}
             <div className={`content-grid${isNamedPortal ? '' : ` ${styles.compactGrid}`}`}>
-              {visible.map((story) => (
+              {/* The five published categories carry the same featured rhythm as
+                  the home feed: a large card two columns wide, moving one place
+                  right on each row. The named jubileeinspire portals are left
+                  as an even row of cards, since only the compact grid above is
+                  measured for it. */}
+              {visible.map((story, i) => (
                 <StoryCard
                   key={String(story.id)}
                   story={story}
+                  className={!isNamedPortal && isFeatured(i) ? styles.featured : undefined}
                   category={title}
-                  articleType="article"
                   showActions
                   onHide={hideStory}
                 />

@@ -1168,6 +1168,36 @@ img {
   color: var(--text-primary);
 }
 
+/* Confirmation for the ⋯ menu (followed / copied). Following a topic changes
+   nothing visible on the card itself, so without this the menu read as inert. */
+.content-card-flash {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 21;
+  max-width: calc(100% - 80px);
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.82);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  animation: jv-card-flash-in 0.18s ease-out;
+}
+
+@keyframes jv-card-flash-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content-card-flash { animation: none; }
+}
+
 .content-card.featured .content-card-title {
   font-size: var(--font-lg);
   -webkit-line-clamp: 3;
@@ -1215,45 +1245,16 @@ img {
   margin-top: var(--space-2xl);
 }
 
-.footer-inner {
+/* The copyright line is the whole footer now — the link columns it used to sit
+   under are gone, and with them .footer-inner / .footer-section / .footer-links.
+   No border-top or top margin here any more: they existed to separate this from
+   those columns, and against .footer's own border they would read as a stray
+   second rule with a gap between. */
+.footer-bottom {
   max-width: var(--max-width);
   margin: 0 auto;
   padding: 0 var(--space-lg);
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-xl);
-}
-
-.footer-section h4 {
-  font-size: var(--font-sm);
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: var(--space-md);
-}
-
-.footer-links {
-  list-style: none;
-}
-
-.footer-links li {
-  margin-bottom: var(--space-sm);
-}
-
-.footer-links a {
-  font-size: var(--font-sm);
-  color: var(--text-muted);
-}
-
-.footer-links a:hover {
-  color: var(--text-primary);
-}
-
-.footer-bottom {
-  max-width: var(--max-width);
-  margin: var(--space-lg) auto 0;
-  padding: var(--space-lg);
   text-align: center;
-  border-top: 1px solid var(--border-color);
 }
 
 .footer-bottom p {
@@ -1444,17 +1445,6 @@ img {
 
   .nav-menu.mobile-open .mobile-media-link {
     display: block;
-  }
-
-  .footer-inner {
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-lg);
-  }
-}
-
-@media (max-width: 480px) {
-  .footer-inner {
-    grid-template-columns: 1fr;
   }
 }
 
