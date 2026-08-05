@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getAuthToken } from '@/lib/authStorage';
+import { csrfHeaders } from '@/lib/csrf';
 import { LANGUAGES, getLangName } from '@/lib/languages';
 import { getSiteLang } from '@/lib/translate';
 import styles from './widgets.module.css';
@@ -81,6 +82,9 @@ export default function TranslateArticle({
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          // Signed-in readers carry a session cookie, and the backend's CSRF
+          // guard 403s any /api/ POST that does not echo the jv-csrf cookie.
+          ...csrfHeaders(),
         },
         body: JSON.stringify({
           language_code: code,
@@ -89,7 +93,11 @@ export default function TranslateArticle({
           fallback_content: fallbackContent,
         }),
       });
-      if (!res.ok || !res.body) throw new Error('Translation unavailable');
+      // The status is worth keeping: a bare "unavailable" gave no way to tell a
+      // rejected request from a translation the model could not produce.
+      if (!res.ok || !res.body) {
+        throw new Error(`Translation unavailable (${res.status})`);
+      }
 
       setStatus('streaming');
       const reader = res.body.getReader();

@@ -6,6 +6,7 @@
  * Kept as a DOM-scanning routine (rather than i18n message catalogs) to match
  * the original behavior and the backend contract exactly.
  */
+import { csrfHeaders } from './csrf';
 import { getLangName } from './languages';
 
 const CACHE_PREFIX = 'jv_pg_';
@@ -23,8 +24,6 @@ const SELECTORS: SelectorSpec[] = [
   { sel: '#signInBtn', prop: 'textContent' },
   { sel: '#searchBtn', prop: 'textContent' },
   { sel: '#searchInput', prop: 'placeholder' },
-  { sel: '.footer-section h4', prop: 'textContent' },
-  { sel: '.footer-links a', prop: 'textContent' },
   { sel: '.footer-bottom p', prop: 'innerHTML' },
   { sel: 'h1', prop: 'textContent' },
   { sel: 'h2', prop: 'textContent' },
@@ -43,13 +42,12 @@ const TEMPLATE_STRINGS = [
   'PRAYER', 'MUSIC', 'RADIO', 'AI BIBLE CHAT',
   'Prayer', 'Music', 'Radio', 'AI Bible Chat',
   'Sign In', 'Sign Out', 'Profile Settings', 'Search good news...',
-  'About', 'Categories', 'Resources', 'Connect',
-  'About Us', 'Our Team', 'Our Mission', 'Contact',
-  'Devotionals', 'Sermons', 'Faith Stories', 'Community',
-  'Bible Study', 'Prayer Requests', 'Podcasts', 'Videos',
-  'Facebook', 'Twitter', 'Instagram', 'YouTube',
   'Languages', 'Search languages...', 'No languages found',
 ];
+// The footer's four column headings and their sixteen links used to be seeded
+// here. The footer is now just the copyright line, and this list is only a
+// warm-up — collectElements() adds whatever is actually on the page — so seeding
+// strings nothing renders just paid the translation API to translate them.
 
 type TranslationMap = Record<string, string>;
 
@@ -163,10 +161,18 @@ export async function translatePage(lang: string): Promise<boolean> {
       const chunk = missing.slice(i, i + CHUNK);
       const resp = await fetch('/api/translate-batch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // A signed-in reader's session cookie makes this a CSRF-guarded call;
+        // without the header the backend answers 403 and the page silently
+        // stayed in English.
+        headers: { 'Content-Type': 'application/json', ...csrfHeaders() },
         body: JSON.stringify({ texts: chunk, targetLang: lang, targetLangName: langName }),
       });
-      if (!resp.ok) continue;
+      if (!resp.ok) {
+        // Swallowing this is what made the failure invisible: the language
+        // picker appeared to do nothing at all, with nothing in the console.
+        console.warn('[SiteTranslate] /api/translate-batch failed:', resp.status);
+        continue;
+      }
       const data = await resp.json();
       if (data.translations && Object.keys(data.translations).length > 0) {
         Object.assign(translationMap, data.translations);

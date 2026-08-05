@@ -8,6 +8,7 @@
  */
 import type { SyntheticEvent } from 'react';
 import { clearStoredAuth, getAuthToken, getRefreshToken, getStoredAuth, setStoredAuth } from './authStorage';
+import { getCsrfToken } from './csrf';
 
 export class ApiError extends Error {
   status: number;
@@ -30,6 +31,9 @@ export interface ApiFetchOptions extends Omit<RequestInit, 'body'> {
   auth?: boolean;
 }
 
+/** Requests the backend's CSRF guard lets through untouched. */
+const CSRF_SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
 function buildHeaders(options: ApiFetchOptions): Headers {
   const headers = new Headers(options.headers);
   if (options.json !== undefined && !headers.has('Content-Type')) {
@@ -40,6 +44,15 @@ function buildHeaders(options: ApiFetchOptions): Headers {
     if (token && !headers.has('Authorization')) {
       headers.set('Authorization', `Bearer ${token}`);
     }
+  }
+  // A reader signed in through /auth carries a session cookie, and the backend
+  // then rejects every state-changing /api/ call that does not echo the
+  // `jv-csrf` cookie back as a header. Bearer-only callers have no such cookie
+  // and the guard skips them, so this is a no-op for them.
+  const method = (options.method || 'GET').toUpperCase();
+  if (!CSRF_SAFE_METHODS.has(method) && !headers.has('X-CSRF-Token')) {
+    const csrf = getCsrfToken();
+    if (csrf) headers.set('X-CSRF-Token', csrf);
   }
   return headers;
 }

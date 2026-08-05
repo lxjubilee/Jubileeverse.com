@@ -1102,7 +1102,20 @@ app.use(cors({
     },
     credentials: true,
 }));
-app.use(express.json());
+// The article translator posts the whole article body as `fallback_content`,
+// because for a published bundle or a CDN news item that text is the only copy
+// the backend can see. A long-form piece passes the 100 kb default, and the
+// parser then rejected it with 413 before the route ever ran — so translation
+// worked on short articles and failed on exactly the long ones most worth
+// translating. The larger cap is scoped to that one route rather than raised
+// globally, which would widen the request-body surface of every endpoint.
+const LARGE_BODY_PATHS = [/^\/api\/articles\/[^/]+\/translate$/];
+const defaultJsonParser = express.json();
+const largeJsonParser = express.json({ limit: '2mb' });
+app.use((req, res, next) => {
+    const parser = LARGE_BODY_PATHS.some((p) => p.test(req.path)) ? largeJsonParser : defaultJsonParser;
+    return parser(req, res, next);
+});
 app.use(express.urlencoded({ extended: true }));
 
 // Logging
@@ -1136,15 +1149,27 @@ app.use((req, res, next) => {
 // escalating to a fresh set if none pass — a normal success takes one to three
 // minutes. At the shared 30 s it always timed out, and because the work carried
 // on and answered afterwards it took the process down with ERR_HTTP_HEADERS_SENT.
-const LONG_RUNNING_PATHS = new Map([
-    ['/api/admin/regenerate-image', 300_000],
-]);
+// Matched in order; the first hit wins. Patterns rather than exact paths so a
+// parameterised route can be listed at all — /api/articles/:id/translate could
+// never match a literal key, so it silently ran on the shared 30 s.
+//
+// Translation calls an LLM and is routinely slower than that: a long article,
+// or a batch of UI strings in a language with no cache entries yet, comfortably
+// passes 30 s. The timeout answered 503 while the work carried on, so the
+// reader saw "Translation unavailable" and the handler then wrote to a response
+// that was already sent.
+const LONG_RUNNING_PATHS = [
+    [/^\/api\/admin\/regenerate-image$/, 300_000],
+    [/^\/api\/articles\/[^/]+\/translate$/, 180_000],
+    [/^\/api\/translate-batch$/, 120_000],
+];
 
 app.use((req, res, next) => {
     if (req.path.startsWith('/backoffice/assets/') || req.path.startsWith('/images/') || req.path.startsWith('/fonts/')) {
         return next(); // static assets — no timeout needed
     }
-    const limit = LONG_RUNNING_PATHS.get(req.path) || 30_000;
+    const matched = LONG_RUNNING_PATHS.find(([pattern]) => pattern.test(req.path));
+    const limit = matched ? matched[1] : 30_000;
     const timeout = setTimeout(() => {
         if (!res.headersSent) {
             console.error(`[Timeout] ${req.method} ${req.path} exceeded ${Math.round(limit / 1000)} s — responding 503`);
@@ -14708,24 +14733,72 @@ function isRTLLanguage(languageCode) {
     return rtlLanguages.includes(languageCode.toLowerCase());
 }
 
+// Ids above this floor are hashes of a non-numeric id, never a real serial.
+// Matches reactionIdForSlug() in src/lib/homeFeed.ts, which already hands the
+// backend hashed ids in this range for views and reactions.
+const HASHED_ID_FLOOR = 1_000_000_000;
+
+/** FNV-1a 32-bit, folded into HASHED_ID_FLOOR..2e9. Same scheme as the frontend. */
+function hashIdToInt(str) {
+    let hash = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+        hash ^= str.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return HASHED_ID_FLOOR + (Math.abs(hash) % 1_000_000_000);
+}
+
+/**
+ * How one article id maps onto the translation cache.
+ *
+ * `article_translations.article_id` is INTEGER, but a reader addresses an
+ * article by three different id shapes: a backend serial, a published bundle's
+ * `category__slug`, and a `jv_content_objects` UUID. The previous code ran
+ * parseInt() over all of them, so the latter two became NaN — which pg sends as
+ * the literal string "NaN", failing the query outright. Every lookup for those
+ * articles therefore reported a cache miss, and nothing was ever written back.
+ *
+ * Non-numeric ids get a stable hashed key instead, which needs no schema change
+ * and cannot collide with a serial id.
+ *
+ * `isNativeInteger` stays separate from the cache key on purpose: only a real
+ * serial may be used to read the original text out of `articles`. A hashed id
+ * that happened to land on an existing row would otherwise translate an
+ * unrelated article.
+ */
+function translationIdentity(idStr) {
+    const raw = String(idStr ?? '').trim();
+    const numeric = /^\d+$/.test(raw) ? parseInt(raw, 10) : null;
+    return {
+        raw,
+        isUUID: isUUID(raw),
+        isNativeInteger: numeric !== null && numeric > 0 && numeric < HASHED_ID_FLOOR,
+        cacheKey: numeric !== null && numeric > 0 ? numeric : hashIdToInt(raw),
+    };
+}
+
 // GET /api/articles/:id/translation/:lang — check cache and increment hit_count
 app.get('/api/articles/:id/translation/:lang', async (req, res) => {
     const { id, lang } = req.params;
-    // Only check cache for legacy integer-based articles (UUIDs don't have cache entries yet)
-    if (isUUID(id)) {
+    const ident = translationIdentity(id);
+    const cacheKey = ident.cacheKey;
+    // Same rule as the POST below: only ids whose original the server can read
+    // are answered from the id-keyed cache. Anything else falls through to a
+    // miss, and the POST path serves it from the content-addressed cache.
+    if (!(ident.isNativeInteger || ident.isUUID)) {
         return res.json({ found: false });
     }
     try {
         const result = await pgPool.query(
             `SELECT translated_title, translated_content, is_rtl, translated_source_badge, translated_category FROM article_translations WHERE article_id = $1 AND language_code = $2`,
-            [parseInt(id), lang]
+            [cacheKey, lang]
         );
         if (result.rows.length > 0) {
             const row = result.rows[0];
             // Increment hit count (fire-and-forget)
             pgPool.query(
                 `UPDATE article_translations SET hit_count = COALESCE(hit_count, 0) + 1 WHERE article_id = $1 AND language_code = $2`,
-                [parseInt(id), lang]
+                [cacheKey, lang]
             ).catch(e => console.error('[Translation] hit_count update error:', e.message));
             res.json({
                 found: true,
@@ -14753,8 +14826,8 @@ function isUUID(str) {
 // POST /api/articles/:id/translate — stream Claude translation via SSE
 app.post('/api/articles/:id/translate', async (req, res) => {
     const idStr = req.params.id;
-    const isIntegerId = !isUUID(idStr);
-    const articleId = isIntegerId ? parseInt(idStr) : idStr;
+    const ident = translationIdentity(idStr);
+    const articleId = ident.cacheKey;
     const { language_code, language_name, fallback_title, fallback_content, source_badge, category_label } = req.body || {};
     if (!language_code || !language_name) {
         return res.status(400).json({ error: 'language_code and language_name required' });
@@ -14763,37 +14836,57 @@ app.post('/api/articles/:id/translate', async (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    // Reverse proxies buffer a streamed body by default, which holds every event
+    // back until the translation finishes and loses the point of streaming.
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
 
-    const sendEvent = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+    // The response can already be over — the request timeout answers 503 on its
+    // own, and a reader who navigates away closes the socket. Writing then
+    // throws inside the stream loop, and the throw used to land in the catch
+    // below, which wrote again.
+    const sendEvent = (data) => {
+        if (res.writableEnded) return false;
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+        return true;
+    };
 
     try {
-        // Race-condition guard: check cache first (only for legacy integer-based articles)
-        if (isIntegerId && articleId > 0) {
-            const cached = await pgPool.query(
+        // Race-condition guard: check the id-keyed cache first, but only for the
+        // id shapes whose original text this server can read for itself. Those
+        // are the only entries it can have written from a trustworthy source —
+        // and rows an earlier build stored under a hashed id came from a caller's
+        // request body, so they are not served again.
+        const idKeyedCacheUsable = ident.isNativeInteger || ident.isUUID;
+        const cached = idKeyedCacheUsable
+            ? await pgPool.query(
                 `SELECT translated_title, translated_content, is_rtl, translated_source_badge, translated_category FROM article_translations WHERE article_id = $1 AND language_code = $2`,
                 [articleId, language_code]
-            );
-            if (cached.rows.length > 0) {
-                // Increment hit count for cached translation
-                pgPool.query(
-                    `UPDATE article_translations SET hit_count = COALESCE(hit_count, 0) + 1 WHERE article_id = $1 AND language_code = $2`,
-                    [articleId, language_code]
-                ).catch(e => console.error('[Translation] hit_count update error:', e.message));
-                sendEvent({
-                    type: 'cached',
-                    title: cached.rows[0].translated_title,
-                    content: cached.rows[0].translated_content,
-                    isRtl: cached.rows[0].is_rtl,
-                    sourceBadge: cached.rows[0].translated_source_badge,
-                    category: cached.rows[0].translated_category
-                });
-                return res.end();
-            }
+            )
+            : { rows: [] };
+        if (cached.rows.length > 0) {
+            // Increment hit count for cached translation
+            pgPool.query(
+                `UPDATE article_translations SET hit_count = COALESCE(hit_count, 0) + 1 WHERE article_id = $1 AND language_code = $2`,
+                [articleId, language_code]
+            ).catch(e => console.error('[Translation] hit_count update error:', e.message));
+            sendEvent({
+                type: 'cached',
+                title: cached.rows[0].translated_title,
+                content: cached.rows[0].translated_content,
+                isRtl: cached.rows[0].is_rtl,
+                sourceBadge: cached.rows[0].translated_source_badge,
+                category: cached.rows[0].translated_category
+            });
+            return res.end();
         }
 
-        // Fetch original article: try DB first, fall back to client-provided content
+        // Fetch original article: try DB first, fall back to client-provided content.
+        // `serverSourced` decides whether the result may be written to the shared
+        // cache below — see the note there.
         let title, content;
-        if (isIntegerId && articleId > 0) {
+        let serverSourced = false;
+        if (ident.isNativeInteger) {
             // Legacy: fetch from inspirePool articles table
             const articleResult = await inspirePool.query(
                 `SELECT title, content FROM articles WHERE id = $1`,
@@ -14802,17 +14895,19 @@ app.post('/api/articles/:id/translate', async (req, res) => {
             if (articleResult.rows.length > 0) {
                 title = articleResult.rows[0].title;
                 content = articleResult.rows[0].content;
+                serverSourced = !!(title && content);
             }
-        } else if (!isIntegerId) {
+        } else if (ident.isUUID) {
             // UUID-based: fetch from pgPool jv_content_objects
             const articleResult = await pgPool.query(
                 `SELECT title, extension_data FROM jv_content_objects WHERE id = $1 AND status = 'published'`,
-                [articleId]
+                [ident.raw]
             );
             if (articleResult.rows.length > 0) {
                 title = articleResult.rows[0].title;
                 const ext = articleResult.rows[0].extension_data || {};
                 content = ext.body || '';
+                serverSourced = !!(title && content);
             }
         }
         // Fall back to content sent by client (for articles not in DB or as override)
@@ -14821,6 +14916,61 @@ app.post('/api/articles/:id/translate', async (req, res) => {
         if (!title || !content) {
             sendEvent({ type: 'error', message: 'Article not found' });
             return res.end();
+        }
+
+        // Content-addressed cache for articles the backend cannot read itself.
+        //
+        // Keying those by article id would be unsafe (see the note at the write
+        // below), but keying them by a hash of the very text being translated is
+        // not: an entry can only ever be served back to a request that supplied
+        // the identical source, so the worst a forged body can do is cache a
+        // translation of itself. That restores caching for CDN news and
+        // published bundles, which is most of what readers open — and without it
+        // every non-English reader re-translates every article on every visit.
+        const sourceHash = serverSourced
+            ? null
+            : crypto.createHash('sha1').update(`${title}\n${content}`).digest('hex');
+        if (sourceHash) {
+            try {
+                await pgPool.query(`
+                    CREATE TABLE IF NOT EXISTS article_translation_bodies (
+                        source_hash             TEXT NOT NULL,
+                        language_code           TEXT NOT NULL,
+                        translated_title        TEXT NOT NULL,
+                        translated_content      TEXT NOT NULL,
+                        is_rtl                  BOOLEAN,
+                        translated_source_badge TEXT,
+                        translated_category     TEXT,
+                        hit_count               INTEGER DEFAULT 1,
+                        created_at              TIMESTAMPTZ DEFAULT NOW(),
+                        PRIMARY KEY (source_hash, language_code)
+                    )
+                `);
+                const byBody = await pgPool.query(
+                    `SELECT translated_title, translated_content, is_rtl, translated_source_badge, translated_category
+                     FROM article_translation_bodies WHERE source_hash = $1 AND language_code = $2`,
+                    [sourceHash, language_code]
+                );
+                if (byBody.rows.length > 0) {
+                    pgPool.query(
+                        `UPDATE article_translation_bodies SET hit_count = COALESCE(hit_count, 0) + 1
+                         WHERE source_hash = $1 AND language_code = $2`,
+                        [sourceHash, language_code]
+                    ).catch(e => console.error('[Translation] body hit_count error:', e.message));
+                    sendEvent({
+                        type: 'cached',
+                        title: byBody.rows[0].translated_title,
+                        content: byBody.rows[0].translated_content,
+                        isRtl: byBody.rows[0].is_rtl,
+                        sourceBadge: byBody.rows[0].translated_source_badge,
+                        category: byBody.rows[0].translated_category
+                    });
+                    return res.end();
+                }
+            } catch (e) {
+                // A cache that is unavailable must never block a translation.
+                console.warn('[Translation] body cache read failed:', e.message);
+            }
         }
 
         // Try translation: Anthropic first, OpenAI fallback, then friendly error
@@ -14987,8 +15137,20 @@ app.post('/api/articles/:id/translate', async (req, res) => {
         const translatedContent = lines.slice(contentStartIndex).join('\n').trim();
         if (!translatedTitle) translatedTitle = title; // Fallback to original
 
-        // Save to DB only for legacy integer-based articles (caching not supported for UUIDs yet)
-        if (isIntegerId && articleId > 0) {
+        // Two caches, and which one is written turns on where the original came
+        // from.
+        //
+        // Text the server read out of the database is keyed by article id, as
+        // before. Text the caller supplied is not: this endpoint is public, and
+        // for a published bundle or a CDN news item the "original" is whatever
+        // `fallback_content` was posted — that article lives on the CDN, which
+        // Express cannot see. Keying that by article id would let anyone replace
+        // the stored translation every later reader is served, and the reader
+        // renders an HTML body verbatim (dangerouslySetInnerHTML in
+        // ArticleReader), so the replacement would execute. Keyed by a hash of
+        // the source text instead, a forged body can only ever collide with
+        // itself.
+        if (serverSourced) {
             await pgPool.query(
                 `INSERT INTO article_translations (article_id, language_code, language_name, translated_title, translated_content, is_rtl, translated_source_badge, translated_category, hit_count)
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1)
@@ -15000,6 +15162,15 @@ app.post('/api/articles/:id/translate', async (req, res) => {
                      translated_category = EXCLUDED.translated_category`,
                 [articleId, language_code, language_name, translatedTitle, translatedContent, isRtl, translatedSourceBadge || null, translatedCategory || null]
             );
+        } else if (sourceHash) {
+            // Best-effort: a cache write must never fail the translation the
+            // reader is already receiving.
+            pgPool.query(
+                `INSERT INTO article_translation_bodies (source_hash, language_code, translated_title, translated_content, is_rtl, translated_source_badge, translated_category, hit_count)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
+                 ON CONFLICT (source_hash, language_code) DO NOTHING`,
+                [sourceHash, language_code, translatedTitle, translatedContent, isRtl, translatedSourceBadge || null, translatedCategory || null]
+            ).catch(e => console.warn('[Translation] body cache write failed:', e.message));
         }
 
         sendEvent({
@@ -15013,8 +15184,10 @@ app.post('/api/articles/:id/translate', async (req, res) => {
         res.end();
     } catch (err) {
         console.error('[Translation] Error:', err.message);
+        // sendEvent is a no-op once the response is over, so a socket that closed
+        // mid-stream ends the request here instead of throwing again.
         sendEvent({ type: 'error', message: err.message });
-        res.end();
+        if (!res.writableEnded) res.end();
     }
 });
 
@@ -15146,9 +15319,14 @@ app.post('/api/translate-batch', async (req, res) => {
             }
         }
 
+        // The request timeout may already have answered on our behalf; writing
+        // again throws ERR_HTTP_HEADERS_SENT, and that throw used to reach the
+        // catch below, which wrote a third time and took the process down.
+        if (res.headersSent) return;
         return res.json({ translations });
     } catch (err) {
         console.error('[translate-batch] error:', err.message);
+        if (res.headersSent) return;
         return res.status(500).json({ error: 'Translation failed', translations: {} });
     }
 });
