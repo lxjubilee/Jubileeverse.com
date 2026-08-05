@@ -1194,20 +1194,25 @@ app.use((req, res, next) => {
 });
 
 // Part 3 Section 11: CSRF protection — enforce X-CSRF-Token for state-changing requests when session cookie is present
+const csrfGuard = require('./lib/csrf-guard');
+// The exempt list and the rule live in lib/csrf-guard.js. This middleware is
+// mounted at '/api/', and Express hands a mounted handler a `req.path` relative
+// to that mount — '/tts', not '/api/tts' — so the list was compared against a
+// path that could never match it and every "exempt" endpoint was guarded
+// anyway. The guard only bites when a session COOKIE is present, which in
+// practice means only signed-in readers on the deployed site, so it answered
+// 200 in development and 403 in production.
 function requireCsrf(req, res, next) {
-    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
-    // Exempt public endpoints that don't require authentication and don't modify sensitive state
-    const pathsExemptFromCsrf = ['/api/track/view', '/api/tts', '/api/verse'];
-    if (pathsExemptFromCsrf.includes(req.path)) return next();
-    const cookies = _parseCookies(req);
-    const hasSession = !!cookies[_getSessionCookieName()];
-    if (!hasSession) return next(); // Bearer auth path — no CSRF check needed
-    const csrfCookie  = cookies['jv-csrf'];
-    const csrfHeader  = req.headers['x-csrf-token'];
-    if (!csrfCookie || csrfCookie !== csrfHeader) {
-        return res.status(403).json({ error: 'CSRF token mismatch' });
-    }
-    next();
+    const decision = csrfGuard.csrfDecision({
+        method: req.method,
+        baseUrl: req.baseUrl,
+        path: req.path,
+        cookies: _parseCookies(req),
+        csrfHeader: req.headers['x-csrf-token'],
+        sessionCookieName: _getSessionCookieName(),
+    });
+    if (decision.allow) return next();
+    return res.status(decision.status).json({ error: decision.error });
 }
 // Apply CSRF check to all /api/ routes; exclude /idp/ and /auth/ (those use redirects / form POSTs)
 app.use('/api/', requireCsrf);
@@ -15520,6 +15525,25 @@ app.post('/api/translate-batch', async (req, res) => {
         // again throws ERR_HTTP_HEADERS_SENT, and that throw used to reach the
         // catch below, which wrote a third time and took the process down.
         if (res.headersSent) return;
+
+        // Asked to translate something and came back with nothing at all.
+        //
+        // This used to answer 200 with an empty map: both providers could be
+        // failing — a missing key on one host, an expired token — and the client
+        // would see a successful response, apply nothing, log nothing, and leave
+        // the page in English. The picker looked broken with no trace anywhere,
+        // which is exactly how an environment-specific outage hides. A status the
+        // client already treats as a failure puts it in the browser console and
+        // in this log. Partial results still answer 200, so one bad string never
+        // costs a page its other translations.
+        if (misses.length > 0 && Object.keys(translations).length === 0) {
+            console.error(
+                `[translate-batch] produced no translations for ${misses.length} string(s) ` +
+                `into ${targetLang}. Both providers failed or returned nothing — check ` +
+                `ANTHROPIC_API_KEY / OPENAI_API_KEY_PRIMARY on THIS host.`
+            );
+            return res.status(502).json({ error: 'translation_unavailable', translations: {} });
+        }
         return res.json({ translations });
     } catch (err) {
         console.error('[translate-batch] error:', err.message);

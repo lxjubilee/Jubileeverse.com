@@ -65,9 +65,15 @@ function extractDeclaration(src, name) {
     throw new Error(`unbalanced brackets reading ${name}`);
 }
 
-/** Run extracted source in a sandbox and hand back the named globals. */
-function evaluate(source, names) {
-    const sandbox = { console, module: {}, exports: {} };
+/**
+ * Run extracted source in a sandbox and hand back the named globals.
+ *
+ * `extraGlobals` supplies module-level bindings the extracted function closes
+ * over — requireCsrf now delegates its rule to lib/csrf-guard, which the
+ * extracted source references but cannot require from inside the sandbox.
+ */
+function evaluate(source, names, extraGlobals = {}) {
+    const sandbox = { console, module: {}, exports: {}, ...extraGlobals };
     vm.createContext(sandbox);
     vm.runInContext(`${source}\n;__out = { ${names.join(', ')} };`, sandbox);
     return sandbox.__out;
@@ -104,6 +110,7 @@ function buildCsrfMiddleware(sessionCookieName) {
             extractFunction(SERVER_JS, 'requireCsrf'),
         ].join('\n'),
         ['requireCsrf'],
+        { csrfGuard: require('../../lib/csrf-guard') },
     );
     return requireCsrf;
 }
