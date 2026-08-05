@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getAuthToken } from '@/lib/authStorage';
+import { playAction, type Voice } from '@/lib/readAloudPlayback';
 import styles from './widgets.module.css';
 
 /**
@@ -93,7 +94,20 @@ export default function ReadAloud({
   const [segIndex, setSegIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [voice, setVoice] = useState<'female' | 'male'>('female');
+  const [voice, setVoice] = useState<Voice>('female');
+  /**
+   * Mirrors `voice` for the async paths. `setVoice` does not take effect until
+   * the next render, so a fetch started in the same tick as the change — which
+   * is exactly what switching voice mid-playback does — would otherwise read the
+   * previous render's value and synthesize in the voice the reader just left.
+   */
+  const voiceRef = useRef<Voice>('female');
+  /**
+   * The voice the blob currently attached to the audio element was synthesized
+   * with, or null when nothing is loaded. Resuming is only valid while this
+   * still matches the selection.
+   */
+  const loadedVoiceRef = useRef<Voice | null>(null);
   const [speedIdx, setSpeedIdx] = useState(0);
   const [error, setError] = useState('');
   /** True from first play until stop/finish — keeps the highlight while paused. */
@@ -103,11 +117,40 @@ export default function ReadAloud({
   /** Measured duration per segment; unplayed entries stay undefined. */
   const [durations, setDurations] = useState<number[]>([]);
 
+  // changeVoice sets the ref itself, because the re-fetch it triggers runs
+  // before this effect does. This keeps the two in step for any other path that
+  // may come to set `voice`.
+  useEffect(() => {
+    voiceRef.current = voice;
+  }, [voice]);
+
+  /**
+   * Drop the synthesized segment attached to the audio element, so the next
+   * play re-synthesizes rather than replaying what is loaded.
+   */
+  const detachLoadedAudio = useCallback(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      if (audio.src.startsWith('blob:')) URL.revokeObjectURL(audio.src);
+      // removeAttribute rather than `src = ''`, which would re-load the page
+      // URL as media.
+      audio.removeAttribute('src');
+      audio.load();
+    }
+    loadedVoiceRef.current = null;
+  }, []);
+
   useEffect(() => {
     segments.current = segmentize(text);
     setDurations([]);
     setSegTime(0);
-  }, [text]);
+    // The body itself changed — translating the article swaps it — so audio
+    // synthesized from the previous text is no longer what these segments say.
+    detachLoadedAudio();
+    setSegIndex(0);
+    setPlaying(false);
+    setActive(false);
+  }, [text, detachLoadedAudio]);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -166,9 +209,13 @@ export default function ReadAloud({
   }, [segIndex, active, contentRef, text]);
 
   const fetchSegment = useCallback(
-    async (idx: number): Promise<string | null> => {
+    async (idx: number): Promise<{ url: string; voice: Voice } | null> => {
       const seg = segments.current[idx];
       if (!seg) return null;
+      // Read the selection at call time, and report back which voice was
+      // actually requested: the reader can switch again while this is in
+      // flight, and the caller must not label the result with the newer choice.
+      const requestedVoice = voiceRef.current;
       const token = getAuthToken();
       const res = await fetch('/api/tts', {
         method: 'POST',
@@ -176,16 +223,16 @@ export default function ReadAloud({
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ text: seg, voice, lang: 'en-US' }),
+        body: JSON.stringify({ text: seg, voice: requestedVoice, lang: 'en-US' }),
       });
       if (!res.ok) throw new Error('TTS request failed');
       const blob = await res.blob();
       // The backend answers 200 with an empty body when it can't synthesize the
       // text; a 0-byte blob would only surface later as a MediaError.
       if (blob.size === 0) throw new Error('TTS returned empty audio');
-      return URL.createObjectURL(blob);
+      return { url: URL.createObjectURL(blob), voice: requestedVoice };
     },
-    [voice],
+    [],
   );
 
   const playSegment = useCallback(
@@ -202,11 +249,12 @@ export default function ReadAloud({
       setLoading(true);
       setError('');
       try {
-        const url = await fetchSegment(idx);
-        if (!url) {
+        const fetched = await fetchSegment(idx);
+        if (!fetched) {
           setPlaying(false);
           return;
         }
+        const { url, voice: fetchedVoice } = fetched;
         // The widget may have unmounted while the segment was in flight —
         // starting playback now would leave audio running with no way to stop.
         if (!aliveRef.current || audioRef.current !== audio) {
@@ -215,6 +263,7 @@ export default function ReadAloud({
         }
         if (audio.src.startsWith('blob:')) URL.revokeObjectURL(audio.src);
         audio.src = url;
+        loadedVoiceRef.current = fetchedVoice;
         audio.playbackRate = SPEEDS[speedIdx];
         audio.onended = () => {
           setSegIndex((i) => {
@@ -252,14 +301,21 @@ export default function ReadAloud({
   const toggle = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (playing) {
+    const action = playAction({
+      playing,
+      hasLoadedAudio: !!audio.src,
+      loadedVoice: loadedVoiceRef.current,
+      selectedVoice: voice,
+      segIndex,
+    });
+    if (action.kind === 'pause') {
       audio.pause();
       setPlaying(false);
-    } else if (audio.src) {
+    } else if (action.kind === 'resume') {
       void audio.play();
       setPlaying(true);
     } else {
-      void playSegment(0);
+      void playSegment(action.segment);
     }
   };
 
@@ -269,14 +325,23 @@ export default function ReadAloud({
       audio.pause();
       audio.currentTime = 0;
     }
+    // Detach the segment as well as pausing it. Leaving it attached is what made
+    // a voice change after Stop have no effect: the next Play saw a non-empty
+    // `src` and simply replayed it, so the new voice was never requested. It
+    // also left the audio out of step with `segIndex`, which resets to 0 here
+    // while the element still held a later segment.
+    detachLoadedAudio();
     setPlaying(false);
     setActive(false);
     setSegIndex(0);
     setSegTime(0);
   };
 
-  const changeVoice = (v: 'female' | 'male') => {
+  const changeVoice = (v: Voice) => {
     if (v === voice) return;
+    // Update the ref first: the re-fetch below runs before `setVoice` has taken
+    // effect, and it reads the voice from the ref.
+    voiceRef.current = v;
     setVoice(v);
     if (playing) {
       // Re-fetch the current segment in the new voice.
