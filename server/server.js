@@ -37,33 +37,69 @@ const app = express();
 const PORT = process.env.PORT || 3107;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// ── Phase 5: Email transport (optional — requires SMTP_HOST env var) ─────────────────────────
-const emailTransporter = process.env.SMTP_HOST
-    ? nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    })
-    : null;
+// ── Phase 5: Email transport ────────────────────────────────────────────────
+//
+// Announced at boot. Transactional mail used to be built only when SMTP_HOST
+// was set and to say nothing when it was not, so a deployment with no mail
+// configuration looked identical to a working one until a locked-out user
+// waited for a reset link that was never sent.
+const { resolveMailConfig, resolveFromAddress, describeMailError } = require('./lib/mail-transport');
+
+const mailConfig = resolveMailConfig();
+const mailFrom = resolveFromAddress();
+const emailTransporter = mailConfig.options ? nodemailer.createTransport(mailConfig.options) : null;
+
+if (emailTransporter) {
+    console.log(`[email] ${mailConfig.reason}, from ${mailFrom.from}`);
+    if (mailFrom.defaulted) {
+        console.warn('[email] SMTP_FROM is unset — falling back to noreply@jubileeverse.com. ' +
+            'Providers reject mail whose sender is not an address they are authorised to send for.');
+    }
+    // Confirms the credentials are accepted, without sending anything. A wrong
+    // password otherwise surfaces only on the first real send, which for
+    // password reset is a user who never hears back.
+    emailTransporter.verify()
+        .then(() => console.log('[email] SMTP credentials accepted'))
+        .catch((e) => console.error(`[email] SMTP verification FAILED — transactional mail will not send: ${describeMailError(e)}`));
+} else {
+    console.warn(`[email] DISABLED: ${mailConfig.reason}`);
+}
+
 /**
  * Best-effort transactional send. Swallows its own failures by design: callers are
  * request handlers whose response must not depend on the mail server, and for
  * password reset a thrown error would leak whether an address is registered.
+ *
+ * Swallowed is not the same as unrecorded — every return path here logs why,
+ * because the caller cannot say anything useful in its response and the log is
+ * the only account of what happened.
  *
  * `text` is optional only for backwards compatibility — always pass it. An
  * HTML-only message scores worse with spam filters and is unreadable in
  * text-only clients, which for a reset mail means a locked-out user stays out.
  */
 async function sendEmail(to, subject, html, text) {
-    if (!emailTransporter || !to) return false;
+    if (!to) {
+        console.error('[email] not sent: no recipient address');
+        return false;
+    }
+    if (!emailTransporter) {
+        // This branch used to return silently, so the caller's "see [email]
+        // above" pointed at a line that was never written.
+        console.error(`[email] not sent to ${to}: ${mailConfig.reason}`);
+        return false;
+    }
     try {
         await emailTransporter.sendMail({
-            from: process.env.SMTP_FROM || 'noreply@jubileeverse.com',
+            from: mailFrom.from,
             to, subject, html,
             ...(text ? { text } : {}),
         });
         return true;
-    } catch (e) { console.error('[email]', e.message); return false; }
+    } catch (e) {
+        console.error(`[email] send to ${to} failed: ${describeMailError(e)}`);
+        return false;
+    }
 }
 
 /**
@@ -3360,61 +3396,29 @@ const {
 const ssoDelegationActive = () => AUTH_LOGIN_MODE === 'sso' && ssoEnabled();
 
 // ── Account deletion ─────────────────────────────────────────────────────────
-// Deliberately NOT behind a feature flag: a user deleting their own account is
-// ordinary product behaviour, not something to be switched on per environment.
-// The only gate is _tombstoneReady below, and that is a correctness guard rather
-// than a toggle — it needs no configuration and is satisfied automatically.
+// Deliberately NOT behind a feature flag, and no longer behind a readiness gate
+// either: a user deleting their own account is ordinary product behaviour.
 //
-// Set by the boot probe below runMigrations(). The migration loop swallows any
-// error whose message contains 'already exists' OR 'does not exist', so a failed
-// CREATE TABLE would otherwise leave the server running with no tombstone table —
-// and a deletion without a tombstone is a silent-resurrection bomb. We degrade
-// this one feature to 503 rather than refusing to boot the whole site.
-let _tombstoneReady = false;
-
-const {
-    hashIdentity: _tombstoneHash,
-    purgeUserAccount,
-} = require('./lib/account-deletion');
+// Deletion means the account is ABSENT from this database — no row, and no record
+// that a row ever existed. There used to be a tombstone (a hashed-identity row in
+// jv_deleted_accounts that outlived the account and refused it a way back); it is
+// gone by product decision, along with the boot probe and the 503 that guarded
+// writing it. Two consequences worth knowing:
+//
+//   - Coming back is an ordinary sign-up. The Jubilee ID at the Identity
+//     Authority is deliberately never deleted, so the sign-up email step
+//     recognises a returning reader, asks for their password, and provisions a
+//     brand-new empty account once the authority verifies it.
+//   - Nothing now distinguishes "deleted" from "never existed" — which is the
+//     point, but it also means the implicit-creation paths (/auth/local-login's
+//     LOCAL_AUTH_ENABLED bypass, the dormant /auth/callback) will re-create a
+//     deleted account without ceremony. jv_audit_log's user_account.self_deleted
+//     entry, keyed by a hash, is the only remaining record that a deletion
+//     happened at all.
+const { hashIdentity: _tombstoneHash, purgeUserAccount } = require('./lib/account-deletion');
 
 // Like/dislike keyed by article slug — see lib/slug-reactions.js.
 const slugReactions = require('./lib/slug-reactions');
-
-/**
- * Is this identity tombstoned? Returns { deleted_at } or null.
- *
- * THROWS on a DB error, and callers on the auth path must let it propagate. A
- * tombstone check that fails open re-creates deleted accounts during exactly the
- * incident nobody is watching; a login 500 during a database outage is the
- * correct trade.
- *
- * The SSO subject is matched as well as the email because upsertUserFromSso
- * builds it as `sso|${ssoUser.id ?? email}` — an identity whose address changed
- * at the authority still matches on the subject. UNION ALL rather than OR so
- * each branch is a guaranteed index seek.
- */
-async function accountTombstone({ email, ssoSubjectId = null }) {
-    const params = [_tombstoneHash(email)];
-    let sql = `SELECT deleted_at FROM jv_deleted_accounts
-                WHERE email_sha256 = $1 AND reinstated_at IS NULL`;
-    if (ssoSubjectId) {
-        params.push(_tombstoneHash(ssoSubjectId));
-        sql += ` UNION ALL
-                 SELECT deleted_at FROM jv_deleted_accounts
-                  WHERE sso_subject_sha256 = $2 AND reinstated_at IS NULL`;
-    }
-    const { rows } = await pgPool.query(`${sql} LIMIT 1`, params);
-    return rows[0] || null;
-}
-
-/** Standard 410 for a sign-in attempt against a deleted identity. */
-function _respondAccountDeleted(res) {
-    return res.status(410).json({
-        error: 'This account was deleted and can no longer sign in.',
-        accountDeleted: true,
-        canReinstate: true,
-    });
-}
 
 /**
  * Push a new password to the Identity Authority so the shared credential stays in
@@ -10705,14 +10709,9 @@ app.post('/api/auth/register', ah(async (req, res) => {
     const hash = authHashPassword(password, salt);
     const client = await pgPool.connect();
     try {
-        // Registration is a deliberate front-door act with a typed password, so it
-        // clears any tombstone rather than being blocked by one — the tombstone
-        // exists to stop IMPLICIT re-creation, not to exile people.
-        //
-        // The clear and the INSERT must be one transaction. A crash between them
-        // would leave a live user carrying a live tombstone, i.e. an account that
-        // exists but can never sign in — a self-inflicted permanent lockout that
-        // only direct database access could undo.
+        // Nothing to clear before inserting any more: a previously deleted address
+        // leaves no record behind, so registering under it is an ordinary INSERT.
+        // The transaction is kept because the rest of this handler assumes one.
         await client.query('BEGIN');
         // entitlements is explicitly empty: the column DEFAULT is '["jubileeverse_cms"]',
         // which would grant back-office access to every self-registered account.
@@ -10720,11 +10719,6 @@ app.post('/api/auth/register', ah(async (req, res) => {
             `INSERT INTO jv_users (email, password_hash, password_salt, name, first_name, last_name, date_of_birth, role, entitlements)
                   VALUES ($1, $2, $3, $4, $5, $6, $7, 'user', '[]'::jsonb) RETURNING id`,
             [emailNorm, hash, salt, display, first, last, dob]
-        );
-        await client.query(
-            `UPDATE jv_deleted_accounts SET reinstated_at = NOW(), reinstated_by = 'self-registration'
-              WHERE email_sha256 = $1 AND reinstated_at IS NULL`,
-            [_tombstoneHash(emailNorm)]
         );
         await client.query('COMMIT');
         const user = { id: insertedUser.id, email: emailNorm, name: display, role: 'user', permissions: [] };
@@ -10833,16 +10827,15 @@ app.post('/auth/local-login', express.urlencoded({ extended: false }), async (re
     return res.status(400).json({ error: 'Invalid email address.' });
   }
 
-  // Tombstone gate. This route is the single worst resurrection vector in the
-  // codebase: it sits OUTSIDE the /api/ mount so it has neither requireCsrf nor
-  // backOfficeLimiter, and the LOCAL_AUTH_ENABLED branch below upserts a row with
-  // role='admin' from nothing but an email address. Both branches are guarded —
-  // the password branch does not insert, but it would still mint a jv_cms_sessions
-  // row for an account that is supposed to be gone.
-  if (await accountTombstone({ email })) {
-    return _respondAccountDeleted(res);
-  }
-
+  // This route used to consult the deletion tombstone here. Deletion now leaves
+  // no record, so there is nothing to consult and nothing to block: a deleted
+  // account has no row, and the password branch below cannot authenticate it.
+  //
+  // The LOCAL_AUTH_ENABLED branch is a different matter — it upserts a row with
+  // role='admin' from nothing but an email address, on a route that sits OUTSIDE
+  // the /api/ mount and so has neither requireCsrf nor backOfficeLimiter. That is
+  // a development bypass and must stay off in production; it is now the only
+  // thing standing between an email address and an administrator account.
   try {
     let user;
     if (process.env.LOCAL_AUTH_ENABLED === 'true') {
@@ -10936,14 +10929,11 @@ app.get('/auth/callback', async (req, res) => {
       return res.status(403).send('<!DOCTYPE html><html><head><title>Access Denied</title><style>body{font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f4f4f5}.card{background:#fff;padding:2rem;border-radius:8px;max-width:360px;text-align:center}h1{color:#dc2626;margin-bottom:1rem}a{color:#2563eb}</style></head><body><div class="card"><h1>Access Denied</h1><p>You don\'t have access to JubileeVerse CMS.</p><a href="/">Back to JubileeVerse</a></div></body></html>');
     }
 
-    // Tombstone gate. This OIDC path is dormant today, but a dormant path is
-    // precisely what gets switched back on without review, and the upsert below
-    // would re-create a deleted account. Note the `sub` is checked as BOTH the
-    // email and the subject: line ~10850 passes idTokenPayload.sub into the email
-    // column (a pre-existing quirk of this route), so we must match either shape.
-    if (await accountTombstone({ email: idTokenPayload.sub, ssoSubjectId: idTokenPayload.sub })) {
-      return res.status(410).send('<h1>Account Deleted</h1><p>This account was deleted and can no longer sign in.</p><a href="/">Back to JubileeVerse</a>');
-    }
+    // This dormant OIDC path also used to check the deletion tombstone. With no
+    // record kept, a deleted CMS user who still satisfies the entitlement check
+    // above is re-created by the upsert below — consistent with the Jubilee ID
+    // path, though note this one takes role and entitlements from the token
+    // rather than seeding a reader.
 
     // Upsert user in jv_users (first SSO login creates row)
     const { rows: [user] } = await pgPool.query(`
@@ -11038,7 +11028,7 @@ app.post('/auth/logout', express.json(), async (req, res) => {
  * '["jubileeverse_cms"]', which would hand back-office access to every identity
  * that can sign in. New SSO users start with none.
  */
-async function upsertUserFromSso(ssoUser) {
+async function upsertUserFromSso(ssoUser, req = null) {
     const email = String(ssoUser.email || '').toLowerCase().trim();
     if (!email) throw new Error('SSO login response missing email');
     const firstName = (ssoUser.first_name ?? ssoUser.firstName ?? '').trim() || null;
@@ -11047,25 +11037,26 @@ async function upsertUserFromSso(ssoUser) {
         || ssoUser.display_name || ssoUser.name || email;
     const subject = `sso|${ssoUser.id ?? email}`;
 
-    // The INSERT below is ON CONFLICT, so without this check a deleted account
-    // silently re-creates itself the moment the user signs in again — and because
-    // we deliberately leave the Jubilee ID alive, they still hold working
-    // credentials, so that sign-in is the expected outcome rather than an edge case.
+    // A previously deleted account lands on the INSERT branch and is provisioned
+    // again from what the authority just returned. Nothing here has to detect that
+    // case, because deletion leaves no record to detect it with: purgeUserAccount
+    // removes the jv_users row and everything hanging off it, so what comes back is
+    // a NEW, EMPTY account that merely reuses the address, with the same
+    // lowest-privilege defaults as any first-time SSO user — a deleted
+    // administrator comes back as a reader.
     //
-    // Throw rather than return null: this function's contract is "returns a user
-    // row", and a null would flow into `user.is_active` at the call site as a
-    // TypeError instead of a clean 410.
-    const tomb = await accountTombstone({ email, ssoSubjectId: subject });
-    if (tomb) {
-        const err = new Error('account_deleted');
-        err.code = 'ACCOUNT_DELETED';
-        err.deletedAt = tomb.deleted_at;
-        throw err;
-    }
-
+    // Reaching here at all is the caller's decision, not this function's. The login
+    // route only calls it when a local account already exists OR the request came
+    // from the sign-up screen (`provision: true`); a plain sign-in for an address
+    // with no local row is refused there with 404 needsSignup and never arrives.
+    //
+    // is_active is set explicitly rather than left to the column default, so a
+    // re-provisioned account is unambiguously live. It is NOT in the DO UPDATE
+    // list: an account an administrator disabled must stay disabled, and a
+    // returning sign-in is not the place to re-enable it.
     const { rows: [user] } = await pgPool.query(
-        `INSERT INTO jv_users (email, name, first_name, last_name, sso_subject_id, role, entitlements, last_login_at)
-              VALUES ($1, $2, $3, $4, $5, 'user', '[]'::jsonb, NOW())
+        `INSERT INTO jv_users (email, name, first_name, last_name, sso_subject_id, role, entitlements, is_active, last_login_at)
+              VALUES ($1, $2, $3, $4, $5, 'user', '[]'::jsonb, 1, NOW())
          ON CONFLICT (email) DO UPDATE
             SET last_login_at   = NOW(),
                 updated_at      = NOW(),
@@ -11126,6 +11117,13 @@ async function selfHealSsoLogin(emailNorm, password, req) {
 // In 'sso' mode the Identity Authority verifies the password and we mint our own
 // session from the user it returns. MFA stays LOCAL and still runs afterwards for
 // privileged roles: a remote first factor does not replace our second factor.
+//
+// The authority proves WHO you are; it does not grant membership of JubileeVerse.
+// Membership is a local row, and only the sign-up flow creates one — see
+// `provision` below. This mirrors Jubilujah's /signin exactly, deliberately: the
+// two sites share an Identity Authority, so they must agree on what a surviving
+// Jubilee ID entitles you to, or deleting an account means something different
+// depending on which door you knock at.
 app.post('/api/auth/login', loginLimiter, ah(async (req, res) => {
     const { email, password, totp_code, rememberMe } = req.body || {};
     // Type-check before use: a non-string here would throw inside toLowerCase()
@@ -11141,26 +11139,51 @@ app.post('/api/auth/login', loginLimiter, ah(async (req, res) => {
     let user = null;
     let authMethod = 'password';
 
+    // `provision: true` is sent ONLY by the sign-up screen's "you already have a
+    // Jubilee ID" step, which is a deliberate act of joining. Plain sign-in omits
+    // it, so a deleted account is NOT resurrected merely because the authority
+    // still holds the credential — the whole point of deleting it.
+    const allowProvision = req.body.provision === true;
+
     if (ssoDelegationActive()) {
         let ssoStatus = null;
+        let ssoUser = null;
         try {
             const { status, body } = await ssoLogin({ email: emailNorm, password });
             ssoStatus = status;
-            if (status === 200 && body && body.user) {
-                user = await upsertUserFromSso(body.user);
-                authMethod = 'sso';
-            }
+            if (status === 200 && body && body.user) ssoUser = body.user;
         } catch (err) {
-            // A tombstoned identity is a definitive answer, not an outage. Without
-            // this the catch below would swallow it, the local lookup would find no
-            // row, and the user would get a misleading "Invalid email or password"
-            // for an account they deliberately deleted.
-            if (err.code === 'ACCOUNT_DELETED') return _respondAccountDeleted(res);
             // The authority is unreachable. Fail OPEN to the local credential path
             // so an SSO outage cannot lock staff out of the back office. A 401 is
             // a different thing entirely and must NOT fall through this way.
+            //
+            // Only ssoLogin is inside this try. The membership check and upsert
+            // below used to be, which meant a DATABASE fault during them was
+            // reported as "authority unreachable" and silently retried against the
+            // local password path — hiding a real error behind a wrong one.
             console.error('[sso] login unreachable, falling back to local:', err.message);
         }
+
+        if (ssoUser) {
+            // The authority verified the password. Complete the sign-in only if a
+            // local account exists, unless this IS the sign-up. `is_active` is part
+            // of the test, matching Jubilujah: a disabled account answers "sign up"
+            // here rather than reaching the 403 below. That is a real difference in
+            // wording for a suspended user, and it is intentional — the two sites
+            // must not disagree about what a live Jubilee ID gets you.
+            const { rows: [localRow] } = await pgPool.query(
+                `SELECT 1 FROM jv_users WHERE email = $1 AND is_active = 1`, [emailNorm]
+            );
+            if (!localRow && !allowProvision) {
+                return res.status(404).json({
+                    error: 'No JubileeVerse account for this email. Please sign up.',
+                    needsSignup: true,
+                });
+            }
+            user = await upsertUserFromSso(ssoUser, req);
+            authMethod = 'sso';
+        }
+
         if (!user && ssoStatus === 401) {
             user = await selfHealSsoLogin(emailNorm, password, req);
             if (user) authMethod = 'sso';
@@ -11169,34 +11192,19 @@ app.post('/api/auth/login', loginLimiter, ah(async (req, res) => {
     }
 
     if (!user) {
-        // The join is FROM jv_users, so it only reports a tombstone when a row
-        // still exists. That is deliberate, and it is worth being precise about
-        // what it does and does not cover:
+        // Deletion leaves nothing behind, so there is nothing here to consult: a
+        // deleted local-mode account has no row and no password hash, and gets the
+        // generic 401 below. That is the right answer rather than a gap — the
+        // delete took the hash with it, so there is nothing to authenticate
+        // against, and a distinct "this account was deleted" would turn login into
+        // an oracle for an unauthenticated caller.
         //
-        //   COVERED — /api/admin/directory/grant-access re-inserts by email
-        //   without clearing the tombstone. Such a row must not become a working
-        //   login until an administrator deliberately reinstates it.
-        //
-        //   NOT COVERED — a plain hard delete. The row is gone, so this returns
-        //   no rows at all and the caller gets the generic 401 below. That is the
-        //   correct answer rather than a gap: the delete took the password hash
-        //   with it, so there is nothing left to authenticate against, and
-        //   answering 410 to an unauthenticated request would turn login into a
-        //   "was this account deleted?" oracle — the same leak /api/auth/lookup
-        //   is deliberately kept free of.
-        //
-        // In SSO mode the 410 IS reachable, because the authority verifies the
-        // password before upsertUserFromSso throws ACCOUNT_DELETED, so the answer
-        // is credential-gated by then.
+        // In SSO mode this path is reached only when the authority was unreachable
+        // or rejected the password; a correct password never arrives here, because
+        // upsertUserFromSso has already provisioned the account.
         const { rows: [row] } = await pgPool.query(
-            `SELECT u.*, d.deleted_at AS _tombstoned_at
-               FROM jv_users u
-               LEFT JOIN jv_deleted_accounts d
-                 ON d.email_sha256 = $2 AND d.reinstated_at IS NULL
-              WHERE u.email = $1`,
-            [emailNorm, _tombstoneHash(emailNorm)]
+            `SELECT * FROM jv_users WHERE email = $1`, [emailNorm]
         );
-        if (row && row._tombstoned_at) return _respondAccountDeleted(res);
         if (!row || !row.password_hash) return res.status(401).json({ error: 'Invalid email or password' });
         const hash = authHashPassword(password, row.password_salt);
         if (hash !== row.password_hash) return res.status(401).json({ error: 'Invalid email or password' });
@@ -11269,10 +11277,16 @@ app.post('/api/auth/login', loginLimiter, ah(async (req, res) => {
 //
 // is_active is deliberately not a filter: a disabled row still occupies the
 // address, and "sign in" leads to an explanation of why it is disabled, which is a
-// better answer than a form that cannot be submitted. A DELETED account is a
-// different case and stays absent here — deletion removes the row, so its owner
-// can register again, which is what the tombstone-clearing in the register route
-// is for.
+// better answer than a form that cannot be submitted.
+//
+// A DELETED account is the case that makes this route the front door of the return
+// path. Its jv_users row is gone, so the first leg finds nothing; in 'sso' mode the
+// second leg then asks the authority, which still holds the Jubilee ID and answers
+// yes. The signup screen reads that as "you already have a Jubilee ID", collects
+// the password instead of a registration form, and POST /api/auth/login provisions
+// the account again from what the authority returns. In 'local' mode both legs are
+// silent and the visitor registers from scratch, which is the only thing that can
+// work there — the password hash went with the row.
 //
 // Only the authority leg FAILS OPEN (exists:false) when it is unreachable, so an
 // outage never blocks signup — a genuine collision is still caught at registration.
@@ -11307,12 +11321,12 @@ app.get('/api/auth/me', ah(async (req, res) => {
         const cms_roles     = _parseJsonb(user.cms_roles, []);
         const has_cms_access = entitlements.includes('jubileeverse_cms') || PRIVILEGED_ROLES.includes(user.role);
         // Mirrors exactly what POST /api/auth/account/delete will accept, so the
-        // button is never enabled into a request that cannot succeed. In normal
-        // operation this is always true; it only goes false if the tombstone
-        // table is unavailable, which would make deletion unsafe rather than
-        // merely unavailable. Role is deliberately not a factor — back-office
-        // accounts may delete themselves too.
-        const can_delete_account = _tombstoneReady;
+        // button is never enabled into a request that cannot succeed. Now
+        // unconditional: the endpoint has no readiness gate left and no role
+        // condition — back-office accounts may delete themselves too. Kept as a
+        // field rather than dropped so the settings page keeps ONE contract to
+        // read, and a future condition has somewhere to live.
+        const can_delete_account = true;
         return { ...user, permissions, entitlements, cms_roles, has_cms_access, can_delete_account };
     }
     // Try cookie session first
@@ -11653,10 +11667,6 @@ async function _reverifyPasswordForDeletion(user, password) {
 // unconditional again and put the fields back in DeleteAccountDialog.tsx. Do not
 // do one without the other.
 app.post('/api/auth/account/delete', accountDeleteLimiter, ah(async (req, res) => {
-    if (!_tombstoneReady) {
-        return res.status(503).json({ error: 'Account deletion is temporarily unavailable. Please try again later.' });
-    }
-
     const actor = await _requireSelfActor(req, res);
     if (!actor) return;
 
@@ -11770,65 +11780,12 @@ app.post('/api/auth/account/delete', accountDeleteLimiter, ah(async (req, res) =
     res.json({ success: true, deleted: true, newsletterUnsubscribed: result.newsletterUnsubscribed });
 }));
 
-// POST /api/auth/reinstate — clear a tombstone so a deleted identity can sign up again.
-//
-// Needed because the tombstone is otherwise a dead end in SSO mode: the Jubilee ID
-// still exists at the authority, so POST /api/auth/register short-circuits on the
-// ssoLookup 409 before it ever reaches the local insert. Without this route an
-// ordinary reader who changes their mind has no way back at all.
-//
-// Requires the same proof as deletion — live credentials plus the typed address —
-// so it can never be triggered by a stale cookie or a background token refresh.
-app.post('/api/auth/reinstate', accountDeleteLimiter, ah(async (req, res) => {
-    if (!_tombstoneReady) {
-        return res.status(503).json({ error: 'This service is temporarily unavailable. Please try again later.' });
-    }
-    const { email, password, confirmEmail } = req.body || {};
-    if (typeof email !== 'string' || typeof password !== 'string' || typeof confirmEmail !== 'string') {
-        return res.status(400).json({ error: 'Email, password and confirmation are required.' });
-    }
-    const emailNorm = email.trim().toLowerCase();
-    if (!emailNorm || confirmEmail.trim().toLowerCase() !== emailNorm) {
-        return res.status(400).json({ error: 'The email you typed does not match.' });
-    }
-
-    const tomb = await accountTombstone({ email: emailNorm });
-    // Generic 400 rather than "not deleted": a specific answer here would turn this
-    // unauthenticated route into a "was this account deleted?" oracle.
-    if (!tomb) return res.status(400).json({ error: 'This account cannot be restored.' });
-
-    // Only the authority can verify — the local row and its hash are both gone.
-    if (!ssoDelegationActive()) {
-        return res.status(409).json({ error: 'Please register again to create a new account.' });
-    }
-    let result;
-    try {
-        result = await ssoLogin({ email: emailNorm, password });
-    } catch (e) {
-        console.error('[reinstate] SSO verify unreachable:', e.message);
-        return res.status(503).json({ error: 'We could not verify your identity right now. Please try again shortly.' });
-    }
-    if (result.status === 401) return res.status(401).json({ error: 'Email or password is incorrect.' });
-    if (result.status !== 200) {
-        return res.status(503).json({ error: 'We could not verify your identity right now. Please try again shortly.' });
-    }
-
-    await pgPool.query(
-        `UPDATE jv_deleted_accounts SET reinstated_at = NOW(), reinstated_by = 'self-reinstate'
-          WHERE email_sha256 = $1 AND reinstated_at IS NULL`,
-        [_tombstoneHash(emailNorm)]
-    );
-    logAuditEvent(pgPool, {
-        event_type: 'user_account.reinstated', actor_id: 'self',
-        target_type: 'user_account', target_id: _tombstoneHash(emailNorm),
-        details: { via: 'self_reinstate' },
-        ip_address: req.ip, user_agent: req.get('user-agent'),
-    });
-
-    // No session is minted here. The next sign-in creates a fresh, empty account
-    // via upsertUserFromSso — the old one is not coming back.
-    res.json({ success: true, reinstated: true, message: 'You can now sign in again. Your new account will start empty.' });
-}));
+// POST /api/auth/reinstate is GONE. It existed only to clear a tombstone so a
+// deleted identity could get back in; with no record kept there is nothing to
+// clear and nothing to unblock. The way back is the ordinary sign-up screen: its
+// email step asks the authority, which still holds the Jubilee ID, and on "yes"
+// collects the password and posts /api/auth/login, which provisions the account
+// again from what the authority returns.
 
 // POST /api/auth/forgot-password — Request password reset (public)
 app.post('/api/auth/forgot-password', ah(async (req, res) => {
@@ -17370,45 +17327,14 @@ async function runMigrations() {
         )`,
         `CREATE INDEX IF NOT EXISTS idx_qdrant_snapshots_hash ON jv_qdrant_snapshots(data_hash)`,
 
-        // ── Account deletion tombstones ──────────────────────────────────────
-        // A hard DELETE of jv_users leaves nothing behind to check, so every
-        // implicit "a token showed up, make a user" path — upsertUserFromSso,
-        // /auth/callback, /auth/local-login — would silently re-create a deleted
-        // account on the next sign-in. In SSO mode that sign-in is not
-        // hypothetical: the Jubilee ID is deliberately left alive, so the user
-        // still has working credentials. This table is the only thing standing
-        // between a deletion and that resurrection, and it must therefore
-        // outlive the row it describes.
-        //
-        // Identities are stored as SHA-256 so the table is not itself a
-        // directory of everyone who ever left. The SSO subject is hashed too,
-        // and not merely copied: upsertUserFromSso builds it as
-        // `sso|${ssoUser.id ?? email}` and selfHealSsoLogin as `sso|${email}`,
-        // so it frequently embeds the address verbatim — storing it raw would
-        // defeat hashing the email.
-        //
-        // The row doubles as the durable record of the deletion: logAuditEvent
-        // is fire-and-forget and can fail silently, so former_user_id /
-        // former_role / deleted_at / deleted_by live here as the backstop.
-        `CREATE TABLE IF NOT EXISTS jv_deleted_accounts (
-            id                 BIGSERIAL   PRIMARY KEY,
-            email_sha256       TEXT        NOT NULL UNIQUE,
-            sso_subject_sha256 TEXT,
-            hash_algo          TEXT        NOT NULL DEFAULT 'sha256',
-            email_domain       TEXT,
-            former_user_id     BIGINT      NOT NULL,
-            former_role        TEXT,
-            deleted_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            deleted_by         TEXT        NOT NULL,
-            deletion_reason    TEXT,
-            reinstated_at      TIMESTAMPTZ,
-            reinstated_by      TEXT
-        )`,
-        `CREATE INDEX IF NOT EXISTS idx_jv_deleted_accounts_subject
-            ON jv_deleted_accounts(sso_subject_sha256)
-            WHERE sso_subject_sha256 IS NOT NULL AND reinstated_at IS NULL`,
-        `CREATE INDEX IF NOT EXISTS idx_jv_deleted_accounts_at
-            ON jv_deleted_accounts(deleted_at DESC)`,
+        // NOTE: the jv_deleted_accounts tombstone table is no longer created or
+        // written. Deletion keeps no record of the account by product decision, so
+        // there is nothing left to store. The physical table is deliberately NOT
+        // dropped here — a DROP in a boot-time migration loop against this shared
+        // database is not something to do silently, and purgeUserAccount still
+        // DELETEs from it when present so rows written under the old behaviour go
+        // away as those identities are re-deleted. Drop it by hand once it is
+        // empty, or leave it: nothing reads it.
     ];
     for (const sql of migrations) {
         try { await pgPool.query(sql); } catch (e) {
@@ -17419,21 +17345,9 @@ async function runMigrations() {
         }
     }
 
-    // Tombstone probe. The loop above swallows any error mentioning 'already exists'
-    // or 'does not exist', so a failed CREATE TABLE jv_deleted_accounts would pass
-    // silently. Account deletion without a working tombstone is worse than no
-    // deletion at all: in SSO mode the account resurrects on the next sign-in while
-    // the user believes it is gone. Verify explicitly rather than trusting the loop.
-    try {
-        await pgPool.query('SELECT 1 FROM jv_deleted_accounts LIMIT 1');
-        _tombstoneReady = true;
-    } catch (e) {
-        _tombstoneReady = false;
-        console.error(
-            '[FATAL] jv_deleted_accounts is unavailable — account deletion is DISABLED:',
-            e.message
-        );
-    }
+    // The tombstone probe that used to run here is gone with the tombstone: there
+    // is no longer a table whose absence could make deletion unsafe, so nothing to
+    // verify and nothing to degrade to a 503.
 
     // Backfill category_id for existing records that have none
     try {
@@ -19693,24 +19607,9 @@ app.post('/api/admin/directory/grant-access', express.json(), async (req, res) =
         return res.status(400).json({ error: `initial_role must be one of: ${PRIVILEGED_ROLES.join(', ')}` });
     }
     try {
-        // Granting access is a deliberate, authenticated admin act, so it is the one
-        // upsert that is allowed to bring back a deleted identity — but the tombstone
-        // must be cleared explicitly, or login would keep answering 410 for a user
-        // who now has a perfectly good row. Audited, because un-deleting an account
-        // deserves a trail of its own.
-        const { rowCount: reinstated } = await pgPool.query(
-            `UPDATE jv_deleted_accounts SET reinstated_at = NOW(), reinstated_by = $2
-              WHERE email_sha256 = $1 AND reinstated_at IS NULL`,
-            [_tombstoneHash(email), actor.email || actor.sub]
-        );
-        if (reinstated) {
-            logAuditEvent(pgPool, {
-                event_type: 'user_account.reinstated', actor_id: actor.email || actor.sub,
-                target_type: 'user_account', target_id: _tombstoneHash(email),
-                details: { via: 'directory.grant_access', role: initial_role },
-                ip_address: req.ip, user_agent: req.get('user-agent'),
-            });
-        }
+        // Granting access used to have to clear the deleted-account tombstone here,
+        // or the row it creates below would exist while login kept answering 410.
+        // No record survives a deletion now, so the upsert stands on its own.
         // Upsert user
         await pgPool.query(
             `INSERT INTO jv_users (email, idp_subject_id, role, entitlements, is_active)
@@ -19907,9 +19806,6 @@ app.put('/api/admin/users/:id', async (req, res) => {
 // apart on what "deleted" means.
 app.delete('/api/admin/users/:id', express.json(), async (req, res) => {
     const actor = await requireRole(req, res, 'admin'); if (!actor) return;
-    if (!_tombstoneReady) {
-        return res.status(503).json({ error: 'Account deletion is temporarily unavailable. Please try again later.' });
-    }
     // Sibling admin routes pass req.params.id straight into a BIGINT comparison, so
     // /api/admin/users/abc throws "invalid input syntax for type bigint" and their
     // catch leaks e.message in a 500. Validate here; the siblings deserve the same.
