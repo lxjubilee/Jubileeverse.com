@@ -15,11 +15,6 @@ interface Props {
   onOpenPersonalize: () => void;
 }
 
-const MEDIA_LINKS = [
-  { href: 'https://jubilujah.com', label: 'MUSIC', external: true },
-  { href: 'https://www.jubileeinspire.com', label: 'AI BIBLE CHAT', external: true },
-];
-
 /** Secondary nav bar: taxonomy links, mobile menu, personalize + language. */
 export default function NavBar({
   categories,
@@ -66,28 +61,6 @@ export default function NavBar({
               {link.label}
             </Link>
           ))}
-
-          {MEDIA_LINKS.map((link) =>
-            link.external ? (
-              <a
-                key={link.label}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="nav-link mobile-media-link"
-              >
-                {link.label}
-              </a>
-            ) : (
-              <Link
-                key={link.label}
-                href={link.href}
-                className={`nav-link mobile-media-link${isActive(link.href) ? ' active' : ''}`}
-              >
-                {link.label}
-              </Link>
-            ),
-          )}
 
           <button className="mobile-close-btn" onClick={onToggleMobileMenu} aria-label="Close menu">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

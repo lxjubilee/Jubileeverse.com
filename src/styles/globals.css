@@ -818,10 +818,6 @@ img {
   background: transparent;
 }
 
-.mobile-media-link {
-  display: none;
-}
-
 .mobile-close-btn {
   display: none;
   align-items: center;
@@ -1440,10 +1436,6 @@ img {
     border-left: 3px solid var(--accent-gold);
     border-bottom: 1px solid var(--border-color);
     padding-left: calc(40px - 3px);
-  }
-
-  .nav-menu.mobile-open .mobile-media-link {
-    display: block;
   }
 }
 

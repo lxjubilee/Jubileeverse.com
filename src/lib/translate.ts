@@ -19,7 +19,6 @@ interface SelectorSpec {
 
 const SELECTORS: SelectorSpec[] = [
   { sel: '.nav-menu > .nav-link', prop: 'textContent' },
-  { sel: '.nav-menu > .mobile-media-link', prop: 'textContent' },
   { sel: '.header-media-links > a', prop: 'textContent' },
   { sel: '#signInBtn', prop: 'textContent' },
   { sel: '#searchBtn', prop: 'textContent' },
