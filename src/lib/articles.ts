@@ -296,6 +296,30 @@ function splitFrontmatter(raw: string): { data: Record<string, string>; body: st
 }
 
 /**
+ * The authoring template opens every published article with the title as an h1
+ * and the author as an emphasised "*by <name>*" line beneath it. Both are
+ * already on the page by the time the body renders — the reader puts the title
+ * in the hero overlay and the author in the source badge, and Backstage prints
+ * the author four times over — so leaving the line in the markdown prints the
+ * byline twice, once in the chrome and once as the article's opening words.
+ *
+ * Only the line directly under the title is dropped, matched from the start of
+ * the body. A paragraph further down that happens to open with an emphasised
+ * "by" is left alone, and an article written without a byline is unchanged.
+ * The emphasis marker is back-referenced so the same marker has to close the
+ * line it opened: `*by X*` and `**by X**` are the template's byline, while an
+ * unpaired `*by X_` is prose that happens to start that way.
+ *
+ * The h1 itself stays: <ArticleReader> strips it for its own hero, and
+ * Backstage renders the body through a different component that does not.
+ */
+const BODY_BYLINE = /^(\s*(?:#[^\n]*\r?\n\s*)?)([*_]{1,2})\s*by\s+[^\n]*?\2[ \t]*(?:\r?\n)+/i;
+
+function stripBodyByline(body: string): string {
+  return body.replace(BODY_BYLINE, '$1');
+}
+
+/**
  * One article with its body, or null when the category or slug is not
  * published. The manifest is checked first so an unlisted markdown file left in
  * the folder is not readable.
@@ -321,6 +345,6 @@ export async function fetchArticle(
     title: data.title || base.title,
     author: data.author || base.author,
     summary: data.summary || '',
-    content: body.trim(),
+    content: stripBodyByline(body).trim(),
   };
 }
