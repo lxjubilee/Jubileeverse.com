@@ -3,21 +3,26 @@
  *
  * A category portal shows every published article at once, so without this the
  * top of the page is frozen until something new is published. Re-ordering on a
- * clock gives the page a fresh face through the day.
+ * clock gives the page a fresh face each day.
  *
  * The order must be the same for every reader inside one window: it is derived
  * from the window and a caller-supplied key, never from a random source, so two
  * people opening the same category at the same moment see the same page — and
  * so a server render and its hydration agree.
  *
- * Windows are six PST hours (00, 06, 12, 18), matching the boundaries the Home
- * page already refreshes on and the day boundary the news pipeline publishes
- * against. Nothing here reads the clock unless asked: pass `now` and the result
- * is fully determined.
+ * A window is one PST day, turning over at midnight. That is the boundary the
+ * backend already locks its portal layout on (`generatePortalLayout` in
+ * server.js, seeded from the PST date), so the whole site changes face at one
+ * moment rather than drifting apart through the day — and a reader who returns
+ * in the afternoon finds the page as they left it that morning.
+ *
+ * The window size is still a parameter, so a caller that wants finer rotation
+ * can ask for it. Nothing here reads the clock unless asked: pass `now` and the
+ * result is fully determined.
  */
 
-/** Hours per rotation window. */
-export const ROTATION_HOURS = 6;
+/** Hours per rotation window — one full PST day. */
+export const ROTATION_HOURS = 24;
 
 /** The timezone whose day and 6-hour boundaries the site runs on. */
 const ROTATION_TIME_ZONE = 'America/Los_Angeles';
@@ -25,9 +30,11 @@ const ROTATION_TIME_ZONE = 'America/Los_Angeles';
 /**
  * The current rotation window, as `YYYY-MM-DDTHH` in PST.
  *
- * The hour is the window's opening hour, so every instant between 06:00:00 and
- * 11:59:59 PST yields `...T06`. Intl does the timezone work, which is what
- * keeps this correct across DST — the offset is not a constant to subtract.
+ * The hour is the window's opening hour, so at the 24-hour default every
+ * instant of a PST day yields `...T00` and the key is that day's date; at six
+ * hours, everything between 06:00:00 and 11:59:59 yields `...T06`. Intl does
+ * the timezone work, which is what keeps this correct across DST — the offset
+ * is not a constant to subtract.
  */
 export function rotationWindow(now: Date = new Date(), hours: number = ROTATION_HOURS): string {
   const parts = new Intl.DateTimeFormat('en-CA', {

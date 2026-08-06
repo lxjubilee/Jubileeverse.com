@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Six-hourly rotation of category listings.
+ * Daily rotation of category listings.
  *
  * A category portal shows every published article at once, so its order is
  * re-shuffled on a clock. Three properties carry the whole feature:
@@ -8,7 +8,9 @@
  *   1. everyone inside one window sees the same order — it must be derived from
  *      the window, never from a random source, or a server render and its
  *      hydration would disagree and two readers would compare different pages;
- *   2. the order actually changes at each PST boundary (00, 06, 12, 18);
+ *   2. the order actually changes at midnight PST, and holds for the day
+ *      between — a reader returning in the afternoon finds the page as they
+ *      left it that dayOne;
  *   3. nothing is added, dropped, or duplicated — a shuffle, not a filter.
  *
  * The module is TypeScript in src/, so this test transpiles the real file
@@ -43,32 +45,35 @@ const articles = (n = 84) => Array.from({ length: n }, (_, i) => ({
 
 const ids = (list) => list.map((a) => a.id);
 
-describe('rotationWindow — six PST hours', () => {
-    test('names the window by its opening hour', () => {
-        // 14:30 UTC on 1 Aug 2026 is 07:30 PDT — inside the 06:00 window.
-        expect(R.rotationWindow(new Date('2026-08-01T14:30:00Z'))).toBe('2026-08-01T06');
+describe('rotationWindow — one PST day', () => {
+    test('the default window is a full day', () => {
+        expect(R.ROTATION_HOURS).toBe(24);
     });
 
-    test('every instant within one window yields the same key', () => {
+    test('names the window by the PST day it opens', () => {
+        // 14:30 UTC on 1 Aug 2026 is 07:30 PDT — the 1 August window.
+        expect(R.rotationWindow(new Date('2026-08-01T14:30:00Z'))).toBe('2026-08-01T00');
+    });
+
+    test('every instant within one PST day yields the same key', () => {
         const inWindow = [
-            '2026-08-01T13:00:00Z', // 06:00 PDT exactly
+            '2026-08-01T07:00:00Z', // 00:00 PDT exactly
             '2026-08-01T15:45:12Z',
-            '2026-08-01T18:59:59Z', // 11:59:59 PDT
+            '2026-08-02T06:59:59Z', // 23:59:59 PDT — still 1 August in PST
         ].map((t) => R.rotationWindow(new Date(t)));
         expect(new Set(inWindow).size).toBe(1);
-        expect(inWindow[0]).toBe('2026-08-01T06');
+        expect(inWindow[0]).toBe('2026-08-01T00');
     });
 
-    test('rolls at each of the four PST boundaries', () => {
-        // PDT is UTC-7 in August: 00/06/12/18 PDT are 07/13/19/01Z.
-        expect(R.rotationWindow(new Date('2026-08-01T07:00:00Z'))).toBe('2026-08-01T00');
-        expect(R.rotationWindow(new Date('2026-08-01T13:00:00Z'))).toBe('2026-08-01T06');
-        expect(R.rotationWindow(new Date('2026-08-01T19:00:00Z'))).toBe('2026-08-01T12');
-        expect(R.rotationWindow(new Date('2026-08-02T01:00:00Z'))).toBe('2026-08-01T18');
+    test('rolls at midnight PST, not at midnight UTC', () => {
+        // PDT is UTC-7 in August, so midnight UTC is still 17:00 the day before.
+        expect(R.rotationWindow(new Date('2026-08-02T00:00:00Z'))).toBe('2026-08-01T00');
+        // 07:00Z is midnight PDT: the new window.
+        expect(R.rotationWindow(new Date('2026-08-02T07:00:00Z'))).toBe('2026-08-02T00');
     });
 
-    test('a second before a boundary is still the previous window', () => {
-        expect(R.rotationWindow(new Date('2026-08-01T12:59:59Z'))).toBe('2026-08-01T00');
+    test('a second before midnight PST is still the previous day', () => {
+        expect(R.rotationWindow(new Date('2026-08-02T06:59:59Z'))).toBe('2026-08-01T00');
     });
 
     test('midnight PST opens the day, not hour 24', () => {
@@ -76,22 +81,28 @@ describe('rotationWindow — six PST hours', () => {
     });
 
     test('follows the timezone through DST rather than a fixed offset', () => {
-        // January is PST (UTC-8): 20:00Z is 12:00 PST, the 12:00 window.
-        expect(R.rotationWindow(new Date('2026-01-15T20:00:00Z'))).toBe('2026-01-15T12');
-        // July is PDT (UTC-7): the same 20:00Z is 13:00 PDT — still 12:00.
-        expect(R.rotationWindow(new Date('2026-07-15T20:00:00Z'))).toBe('2026-07-15T12');
-        // An hour earlier in January is 11:00 PST, so the previous window.
-        expect(R.rotationWindow(new Date('2026-01-15T19:00:00Z'))).toBe('2026-01-15T06');
+        // January is PST (UTC-8): 06:00Z on the 16th is 22:00 PST on the 15th.
+        expect(R.rotationWindow(new Date('2026-01-16T06:00:00Z'))).toBe('2026-01-15T00');
+        // July is PDT (UTC-7): the same 06:00Z is 23:00 PDT on the 15th.
+        expect(R.rotationWindow(new Date('2026-07-16T06:00:00Z'))).toBe('2026-07-15T00');
+        // Two hours later in January is 00:00 PST on the 16th — the next window.
+        expect(R.rotationWindow(new Date('2026-01-16T08:00:00Z'))).toBe('2026-01-16T00');
     });
 
-    test('gives exactly four windows a day', () => {
+    test('gives exactly one window a day', () => {
         const seen = new Set();
         for (let h = 0; h < 24; h++) {
             seen.add(R.rotationWindow(new Date(Date.UTC(2026, 7, 1, h, 30))));
         }
-        // 24 hourly samples spanning two PST days -> four windows per day.
-        expect(seen.size).toBeLessThanOrEqual(5);
-        for (const key of seen) expect(key).toMatch(/T(00|06|12|18)$/);
+        // 24 hourly UTC samples span two PST days -> two keys, no more.
+        expect(seen.size).toBe(2);
+        for (const key of seen) expect(key).toMatch(/T00$/);
+    });
+
+    test('a shorter window is still available to a caller that asks', () => {
+        // Only the default moved to a day; the size is still a parameter.
+        expect(R.rotationWindow(new Date('2026-08-01T14:30:00Z'), 6)).toBe('2026-08-01T06');
+        expect(R.rotationWindow(new Date('2026-08-01T19:00:00Z'), 6)).toBe('2026-08-01T12');
     });
 });
 
@@ -142,18 +153,24 @@ describe('seededShuffle — same seed, same order', () => {
 });
 
 describe('rotateForWindow — what a category page renders', () => {
-    const morning = new Date('2026-08-01T15:00:00Z');   // 08:00 PDT, window 06
-    const midday = new Date('2026-08-01T20:00:00Z');    // 13:00 PDT, window 12
+    const dayOne = new Date('2026-08-01T15:00:00Z');   // 08:00 PDT, 1 August
+    const dayTwo = new Date('2026-08-02T15:00:00Z');   // 08:00 PDT, 2 August
 
-    test('every reader in one window gets the same order', () => {
-        const a = R.rotateForWindow(articles(), 'covenant-identity', new Date('2026-08-01T13:00:00Z'));
-        const b = R.rotateForWindow(articles(), 'covenant-identity', new Date('2026-08-01T18:30:00Z'));
+    test('every reader on one PST day gets the same order', () => {
+        // Midnight PDT and 23:30 PDT the same day — either side of a UTC date
+        // boundary, which is exactly where a naive implementation would split.
+        const a = R.rotateForWindow(articles(), 'covenant-identity', new Date('2026-08-01T07:00:00Z'));
+        const b = R.rotateForWindow(articles(), 'covenant-identity', new Date('2026-08-02T06:30:00Z'));
         expect(ids(a)).toEqual(ids(b));
     });
 
-    test('the order changes when the window turns over', () => {
-        expect(ids(R.rotateForWindow(articles(), 'covenant-identity', morning)))
-            .not.toEqual(ids(R.rotateForWindow(articles(), 'covenant-identity', midday)));
+    test('the order holds through the day and turns over at midnight PST', () => {
+        // Morning and late evening of the same PST day are one order...
+        expect(ids(R.rotateForWindow(articles(), 'covenant-identity', dayOne)))
+            .toEqual(ids(R.rotateForWindow(articles(), 'covenant-identity', new Date('2026-08-02T05:00:00Z'))));
+        // ...and the next day is a different one.
+        expect(ids(R.rotateForWindow(articles(), 'covenant-identity', dayOne)))
+            .not.toEqual(ids(R.rotateForWindow(articles(), 'covenant-identity', dayTwo)));
     });
 
     test('each category rotates independently', () => {
@@ -163,23 +180,32 @@ describe('rotateForWindow — what a category page renders', () => {
             'shalom-salvation',
             'celebration-mishpakhah',
             'torah-hebraic-insights',
-        ].map((slug) => ids(R.rotateForWindow(articles(), slug, morning)).join(','));
+        ].map((slug) => ids(R.rotateForWindow(articles(), slug, dayOne)).join(','));
         expect(new Set(orders).size).toBe(5);
     });
 
     test('the category still shows exactly its own articles', () => {
         const source = articles();
-        const rotated = R.rotateForWindow(source, 'covenant-identity', morning);
+        const rotated = R.rotateForWindow(source, 'covenant-identity', dayOne);
         expect(ids(rotated).sort()).toEqual(ids(source).sort());
         for (const a of rotated) expect(a.id.startsWith('covenant-identity__')).toBe(true);
     });
 
-    test('four distinct orders across a day, then a fresh set the next day', () => {
-        const day = [7, 13, 19, 25].map((h) =>
-            ids(R.rotateForWindow(articles(), 'faith', new Date(Date.UTC(2026, 7, 1, h)))).join(','));
-        expect(new Set(day).size).toBe(4);
+    test('one order per day, and a fresh one on each day of a run', () => {
+        // 15:00Z is 08:00 PDT, so each sample is mid-morning on its own PST day.
+        const week = Array.from({ length: 7 }, (_, i) =>
+            ids(R.rotateForWindow(articles(), 'faith', new Date(Date.UTC(2026, 7, 1 + i, 15)))).join(','));
+        expect(new Set(week).size).toBe(7);
+    });
 
-        const nextDay = ids(R.rotateForWindow(articles(), 'faith', new Date(Date.UTC(2026, 7, 2, 7)))).join(',');
-        expect(day).not.toContain(nextDay);
+    test('the four old six-hour slots now read as one order', () => {
+        // 00/06/12/18 PDT on 1 August are 07/13/19Z and 01Z the next day.
+        const slots = [
+            new Date('2026-08-01T07:00:00Z'),
+            new Date('2026-08-01T13:00:00Z'),
+            new Date('2026-08-01T19:00:00Z'),
+            new Date('2026-08-02T01:00:00Z'),
+        ].map((t) => ids(R.rotateForWindow(articles(), 'faith', t)).join(','));
+        expect(new Set(slots).size).toBe(1);
     });
 });

@@ -34,7 +34,7 @@ import { rotateForWindow } from '@/lib/rotation';
  * Articles come from the CDN bundle and categories from the published article
  * bundles; both resolve on the server because the CDN sends no CORS headers.
  *
- * A portal's cards are re-ordered once every six PST hours — see the render
+ * A portal's cards are re-ordered once a day, at midnight PST — see the render
  * below. Articles resolve by id, so the order a reader arrives on never affects
  * where a card leads.
  */
@@ -121,10 +121,11 @@ export default async function RootSegmentPage({
     fetchCategoryArticles(topic),
   ]);
 
-  // Re-order every six PST hours so a portal that publishes rarely still reads
-  // differently through the day. Seeded on the window and the category, so
-  // every reader sees one order within a window, each category rotates
-  // independently, and the server render matches its hydration.
+  // Re-order once a day, at midnight PST, so a portal that publishes rarely
+  // still opens on a different face each morning while holding still for the
+  // reader who comes back to it later the same day. Seeded on the window and
+  // the category, so every reader sees one order within a day, each category
+  // rotates independently, and the server render matches its hydration.
   //
   // Deliberately here and not in fetchCategoryArticles(): the Home page's
   // faith-based inserts come from the same call and take the newest articles
