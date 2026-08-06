@@ -85,6 +85,40 @@ async function expectSignIn(email, expected) {
     expect(res.status === 200).toBe(expected);
 }
 
+/**
+ * Assert what signing in AFTER a deletion does. This is deliberately not
+ * `expectSignIn(email, false)` any more, because "cannot sign in" stopped being
+ * the contract:
+ *
+ *   local — nothing left to authenticate against, so a generic 401.
+ *   sso   — the Identity Authority still holds the Jubilee ID and verifies the
+ *     password first, so a correct password reinstates: 200 with a NEW account.
+ *
+ * The invariant in both modes is that the OLD account never returns, so that is
+ * what gets asserted when the answer is 200. Passing the pre-deletion user (not
+ * just the address) is what makes that check possible.
+ */
+async function expectSignInAfterDeletion(user) {
+    const res = await req('POST', '/api/auth/login', { email: user.email, password: PASSWORD });
+    if (res.status === 429) {
+        if (!loginRateLimited) {
+            loginRateLimited = true;
+            console.warn('[account-deletion] /api/auth/login rate limited — sign-in assertions skipped');
+        }
+        return;
+    }
+    // Never 200. A plain sign-in does not provision, in either mode.
+    expect(res.status).not.toBe(200);
+    expect([401, 404]).toContain(res.status);
+    if (res.status === 404) {
+        // sso: the authority still holds the credential and verified it, so the
+        // answer names the real situation rather than blaming the password.
+        const body = await res.json();
+        expect(body.needsSignup).toBe(true);
+        expect(String(body.error)).toMatch(/sign up/i);
+    }
+}
+
 async function deleteSelf(user, overrides = {}) {
     const res = await req('POST', '/api/auth/account/delete', {
         password: PASSWORD, confirmEmail: user.email, ...overrides,
@@ -104,13 +138,14 @@ beforeAll(async () => {
         console.warn(`[account-deletion] no server at ${BASE} — suite is inert`);
         return;
     }
-    // A 503 means the tombstone table is unavailable, so deletion is refused for
-    // safety and every behavioural assertion below would be meaningless. That is
-    // the only condition that disables the feature — there is no config flag.
+    // Deletion has no readiness gate and no config flag left, so an unauthenticated
+    // probe should answer 401 and nothing else. A 5xx here means the endpoint is
+    // broken rather than merely unavailable, and every behavioural assertion below
+    // would be meaningless — so it is reported loudly instead of read as "off".
     const probe = await req('POST', '/api/auth/account/delete', {});
-    deletionEnabled = probe.status !== 503;
+    deletionEnabled = probe.status < 500;
     if (!deletionEnabled) {
-        console.warn('[account-deletion] tombstone table unavailable — behavioural tests skipped');
+        console.warn(`[account-deletion] delete endpoint answered ${probe.status} — behavioural tests skipped`);
     }
 
     const login = await req('POST', '/api/auth/login', {
@@ -155,8 +190,8 @@ describe('Account deletion — self-service', () => {
         // thing between a stranger and someone else's account.
         for (const body of [{ password: PASSWORD, confirmEmail: 'nobody@jubileeverse.test' }, {}]) {
             const res = await req('POST', '/api/auth/account/delete', body);
-            // 503 if the tombstone table is unavailable, 401 otherwise. Never 200.
-            expect([401, 503]).toContain(res.status);
+            // No readiness gate left, so the only correct answer is 401. Never 200.
+            expect(res.status).toBe(401);
         }
     });
 
@@ -171,7 +206,7 @@ describe('Account deletion — self-service', () => {
         const res = await deleteSelf(user, { password: undefined, confirmEmail: undefined });
         if (rateLimited) return;
         expect(res.status).toBe(200);
-        await expectSignIn(user.email, false);
+        await expectSignInAfterDeletion(user);
     });
 
     test('a wrong password is refused and the account survives', async () => {
@@ -227,7 +262,7 @@ describe('Account deletion — self-service', () => {
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body.deleted).toBe(true);
-        await expectSignIn(user.email, false);
+        await expectSignInAfterDeletion(user);
     });
 
     test('the access token of a deleted account stops working', async () => {
@@ -252,24 +287,21 @@ describe('Account deletion — self-service', () => {
         expect(res.status).toBe(401);
     });
 
-    test('a deleted account cannot sign in again', async () => {
-        // The status legitimately differs by auth mode, and asserting 410
-        // unconditionally was wrong:
+    test('a plain sign-in after deletion is refused in both modes — it never provisions', async () => {
+        // The single most important assertion in this file. Deletion only means
+        // something if the account cannot come back by simply signing in again,
+        // and in SSO mode that is not automatic: the Identity Authority keeps the
+        // Jubilee ID alive on purpose, so the user still holds a WORKING
+        // credential. Membership is the local row, and only the sign-up flow
+        // creates one.
         //
-        //   local — the hard delete took the password hash with it, so there is
-        //     nothing to authenticate against and login answers a generic 401.
-        //     Returning 410 here would leak "this address was deleted" to an
-        //     unauthenticated caller.
-        //   sso   — the authority still holds the Jubilee ID and verifies the
-        //     password first, so upsertUserFromSso's ACCOUNT_DELETED becomes a
-        //     credential-gated 410 carrying accountDeleted.
-        //
-        // The invariant that must hold in BOTH modes is the one asserted here:
-        // sign-in never succeeds. When the answer is 410 we additionally check
-        // the body, which is what proves the tombstone fired rather than the row
-        // merely being absent.
+        //   local — nothing left to authenticate against: generic 401.
+        //   sso   — the authority verifies the password, then the login route
+        //     finds no local account and answers 404 { needsSignup: true }.
+        //     Deliberately not 401: the password was RIGHT, and telling someone
+        //     it was wrong would have them retype it forever.
         if (!live()) return;
-        const user = await makeUser('tombstone');
+        const user = await makeUser('nosignin');
         if (!user) return;
         await deleteSelf(user);
         if (rateLimited) return;
@@ -279,11 +311,98 @@ describe('Account deletion — self-service', () => {
         // about whether the deletion worked, so it must not be read as a verdict.
         if (res.status === 429) return;
         expect(res.status).not.toBe(200);
-        expect([401, 410]).toContain(res.status);
-        if (res.status === 410) {
-            const body = await res.json();
-            expect(body.accountDeleted).toBe(true);
-        }
+        expect([401, 404]).toContain(res.status);
+        if (res.status === 401) return;   // local mode — nothing further to check
+
+        const body = await res.json();
+        expect(body.needsSignup).toBe(true);
+        expect(String(body.error)).toMatch(/sign up/i);
+        expect(body.token).toBeFalsy();   // no session may be minted
+    });
+
+    test('the sign-up flow CAN provision, and produces a new empty account', async () => {
+        // The other half of the rule: `provision: true` is what the sign-up
+        // screen's "you already have a Jubilee ID" step sends, and it is the only
+        // thing that may create the local row. Without this test the gate above
+        // could be satisfied by a route that never provisions at all, leaving a
+        // deleted reader with no way back.
+        if (!live()) return;
+        const user = await makeUser('provision');
+        if (!user) return;
+        await deleteSelf(user);
+        if (rateLimited) return;
+        const res = await req('POST', '/api/auth/login', {
+            email: user.email, password: PASSWORD, provision: true,
+        });
+        if (res.status === 429) return;
+        if (res.status !== 200) return;   // local mode: the hash is gone, 401 is correct
+
+        // SSO mode: provisioned. Prove it is a NEW account, not the old one back.
+        const body = await res.json();
+        expect(body.user?.id).not.toBe(user.id);
+        expect(body.user?.role).toBe('user');
+        expect(body.token).toBeTruthy();
+
+        // And prove the session actually works — "recreated" is worth nothing if
+        // the row is there but every subsequent request 401s or 403s on it.
+        const me = await req('GET', '/api/auth/me', undefined, body.token);
+        expect(me.status).toBe(200);
+        const meBody = await me.json();
+        expect(meBody.user?.email).toBe(user.email);
+        expect(meBody.user?.id).not.toBe(user.id);
+        expect(meBody.user?.role).toBe('user');
+        expect(meBody.user?.can_delete_account).toBe(true);
+    });
+
+    test('the signup screen routes a deleted account to its password step, not a doomed form', async () => {
+        // This is the return path the product actually offers: GET /api/auth/lookup
+        // is what the email step calls, and `exists:true` is what makes the screen
+        // ask for a password instead of showing a registration form that would 409
+        // on the surviving Jubilee ID.
+        //
+        // In local mode there is no authority to ask, both legs are silent, and
+        // exists:false is correct — registering from scratch is the only thing that
+        // can work once the password hash has been deleted.
+        if (!live()) return;
+        const user = await makeUser('lookup');
+        if (!user) return;
+        await deleteSelf(user);
+        if (rateLimited) return;
+        const res = await fetch(`${BASE}/api/auth/lookup?email=${encodeURIComponent(user.email)}`);
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.available).toBe(true);
+        expect(typeof body.exists).toBe('boolean');
+        // Whichever mode, the answer must not be driven by a leftover record of
+        // the deleted account — the local leg must find nothing, so `exists` can
+        // only ever be the authority's answer.
+        const signIn = await req('POST', '/api/auth/login', { email: user.email, password: PASSWORD });
+        if (signIn.status === 429) return;
+        // sso: the authority knows them, but a PLAIN sign-in still refuses and
+        // sends them to sign-up. local: gone entirely, generic 401.
+        if (body.exists) expect(signIn.status).toBe(404);
+        else expect(signIn.status).toBe(401);
+    });
+
+    test('a re-provisioned account can be deleted again', async () => {
+        // The tombstone table had a UNIQUE on email_sha256, so a second deletion
+        // used to risk a 23505 that would leave the account stuck alive. Nothing
+        // is written now, but the second deletion still has to work — this is what
+        // proves coming back is not a one-way door out of deletion.
+        if (!live()) return;
+        const user = await makeUser('redelete');
+        if (!user) return;
+        await deleteSelf(user);
+        if (rateLimited) return;
+        // Back in via the sign-up path, the only one that may provision.
+        const back = await req('POST', '/api/auth/login', {
+            email: user.email, password: PASSWORD, provision: true,
+        });
+        if (back.status !== 200) return;  // local mode, or rate limited — not applicable
+        const reborn = await back.json();
+        const res = await deleteSelf({ email: user.email, token: reborn.token });
+        if (rateLimited) return;
+        expect(res.status).toBe(200);
     });
 
     test('re-registering produces a new empty account, never the old one restored', async () => {
@@ -292,8 +411,9 @@ describe('Account deletion — self-service', () => {
         if (!user) return;
         await deleteSelf(user);
         if (rateLimited) return;
-        // Registration is a deliberate front-door act and clears the tombstone, so
-        // in local mode it succeeds; in SSO mode it 409s on the surviving Jubilee ID.
+        // Nothing blocks the address any more, so in local mode registration simply
+        // succeeds; in SSO mode it 409s on the surviving Jubilee ID and the signup
+        // screen sends the visitor to its password step instead (covered above).
         const res = await req('POST', '/api/auth/register', {
             email: user.email, password: PASSWORD, name: 'Back Again',
         });
@@ -361,7 +481,12 @@ describe('Account deletion — administrative', () => {
         const res = await req('DELETE', `/api/admin/users/${user.id}`,
             { confirm_email: user.email }, adminToken);
         expect(res.status).toBe(200);
-        await expectSignIn(user.email, false);
+        // An administrative deletion leaves no record either, so the same
+        // mode-dependent answer applies — including the SSO case, where the target
+        // can come straight back as a NEW empty account. Worth being explicit
+        // about: an admin deletion removes the account and its data, it does not
+        // ban the person.
+        await expectSignInAfterDeletion(user);
     });
 
     test('an unknown id is a 404', async () => {

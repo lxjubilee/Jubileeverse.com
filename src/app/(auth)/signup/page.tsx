@@ -185,16 +185,26 @@ export default function SignUpPage() {
     }
     setSubmitting(true);
     try {
-      const body: { email: string; password: string; rememberMe: boolean; totp_code?: string } = {
+      const body: {
+        email: string;
+        password: string;
+        rememberMe: boolean;
+        provision: boolean;
+        totp_code?: string;
+      } = {
         email: email.trim(),
         password: existingPw,
         rememberMe,
+        // THIS is the sign-up, reached because the authority already holds a
+        // Jubilee ID for the address — so it is the one caller permitted to create
+        // the local account. The login route refuses to provision without it, which
+        // is what makes a deleted account stay deleted until someone deliberately
+        // joins again. A family member who has never visited JubileeVerse, and a
+        // returning reader who deleted last year, are the same case here.
+        provision: true,
       };
       if (mfaRequired && totp.trim()) body.totp_code = totp.trim();
 
-      // A plain sign-in is enough here: in SSO mode the login route upserts the
-      // identity locally on first sign-in, so a family member who has never
-      // visited JubileeVerse gets their account created as a side effect.
       const data = await api.post<LoginResponse>('/api/auth/login', body, { auth: false });
 
       if (isMfaRequired(data)) {
@@ -288,7 +298,7 @@ export default function SignUpPage() {
           <div className={styles.formContent}>
             <div className={styles.logo}>
               <Link href="/">
-                <img src="/brand/jubilee-logo.png" alt="JubileeVerse" className={styles.logoImg} />
+                <img src="/brand/brand-logo.png" alt="JubileeVerse" className={styles.logoImg} />
                 <div className={styles.logoText}>
                   Jubilee<span className={styles.verse}>Verse</span>
                   <span>.com</span>

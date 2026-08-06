@@ -34,10 +34,10 @@ const crypto = require('crypto');
  * Replacement for NOT NULL actor columns.
  *
  * Deliberately flat, and deliberately NOT email-shaped. A per-user token like
- * `deleted-user+1234@invalid` would re-identify the person by joining against
- * jv_deleted_accounts.former_user_id — a privacy regression that would undo the
- * point of the feature. A non-email token also can never be mistaken for a
- * deliverable address by some future mailer.
+ * `deleted-user+1234@invalid` would re-identify the person by joining it against
+ * any surviving row that still carries their former user id — a privacy
+ * regression that would undo the point of the feature. A non-email token also can
+ * never be mistaken for a deliverable address by some future mailer.
  */
 const DELETED_ACTOR = 'deleted-user';
 
@@ -273,34 +273,28 @@ async function purgeUserAccount(client, user, ctx) {
     const present = await loadExistingColumns(client);
     const bump = (key, n) => { if (n) counts[key] = (counts[key] || 0) + n; };
 
-    // ── 1. Tombstone, before anything is destroyed ───────────────────────────
-    // ON CONFLICT so that delete -> reinstate -> delete is idempotent rather than
-    // colliding on the unique email hash.
-    await client.query(
-        `INSERT INTO jv_deleted_accounts
-           (email_sha256, sso_subject_sha256, email_domain, former_user_id,
-            former_role, deleted_by, deletion_reason)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (email_sha256) DO UPDATE SET
-           sso_subject_sha256 = EXCLUDED.sso_subject_sha256,
-           email_domain       = EXCLUDED.email_domain,
-           former_user_id     = EXCLUDED.former_user_id,
-           former_role        = EXCLUDED.former_role,
-           deleted_at         = NOW(),
-           deleted_by         = EXCLUDED.deleted_by,
-           deletion_reason    = EXCLUDED.deletion_reason,
-           reinstated_at      = NULL,
-           reinstated_by      = NULL`,
-        [
-            emailHash,
-            subject ? hashIdentity(subject) : null,
-            email.slice(email.lastIndexOf('@') + 1) || null,
-            user.id,
-            user.role || null,
-            ctx.actor || 'unknown',   // column is NOT NULL
-            ctx.reason || null,
-        ]
-    );
+    // ── 1. Leave NO record of the account ────────────────────────────────────
+    // This used to write a tombstone here — a hashed-identity row that outlived
+    // the account and blocked it from ever signing in again. That is deliberately
+    // gone: deletion now means the person is absent from this database entirely,
+    // and coming back is an ordinary sign-up away (the Jubilee ID still exists at
+    // the Identity Authority, so the sign-up screen's email step recognises them
+    // and asks for their password; the authority verifies it and their account is
+    // provisioned fresh).
+    //
+    // The DELETE is what makes that true for accounts deleted under the old
+    // behaviour: without it their tombstone would survive this purge and go on
+    // describing someone this database is supposed to have forgotten.
+    //
+    // Losing this row also loses the durable deletion receipt it doubled as, so
+    // logAuditEvent at the call site is now the only account of the deletion.
+    if (present.has('jv_deleted_accounts.email_sha256')) {
+        const { rowCount } = await client.query(
+            `DELETE FROM jv_deleted_accounts WHERE email_sha256 = $1 OR sso_subject_sha256 = $2`,
+            [emailHash, subject ? hashIdentity(subject) : null]
+        );
+        bump('jv_deleted_accounts', rowCount);
+    }
 
     // ── 2-4. The declared sweep ──────────────────────────────────────────────
     for (const rule of ACCOUNT_DELETE_SWEEP) {

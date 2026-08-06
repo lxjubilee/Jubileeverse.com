@@ -62,6 +62,16 @@ const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
  */
 const REMEMBERED_EMAIL_KEY = 'jubileeVerseRememberedEmail';
 
+/**
+ * The login route's "the credential is valid but you have no account here" answer,
+ * sent as 404 { needsSignup: true }. Read from the body rather than trusting the
+ * status alone: a bare 404 could equally be a mis-routed request, and telling
+ * someone to sign up when the API simply moved would be worse than a generic error.
+ */
+function isNeedsSignup(body: unknown): boolean {
+  return typeof body === 'object' && body !== null && (body as { needsSignup?: unknown }).needsSignup === true;
+}
+
 function readRememberedEmail(): string {
   try {
     return window.localStorage.getItem(REMEMBERED_EMAIL_KEY) ?? '';
@@ -174,6 +184,18 @@ export default function SignInPage() {
       // Full-page navigation so the AuthProvider re-hydrates from storage.
       window.location.assign(safeRedirectTarget());
     } catch (err) {
+      // 404 + needsSignup is the unambiguous one: the Identity Authority accepted
+      // the password, so the credential is RIGHT — there is simply no JubileeVerse
+      // account behind it. That is a family member who has never joined, or someone
+      // who deleted their account. Never say "incorrect password" here; they typed
+      // it correctly and would retype it forever. The "Sign Up" link already sits
+      // in this card's footer, so the message points at it rather than redirecting
+      // and throwing away what they typed.
+      if (err instanceof ApiError && err.status === 404 && isNeedsSignup(err.body)) {
+        setError(err.message || 'No JubileeVerse account for this email. Please sign up.');
+        setSubmitting(false);
+        return;
+      }
       // A 401 is ambiguous: wrong password, or no Jubilee ID at all? Ask the
       // lookup so we can point a first-time visitor at sign-up instead of letting
       // them retype a password they never had.
@@ -202,7 +224,7 @@ export default function SignInPage() {
           <div className={styles.formContent}>
             <div className={styles.logo}>
               <Link href="/">
-                <img src="/brand/jubilee-logo.png" alt="JubileeVerse" className={styles.logoImg} />
+                <img src="/brand/brand-logo.png" alt="JubileeVerse" className={styles.logoImg} />
                 <div className={styles.logoText}>
                   Jubilee<span className={styles.verse}>Verse</span>
                   <span>.com</span>

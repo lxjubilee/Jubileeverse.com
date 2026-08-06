@@ -6,10 +6,13 @@
  * almost nothing here — the declared sweep IS the integrity. Three properties
  * have to hold, and each one has a concrete failure behind it:
  *
- *   1. ORDER. The tombstone must be written first and jv_users deleted last. Get
- *      it backwards and a mid-transaction abort leaves either an account that
- *      exists but can never sign in, or a deleted account with nothing to stop
- *      the next SSO sign-in from silently re-creating it.
+ *   1. ORDER. jv_users must be deleted LAST, after every denormalized reference
+ *      to it has been swept. Delete the row first and a mid-transaction abort
+ *      leaves the account gone while ~40 columns across ~35 tables still name
+ *      its owner — the leak this whole file exists to prevent.
+ *      (The sweep used to open by WRITING a tombstone row. Deletion now keeps no
+ *      record at all, so the first statement is the DELETE that removes any
+ *      tombstone left over from that behaviour.)
  *   2. MODE. Three tables carry a UNIQUE constraint on the email column. Update
  *      them to one shared sentinel and the SECOND account deletion fails on
  *      23505 — a bug that cannot be reproduced with a single test user, which is
@@ -141,10 +144,26 @@ describe('the sweep plan', () => {
 });
 
 describe('purgeUserAccount execution order', () => {
-    test('the tombstone is written before anything is destroyed', async () => {
-        const client = mockClient();
+    test('no record of the account is written — any surviving tombstone is removed', async () => {
+        // The product contract is that a deleted account is ABSENT from this
+        // database, so nothing may INSERT a row describing it. Asserted as "no
+        // INSERT anywhere in the sweep" rather than by inspecting one statement,
+        // because the failure this guards against is a future re-addition of the
+        // receipt row, wherever in the plan it lands.
+        // The tombstone table is not part of the sweep plan, so the mock has to be
+        // told it exists — which is the point of the guard in purgeUserAccount:
+        // the table may legitimately have been dropped by hand, and a purge that
+        // threw on its absence would make deletion impossible.
+        const client = mockClient({ extraColumns: [{ table_name: 'jv_deleted_accounts', column_name: 'email_sha256' }] });
         await purgeUserAccount(client, USER, { actor: 'self' });
-        expect(client.statements[0].sql).toMatch(/^INSERT INTO jv_deleted_accounts/);
+        expect(client.statements.some((s) => /^INSERT INTO jv_deleted_accounts/.test(s.sql))).toBe(false);
+        expect(client.statements[0].sql).toMatch(/^DELETE FROM jv_deleted_accounts/);
+    });
+
+    test('a dropped tombstone table is skipped, not thrown', async () => {
+        const client = mockClient();   // no jv_deleted_accounts column declared
+        await purgeUserAccount(client, USER, { actor: 'self' });
+        expect(client.statements.some((s) => /jv_deleted_accounts/.test(s.sql))).toBe(false);
     });
 
     test('the user row is deleted last', async () => {
@@ -177,13 +196,16 @@ describe('purgeUserAccount execution order', () => {
         expect(result.emailHash).toBe(hashIdentity('lauren@example.com'));
     });
 
-    test('the SSO subject is hashed, never stored in the clear', async () => {
+    test('the SSO subject is hashed, never sent in the clear', async () => {
         // upsertUserFromSso builds the subject as `sso|${id ?? email}`, so it very
-        // often embeds the address verbatim — storing it raw would defeat hashing.
-        const client = mockClient();
+        // often embeds the address verbatim. Nothing is stored any more, but the
+        // tombstone sweep still MATCHES on these values, and a raw one in the
+        // WHERE clause would leave the address in the query log.
+        const client = mockClient({ extraColumns: [{ table_name: 'jv_deleted_accounts', column_name: 'email_sha256' }] });
         await purgeUserAccount(client, USER, { actor: 'self' });
-        const tombstone = client.statements[0];
-        for (const param of tombstone.params) {
+        const sweep = client.statements[0];
+        expect(sweep.sql).toMatch(/^DELETE FROM jv_deleted_accounts/);
+        for (const param of sweep.params) {
             expect(String(param)).not.toContain('lauren@example.com');
         }
     });
@@ -195,15 +217,16 @@ describe('purgeUserAccount execution order', () => {
         expect(pulse.sql).toContain('"user"');
     });
 
-    test('deleted_by is never null, since the column is NOT NULL', async () => {
+    test('a purge with no actor supplied still completes', async () => {
+        // Used to assert the NOT NULL deleted_by column fell back to 'unknown'.
+        // That column went with the tombstone; what still matters is that an
+        // administrative purge with no actor in context does not throw.
         const client = mockClient();
-        await purgeUserAccount(client, USER, {});   // no actor supplied
-        const tombstone = client.statements[0];
-        expect(tombstone.params.some((p) => p === null && p === undefined)).toBe(false);
-        expect(tombstone.params).toContain('unknown');
+        const result = await purgeUserAccount(client, USER, {});   // no actor supplied
+        expect(result.emailHash).toBe(hashIdentity(USER.email));
     });
 
-    test('a user row that vanished under the lock aborts instead of leaving a tombstone', async () => {
+    test('a user row that vanished under the lock aborts the whole purge', async () => {
         const client = mockClient();
         const original = client.query.bind(client);
         client.query = async (sql, params) => {
