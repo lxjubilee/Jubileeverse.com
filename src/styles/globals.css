@@ -789,11 +789,18 @@ img {
   background: var(--bg-tertiary);
 }
 
+/*
+  Every link carries the same 1px transparent border the active one paints gold,
+  so going active never changes an item's box height. The old asymmetric
+  border-bottom made active links sit a pixel lower than their neighbours.
+*/
 .nav-menu .nav-link {
+  display: inline-flex;
+  align-items: center;
   padding: var(--space-sm) var(--space-md);
   background: transparent;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
   font-size: var(--font-sm);
   color: #ffffff;
   white-space: nowrap;
@@ -807,16 +814,8 @@ img {
 
 .nav-menu .nav-link.active {
   color: var(--accent-gold);
-  border: 1px solid var(--accent-gold);
-  border-radius: 4px;
+  border-color: var(--accent-gold);
   background: transparent;
-}
-
-#homeNavLink {
-  display: flex;
-  align-items: center;
-  line-height: 1;
-  transform: translateY(2px);
 }
 
 .mobile-media-link {

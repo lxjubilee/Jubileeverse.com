@@ -137,6 +137,7 @@ across all three environments. The `inspirePool` variable is an alias for `pgPoo
 
 ### Static Assets
 - `public/images/personas/jubilee.png` — header logo icon (tracked in git)
-- `public/images/jubilee-profile.png` — favicon for auth pages (tracked in git)
+- `public/images/brand-logo.png` — favicon served to backend-rendered pages and the
+  `/favicon.ico` redirect; the Next app serves its own copy from `public/brand/` (tracked in git)
 - `public/images/personas/` — all AI persona profile images (tracked in git)
 - `public/images/prominence/` — dynamically generated news hero images (NOT in git, live on server only)

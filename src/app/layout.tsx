@@ -20,7 +20,9 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: 'JubileeVerse - Inspiring Faith, Sharing Hope',
   description: 'JubileeVerse - Uplifting Christian news, devotionals, and inspiration',
-  icons: { icon: '/images/jubilee-profile.png' },
+  // Next's own public/, not /images — that path rewrites to Express, and the
+  // original there is a 1200px, 967 KB PNG for a 16px tab icon.
+  icons: { icon: '/brand/brand-logo.png', apple: '/brand/brand-logo.png' },
 };
 
 export const viewport: Viewport = {

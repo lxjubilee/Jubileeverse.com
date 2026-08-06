@@ -6,7 +6,8 @@
     <meta name="description" content="JubileeVerse - Uplifting Christian news, devotionals, and inspiration">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-hashes' cdn.jsdelivr.net cdnjs.cloudflare.com static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com; img-src * data: blob:; font-src fonts.googleapis.com fonts.gstatic.com; connect-src *; object-src 'none'; base-uri 'self';">
     <title>JubileeVerse - Inspiring Faith, Sharing Hope</title>
-    <link rel="icon" type="image/png" href="/images/jubilee-profile.png">
+    <link rel="icon" type="image/png" href="/images/brand-logo.png">
+    <link rel="apple-touch-icon" href="/images/brand-logo.png">
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&family=Playfair+Display:wght@700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
     <style>
         /* ============================================
@@ -690,11 +691,15 @@
             display: none;
         }
 
+        /* The 1px border is on every link, not just the active one, so going
+           active never changes an item's height and nudges its text off-centre. */
         .nav-menu .nav-link {
+            display: inline-flex;
+            align-items: center;
             padding: var(--space-sm) var(--space-md);
             background: transparent;
-            border-bottom: 2px solid transparent;
-            border-radius: 0;
+            border: 1px solid transparent;
+            border-radius: 4px;
             font-size: var(--font-sm);
             color: #ffffff;
             white-space: nowrap;
@@ -708,18 +713,8 @@
 
         .nav-menu .nav-link.active {
             color: var(--accent-gold);
-            border: 1px solid var(--accent-gold);
-            border-bottom: 1px solid var(--accent-gold);
-            border-radius: 4px;
+            border-color: var(--accent-gold);
             background: transparent;
-        }
-
-        /* HOME link alignment */
-        #homeNavLink {
-            display: flex;
-            align-items: center;
-            line-height: 1;
-            transform: translateY(2px);
         }
 
         /* Mobile-only media links - hidden on desktop */
@@ -3521,11 +3516,7 @@
             <div class="header-actions">
                 <!-- Header quick links -->
                 <div class="header-media-links">
-                    <a href="/prayer">Prayer</a>
-                    <span class="divider">|</span>
-                    <a href="/music">Music</a>
-                    <span class="divider">|</span>
-                    <a href="/radio">Radio</a>
+                    <a href="https://jubilujah.com" target="_blank" rel="noopener">Music</a>
                     <span class="divider">|</span>
                     <a href="https://www.jubileeinspire.com" target="_blank" rel="noopener">AI Bible Chat</a>
                 </div>
@@ -3577,9 +3568,7 @@
                 </button>
                 <a href="/" class="nav-link" id="homeNavLink">HOME</a>
                 <span id="taxonomyNavLinks"></span>
-                <a href="/prayer" class="nav-link mobile-media-link">PRAYER</a>
-                <a href="/music" class="nav-link mobile-media-link">MUSIC</a>
-                <a href="/radio" class="nav-link mobile-media-link">RADIO</a>
+                <a href="https://jubilujah.com" target="_blank" rel="noopener" class="nav-link mobile-media-link">MUSIC</a>
                 <a href="https://www.jubileeinspire.com" target="_blank" rel="noopener" class="nav-link mobile-media-link">AI BIBLE CHAT</a>
                 <button class="mobile-close-btn" id="mobileCloseBtn" onclick="toggleMobileMenu()" aria-label="Close menu">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">

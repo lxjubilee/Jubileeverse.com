@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Profile Settings - JubileeVerse</title>
-  <link rel="icon" type="image/png" href="/images/jubilee-profile.png">
-  <link rel="apple-touch-icon" href="/images/jubilee-profile.png">
+  <link rel="icon" type="image/png" href="/images/brand-logo.png">
+  <link rel="apple-touch-icon" href="/images/brand-logo.png">
   <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&family=Playfair+Display:wght@700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -144,15 +144,18 @@
       transition: all 0.2s ease;
     }
     .nav-link:hover, .nav-link.active { color: var(--text-primary); background: var(--bg-tertiary); }
+    /* Border on every link, not just the active one, so the gold outline
+       doesn't change an item's height and push its text off-centre. */
     .nav-menu .nav-link {
+      display: inline-flex; align-items: center;
       padding: var(--space-sm) var(--space-md); background: transparent;
-      border-bottom: 2px solid transparent; border-radius: 0;
+      border: 1px solid transparent; border-radius: 4px;
       font-size: var(--font-sm); color: var(--text-muted); white-space: nowrap;
     }
     .nav-menu .nav-link:hover { color: var(--text-primary); background: transparent; }
     .nav-menu .nav-link.active {
-      color: var(--accent-gold); border: 1px solid var(--accent-gold);
-      border-radius: 4px; background: transparent;
+      color: var(--accent-gold); border-color: var(--accent-gold);
+      background: transparent;
     }
     .mobile-media-link { display: none; }
     .mobile-close-btn {
@@ -473,13 +476,9 @@
       </a>
       <div class="header-actions">
         <div class="header-media-links">
-          <a href="/prayer">Prayer</a>
-          <span class="divider">|</span>
           <a href="/sermons">Sermons</a>
           <span class="divider">|</span>
-          <a href="/music">Music</a>
-          <span class="divider">|</span>
-          <a href="/radio">Radio</a>
+          <a href="https://jubilujah.com" target="_blank" rel="noopener">Music</a>
           <span class="divider">|</span>
           <a href="https://www.jubileeinspire.com" target="_blank" rel="noopener">AI Bible Chat</a>
         </div>
@@ -520,9 +519,7 @@
         <a href="/family" class="nav-link">FAMILY</a>
         <a href="/community" class="nav-link">COMMUNITY</a>
         <a href="/encouragement" class="nav-link">ENCOURAGEMENT</a>
-        <a href="/prayer" class="nav-link mobile-media-link">PRAYER</a>
-        <a href="/music" class="nav-link mobile-media-link">MUSIC</a>
-        <a href="/radio" class="nav-link mobile-media-link">RADIO</a>
+        <a href="https://jubilujah.com" target="_blank" rel="noopener" class="nav-link mobile-media-link">MUSIC</a>
         <a href="https://www.jubileeinspire.com" target="_blank" rel="noopener" class="nav-link mobile-media-link">AI BIBLE CHAT</a>
         <button class="mobile-close-btn" id="mobileCloseBtn" onclick="toggleMobileMenu()" aria-label="Close menu">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">

@@ -1253,9 +1253,11 @@ function requireCsrf(req, res, next) {
 // Apply CSRF check to all /api/ routes; exclude /idp/ and /auth/ (those use redirects / form POSTs)
 app.use('/api/', requireCsrf);
 
-// Favicon — redirect /favicon.svg (and /favicon.ico) to the actual profile image
-app.get('/favicon.svg', (_req, res) => res.redirect(301, '/images/jubilee-profile.png'));
-app.get('/favicon.ico', (_req, res) => res.redirect(301, '/images/jubilee-profile.png'));
+// Favicon — redirect /favicon.svg (and /favicon.ico) to the brand logo. It lives
+// under /images because that is the only asset prefix the frontend guard below
+// (and the Next rewrites) forward to this process.
+app.get('/favicon.svg', (_req, res) => res.redirect(301, '/images/brand-logo.png'));
+app.get('/favicon.ico', (_req, res) => res.redirect(301, '/images/brand-logo.png'));
 
 // -----------------------------------------------------------------------------
 // FRONTEND OWNERSHIP — Next.js is the sole frontend origin.

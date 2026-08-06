@@ -111,7 +111,7 @@ checkFileContent('public/index.html', 'await loadTaxonomyNavLinks()', 'Taxonomy 
 
 // Navigation
 log('\nChecking navigation...', 'info');
-checkFileContent('public/index.html', '#homeNavLink', 'HOME link element');
+checkFileContent('public/index.html', 'id="homeNavLink"', 'HOME link element');
 checkFileContent('public/index.html', 'taxonomyNavLinks', 'Taxonomy nav container');
 checkFileContent('public/index.html', /\.mobile-media-link\s*\{\s*display:\s*none/, 'Mobile links hidden on desktop');
 checkFileContent('public/index.html', '#ffffff', 'White text color for nav');
@@ -120,7 +120,9 @@ checkFileContent('public/index.html', '#ffffff', 'White text color for nav');
 log('\nChecking styling...', 'info');
 checkFileContent('public/index.html', '.btn-personalize', 'PERSONALIZE button defined');
 checkFileContent('public/index.html', 'color: #ffffff', 'PERSONALIZE uses white text');
-checkFileContent('public/index.html', '#homeNavLink', 'HOME link alignment fix');
+// Nav items align because every link reserves the active link's 1px border,
+// not because HOME carries a translateY nudge of its own.
+checkFileContent('public/index.html', /\.nav-menu \.nav-link \{[^}]*border:\s*1px solid transparent/, 'Nav links reserve the active border (alignment fix)');
 
 // Syntax checks
 log('\nChecking syntax...', 'info');

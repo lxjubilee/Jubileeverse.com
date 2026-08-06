@@ -16,9 +16,7 @@ interface Props {
 }
 
 const MEDIA_LINKS = [
-  { href: '/prayer', label: 'PRAYER', external: false },
-  { href: '/music', label: 'MUSIC', external: false },
-  { href: '/radio', label: 'RADIO', external: false },
+  { href: 'https://jubilujah.com', label: 'MUSIC', external: true },
   { href: 'https://www.jubileeinspire.com', label: 'AI BIBLE CHAT', external: true },
 ];
 

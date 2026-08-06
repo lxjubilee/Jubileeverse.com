@@ -29,11 +29,9 @@ export default function SiteHeader() {
 
         <div className="header-actions">
           <div className="header-media-links">
-            <Link href="/prayer">Prayer</Link>
-            <span className="divider">|</span>
-            <Link href="/music">Music</Link>
-            <span className="divider">|</span>
-            <Link href="/radio">Radio</Link>
+            <a href="https://jubilujah.com" target="_blank" rel="noopener noreferrer">
+              Music
+            </a>
             <span className="divider">|</span>
             <a href="https://www.jubileeinspire.com" target="_blank" rel="noopener noreferrer">
               AI Bible Chat
