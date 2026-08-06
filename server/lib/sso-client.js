@@ -25,6 +25,7 @@
  *   POST /api/auth/lookup            { email }                     -> { exists }
  *   POST /api/auth/service/provision { email, first_name, last_name, password_hash, site } -> 201 | 409
  *   POST /api/auth/service/password  { email, new_password }       -> { success }
+ *   POST /api/auth/service/profile   { email, first_name?, last_name?, date_of_birth? } -> { user }
  */
 
 const crypto = require('crypto');
@@ -34,6 +35,7 @@ const LOGIN_PATH        = '/api/auth/login';
 const LOOKUP_PATH       = '/api/auth/lookup';
 const PROVISION_PATH    = '/api/auth/service/provision';
 const SET_PASSWORD_PATH = '/api/auth/service/password';
+const PROFILE_PATH      = '/api/auth/service/profile';
 const SKEW_MS = 60_000; // refresh a little before the real expiry
 
 const SSO = {
@@ -175,6 +177,25 @@ async function ssoProvisionHash({ email, firstName, lastName, passwordHash }) {
 }
 
 /**
+ * Update an existing identity's profile (first/last/DOB) at the SSO, by email.
+ * Used when someone edits the pre-filled details while joining a new family site,
+ * so the correction propagates to the shared Jubilee ID rather than living only
+ * here. Never throws: a failure to propagate must not fail the join, so callers
+ * log the result and carry on with what the visitor typed.
+ *   { ok: true, user } | { ok: false, status | error }
+ */
+async function ssoUpdateProfile(email, patch) {
+    try {
+        const { status, body } = await callSso(PROFILE_PATH, { email, ...patch });
+        if (status === 200) return { ok: true, user: body.user };
+        return { ok: false, status };
+    } catch (err) {
+        console.error('[sso] update-profile error:', err.message);
+        return { ok: false, error: String(err && err.message ? err.message : err) };
+    }
+}
+
+/**
  * Set/overwrite a user's password at the SSO so the shared credential stays in
  * lockstep after a local reset or change.
  *   { ok: true } | { ok: false, status | error }
@@ -198,4 +219,5 @@ module.exports = {
     ssoLookup,
     ssoProvisionHash,
     ssoSetPassword,
+    ssoUpdateProfile,
 };

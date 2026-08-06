@@ -50,3 +50,64 @@ export async function hasJubileeId(email: string): Promise<boolean> {
   const { exists, available } = await lookupJubileeId(email);
   return available ? exists : true;
 }
+
+/** What sign-in hands to sign-up when the visitor holds a Jubilee ID but no account here. */
+export interface SignupPrefill {
+  email: string;
+  /** Already verified by the Identity Authority — see the one-shot note below. */
+  password: string;
+  first_name?: string;
+  last_name?: string;
+  date_of_birth?: string;
+}
+
+const SIGNUP_PREFILL_KEY = 'jubileeVerseSignupPrefill';
+
+/**
+ * Hand a verified sign-in attempt over to the sign-up screen.
+ *
+ * Sign-in has just learned that the password is RIGHT and there is simply no
+ * JubileeVerse account behind it. Sending them to a bare sign-up page would throw
+ * that away and ask for everything again, so the verified password and the profile
+ * the authority returned travel with them and land on a filled-in create form.
+ *
+ * sessionStorage, not a query string: a password must never reach the URL bar,
+ * browser history, or a referrer header. It is scoped to this tab and read exactly
+ * once — see readSignupPrefill.
+ */
+export function writeSignupPrefill(data: SignupPrefill): void {
+  try {
+    window.sessionStorage.setItem(SIGNUP_PREFILL_KEY, JSON.stringify(data));
+  } catch {
+    /* storage blocked — sign-up will ask for the password again, which still works */
+  }
+}
+
+/**
+ * Drain the hand-off. Removed on read whether or not it parses, so a verified
+ * password never survives the navigation that consumed it — a reload afterwards
+ * gets the ordinary entry step instead of a form still holding a live credential.
+ */
+export function readSignupPrefill(): SignupPrefill | null {
+  let raw: string | null = null;
+  try {
+    raw = window.sessionStorage.getItem(SIGNUP_PREFILL_KEY);
+    if (raw) window.sessionStorage.removeItem(SIGNUP_PREFILL_KEY);
+  } catch {
+    return null;
+  }
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<SignupPrefill>;
+    if (!parsed?.email || !parsed?.password) return null;
+    return {
+      email: parsed.email,
+      password: parsed.password,
+      first_name: parsed.first_name || '',
+      last_name: parsed.last_name || '',
+      date_of_birth: (parsed.date_of_birth || '').slice(0, 10),
+    };
+  } catch {
+    return null;
+  }
+}

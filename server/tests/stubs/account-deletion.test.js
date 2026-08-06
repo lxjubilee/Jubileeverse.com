@@ -107,15 +107,18 @@ async function expectSignInAfterDeletion(user) {
         }
         return;
     }
-    // Never 200. A plain sign-in does not provision, in either mode.
-    expect(res.status).not.toBe(200);
-    expect([401, 404]).toContain(res.status);
-    if (res.status === 404) {
+    // Never a session. A plain sign-in does not provision, in either mode.
+    expect([200, 401]).toContain(res.status);
+    if (res.status === 200) {
         // sso: the authority still holds the credential and verified it, so the
-        // answer names the real situation rather than blaming the password.
+        // answer names the real situation rather than blaming the password, and
+        // hands back the details for the create form. It is a 200 — which is why
+        // the absence of a session is asserted explicitly rather than inferred
+        // from the status the way it used to be.
         const body = await res.json();
-        expect(body.needsSignup).toBe(true);
-        expect(String(body.error)).toMatch(/sign up/i);
+        expect(body.needsProfile).toBe(true);
+        expect(body.success).not.toBe(true);
+        expect(body.token).toBeFalsy();
     }
 }
 
@@ -297,9 +300,10 @@ describe('Account deletion — self-service', () => {
         //
         //   local — nothing left to authenticate against: generic 401.
         //   sso   — the authority verifies the password, then the login route
-        //     finds no local account and answers 404 { needsSignup: true }.
-        //     Deliberately not 401: the password was RIGHT, and telling someone
-        //     it was wrong would have them retype it forever.
+        //     finds no local account and answers 200 { needsProfile: true } with
+        //     the details for a create form. Deliberately not 401: the password
+        //     was RIGHT, and telling someone it was wrong would have them retype
+        //     it forever. Deliberately not a session either — see below.
         if (!live()) return;
         const user = await makeUser('nosignin');
         if (!user) return;
@@ -310,14 +314,17 @@ describe('Account deletion — self-service', () => {
         // a full-suite run shares with every other stub file. A 429 says nothing
         // about whether the deletion worked, so it must not be read as a verdict.
         if (res.status === 429) return;
-        expect(res.status).not.toBe(200);
-        expect([401, 404]).toContain(res.status);
+        expect([200, 401]).toContain(res.status);
         if (res.status === 401) return;   // local mode — nothing further to check
 
+        // The 200 now carries the routing answer, so "no session" is the thing to
+        // assert directly. A regression that started minting a token here would
+        // still be a 200 and would sail past a status check.
         const body = await res.json();
-        expect(body.needsSignup).toBe(true);
-        expect(String(body.error)).toMatch(/sign up/i);
-        expect(body.token).toBeFalsy();   // no session may be minted
+        expect(body.needsProfile).toBe(true);
+        expect(body.success).not.toBe(true);
+        expect(body.token).toBeFalsy();       // no session may be minted
+        expect(body.refreshToken).toBeFalsy();
     });
 
     test('the sign-up flow CAN provision, and produces a new empty account', async () => {
