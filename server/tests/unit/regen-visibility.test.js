@@ -2,10 +2,14 @@
 /**
  * Which articles offer an admin the regenerate-image control.
  *
- * News no longer does. Its picture is the photograph the originating outlet
- * published, so "regenerate" names an action that cannot happen — and because
- * the control defaulted to on in StoryCard, it appeared over every card in
- * every grid for any signed-in admin.
+ * At present none do. News was excluded first: its picture is the photograph
+ * the originating outlet published, so "regenerate" names an action that cannot
+ * happen — and because the control defaulted to on in StoryCard, it appeared
+ * over every card in every grid for any signed-in admin. The five published
+ * category bundles were then excluded by request.
+ *
+ * Resolving a target is deliberately still intact, so the control is hidden
+ * rather than removed.
  *
  * The rule lives in one function precisely so it cannot drift back: three
  * separate render sites (StoryCard, ArticleReader, and anything added later)
@@ -109,8 +113,19 @@ describe('canRegenerateImage', () => {
         expect(A.canRegenerateImage(A.regenTargetOf(newsStory()))).toBe(false);
     });
 
-    test('is true for a category article — that image is still generated', () => {
-        expect(A.canRegenerateImage(A.regenTargetOf(categoryStory()))).toBe(true);
+    test('is false for a category article — hidden by request', () => {
+        // These images are still generated and the target still resolves; only
+        // the control is off. Restoring it is one clause in canRegenerateImage.
+        expect(A.canRegenerateImage(A.regenTargetOf(categoryStory()))).toBe(false);
+    });
+
+    test('the target still resolves, so the control can be restored', () => {
+        // Guards the difference between "hidden" and "ripped out": if this ever
+        // returns null, turning the control back on will not be a one-liner.
+        expect(A.regenTargetOf(categoryStory())).toMatchObject({
+            kind: 'category',
+            categorySlug: 'covenant-identity',
+        });
     });
 
     test('is false when there is no target at all', () => {

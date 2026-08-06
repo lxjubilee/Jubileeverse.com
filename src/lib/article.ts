@@ -54,18 +54,22 @@ export function regenTargetOf(story: Pick<Story, 'id' | 'slug' | 'date'>): Regen
 /**
  * Whether an admin may regenerate this article's image.
  *
- * News is excluded. Its picture is the photograph the originating outlet
- * published, so there is nothing to regenerate — the control offered an action
- * that no longer means anything, on every card in every grid.
+ * Currently nothing does, so the control appears nowhere.
  *
- * Category articles keep it: those images are still generated, and a bad one
- * still needs a way to be replaced.
+ * News has always been excluded: its picture is the photograph the originating
+ * outlet published, so there is nothing to regenerate. Category — the five
+ * published bundles — is excluded by request. Everything that resolves a
+ * regeneration target is left in place, so bringing the control back for
+ * category articles is deleting one clause below rather than reinstating the
+ * plumbing at every render site.
  *
  * Defined here rather than at each render site so a new surface cannot bring
- * the control back by forgetting to pass a prop.
+ * the control back by forgetting to pass a prop — the article hero and the feed
+ * card both ask this one question.
  */
 export function canRegenerateImage(target: RegenTarget | null): boolean {
-  return target !== null && target.kind !== 'news';
+  if (target === null) return false;
+  return target.kind !== 'news' && target.kind !== 'category';
 }
 
 /**
