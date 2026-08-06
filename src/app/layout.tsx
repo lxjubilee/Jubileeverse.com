@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Orbitron, Playfair_Display } from 'next/font/google';
+import NavigationTracker from '@/components/layout/NavigationTracker';
 import { AuthProvider } from '@/lib/auth';
 import '@/styles/globals.css';
 
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${orbitron.variable} ${playfair.variable}`}>
       <body>
+        <NavigationTracker />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

@@ -54,8 +54,20 @@
   inset: 0;
   display: flex;
   align-items: flex-end;
-  padding: var(--space-2xl);
+  /* Vertical only — the horizontal inset belongs to .heroContent, which carries
+     the body container's gutters so the two left edges agree. */
+  padding: var(--space-2xl) 0;
   background: linear-gradient(transparent 30%, rgba(0, 0, 0, 0.9));
+}
+
+/* The hero is full-bleed but its text is not: this repeats .layout's max-width
+   and side padding exactly, so the title starts on the same line as the article
+   body at every width. Keep the two in step if either changes. */
+.heroContent {
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-lg);
 }
 
 .metaTop {
@@ -294,7 +306,7 @@
   }
 
   .heroOverlay {
-    padding: var(--space-lg);
+    padding: var(--space-lg) 0;
   }
 
   .heroTitle {

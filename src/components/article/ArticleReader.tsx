@@ -13,6 +13,7 @@ import RelatedArticlesGrid from '@/components/article/RelatedArticlesGrid';
 import ReviewerTools from '@/components/article/ReviewerTools';
 import RegenerateImageButton from '@/components/admin/RegenerateImageButton';
 import { canRegenerateImage, regenTargetFor, trackView } from '@/lib/article';
+import { hasInAppHistory } from '@/lib/navigation';
 import styles from './ArticleReader.module.css';
 
 const FALLBACK_IMG =
@@ -165,15 +166,12 @@ export default function ArticleReader({
         <button
           className={styles.backBtn}
           onClick={() => {
-            // Only use history when we arrived from this site; otherwise go home
-            // (matches the original goBack referrer guard).
-            try {
-              if (document.referrer && new URL(document.referrer).host === window.location.host) {
-                router.back();
-                return;
-              }
-            } catch {
-              /* fall through */
+            // Return to whatever the reader was on before. Home is only the
+            // fallback for a cold arrival — a shared link or a search hit —
+            // where history holds nothing of ours to go back to.
+            if (hasInAppHistory()) {
+              router.back();
+              return;
             }
             router.push('/');
           }}
@@ -191,7 +189,7 @@ export default function ArticleReader({
           />
         ) : null}
         <div className={styles.heroOverlay}>
-          <div>
+          <div className={styles.heroContent}>
             <div className={styles.metaTop}>
               <span className={styles.sourceBadge}>
                 {isCurrentEvent ? 'JubileeVerse' : sourceName || 'Good News'}
