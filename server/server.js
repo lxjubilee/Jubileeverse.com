@@ -1301,20 +1301,35 @@ app.use(express.static(path.join(__dirname, 'public'), {
 // =============================================================================
 
 const rateLimit = require('express-rate-limit');
-const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Too many login attempts, please try again in 15 minutes' },
-    skip: () => NODE_ENV === 'test',
-});
-// Account deletion re-verifies a password, so it is a credential-guessing surface —
-// but it must NOT share loginLimiter's bucket. That one is keyed per-IP across all of
-// /api/auth/login, so ten mistyped sign-ins would block a legitimate deletion and a
-// few deletion attempts would lock the user out of signing in.
+
+// There is deliberately NO per-IP limiter on /api/auth/login any more.
 //
-// The window matches loginLimiter's deliberately. This endpoint is strictly harder
+// It used to allow 10 attempts per 15 minutes per IP. Two things made that hurt:
+// everyone behind one NAT address (a household, an office, a church hall) shared a
+// single budget, and the sign-up screen's entry step now posts to this same route
+// with `preview: true`, so sign-up and sign-in drew from that one bucket together.
+// Real people were being locked out of a site they had every right to enter.
+//
+// Removing it was an explicit product decision, made with the exposure stated:
+// password guessing against this endpoint is now throttled only by backOfficeLimiter
+// below (600/min across all of /api/), which is far too loose to stop credential
+// stuffing. The endpoint verifies credentials at the shared Identity Authority, so
+// what is unprotected here is the Jubilee ID itself, not merely a JubileeVerse
+// account.
+//
+// If that trade is ever revisited, the cheap fix is not a smaller number — it is
+// `skipSuccessfulRequests: true`, so only FAILED attempts count. A person signing in
+// correctly then never accumulates anything, while an attacker, who produces nothing
+// but failures, still runs into the wall. That keeps the protection and costs
+// legitimate users nothing.
+// Account deletion re-verifies a password, so it is a credential-guessing surface,
+// and it keeps its own limiter. It never shared one with /api/auth/login even when
+// that route had a limiter of its own: a common bucket meant a few mistyped sign-ins
+// could block a legitimate deletion, and a few deletion attempts could lock someone
+// out of signing in. Now that sign-in has no limiter at all, this is the last budget
+// standing on a password-checking route, which is another reason not to fold it in.
+//
+// This endpoint is strictly harder
 // to attack than login — it needs a valid session token AND the correct password AND
 // the account's own email typed out — so a tighter budget buys little. It costs a
 // lot, though: an earlier 5/hour setting locked out any user who mistyped their
@@ -11197,7 +11212,7 @@ async function selfHealSsoLogin(emailNorm, password, req) {
 //   wrong password            -> 401, same as any other sign-in
 // The third answer is what plain sign-in returns for that case as well, so both
 // doors lead to the same pre-filled form instead of a dead end.
-app.post('/api/auth/login', loginLimiter, ah(async (req, res) => {
+app.post('/api/auth/login', ah(async (req, res) => {
     const { email, password, totp_code, rememberMe } = req.body || {};
     // Type-check before use: a non-string here would throw inside toLowerCase()
     // or scryptSync and surface as a 500 for what is really a malformed request.
