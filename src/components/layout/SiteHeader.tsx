@@ -20,7 +20,7 @@ export default function SiteHeader() {
             32px icon, and streaming it through the dev proxy reset often enough to
             leave the header logo broken. This copy is 256px and needs no proxy hop.
           */}
-          <img src="/brand/jubilee-logo.png" alt="Jubilee" className="logo-icon" />
+          <img src="/brand/brand-logo.png" alt="Jubilee" className="logo-icon" />
           <div className="logo-text">
             Jubilee<span className="logo-verse">Verse</span>
             <span className="logo-dotcom">.com</span>

@@ -15,7 +15,7 @@ import styles from '@/app/(admin)/admin/dashboard.module.css';
 
 const MESSAGES_KEY = 'jubileeChatMessages';
 const SESSION_KEY = 'jubileeChatSessionId';
-const LOGO = '/brand/jubilee-logo.png';
+const LOGO = '/brand/brand-logo.png';
 
 const WELCOME: ChatMessage = {
   text: "Hello there! I'm Jubilee Inspire 😊 I'll keep you updated on all your task progress and help you stay organized with your content. What can I help you with today?",
