@@ -190,6 +190,9 @@ export default function SignUpPage() {
   };
 
   const failed = (err: unknown, fallback: string) => {
+    // Point at the field the message is about, on both steps that can raise it —
+    // a bare "that password doesn't match" leaves the eye scanning the form.
+    if (err instanceof ApiError && err.status === 401) setErrorField('password');
     setError(
       err instanceof ApiError
         ? err.status === 401
@@ -276,6 +279,7 @@ export default function SignUpPage() {
       (msg = 'Please enter a valid date of birth.'), (field = 'dob');
     else if (dob && dob > new Date().toISOString().slice(0, 10))
       (msg = 'Date of birth cannot be in the future.'), (field = 'dob');
+    else if (!password) (msg = 'Please enter your Jubilee ID password.'), (field = 'password');
     else if (!terms) msg = 'You must agree to the Terms of Use and Privacy Policy.';
     if (msg) {
       setErrorField(field);
@@ -576,6 +580,37 @@ export default function SignUpPage() {
                     style={{ opacity: 0.7 }}
                   />
                   <label className={styles.floatingLabel}>Email Address</label>
+                </div>
+
+                {/* Already verified before this step renders, so it arrives filled in.
+                    It stays EDITABLE on purpose: the provision call is a second sign-in
+                    at the authority, and the few things that can turn it down — a
+                    password changed on another family site a moment ago, a lockout
+                    counter, a transient refusal — all report "that password doesn't
+                    match". Without a field to correct, that message would point at a
+                    control that does not exist, which is the dead end this whole screen
+                    was built to remove. It also gives password managers something to
+                    save. */}
+                <div className={styles.floatingGroup}>
+                  <div className={styles.passwordWrapper}>
+                    <input
+                      type={showPw ? 'text' : 'password'}
+                      className={fieldClass('password')}
+                      placeholder=" "
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <label className={styles.floatingLabel}>Jubilee ID Password</label>
+                    <button
+                      type="button"
+                      className={styles.btnEye}
+                      onClick={() => setShowPw((v) => !v)}
+                      aria-label="Toggle password visibility"
+                    >
+                      <EyeIcon open={!showPw} />
+                    </button>
+                  </div>
                 </div>
 
                 {totpField}
