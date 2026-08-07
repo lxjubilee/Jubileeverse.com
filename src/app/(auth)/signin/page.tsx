@@ -6,7 +6,7 @@ import AuthBackground from '@/components/auth/AuthBackground';
 import LegalModals from '@/components/auth/LegalModals';
 import { api, ApiError } from '@/lib/api';
 import { getStoredAuth, setStoredAuth } from '@/lib/authStorage';
-import { hasJubileeId } from '@/lib/identity';
+import { hasJubileeId, writeSignupPrefill } from '@/lib/identity';
 import { safeRedirectTarget } from '@/lib/redirect';
 import type { AuthUser } from '@/lib/types';
 import styles from '../auth.module.css';
@@ -34,10 +34,24 @@ interface LoginSuccessResponse {
   user: AuthUser;
 }
 
-type LoginResponse = MfaRequiredResponse | LoginSuccessResponse;
+/**
+ * The credential is valid but there is no JubileeVerse account behind it — a
+ * family member who has never joined, or someone who deleted theirs. The route
+ * answers with the profile the authority holds so the sign-up screen can open a
+ * create form that is already filled in.
+ */
+interface NeedsProfileResponse {
+  success: false;
+  needsProfile: true;
+  profile?: { first_name?: string; last_name?: string; date_of_birth?: string };
+}
+
+type LoginResponse = MfaRequiredResponse | LoginSuccessResponse | NeedsProfileResponse;
 
 const isMfaRequired = (r: LoginResponse): r is MfaRequiredResponse =>
   'mfa_required' in r && r.mfa_required === true;
+const isNeedsProfile = (r: LoginResponse): r is NeedsProfileResponse =>
+  'needsProfile' in r && r.needsProfile === true;
 
 const EyeIcon = ({ open }: { open: boolean }) =>
   open ? (
@@ -61,16 +75,6 @@ const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
  * localStorage["jubileeVerseAuth"] either way.
  */
 const REMEMBERED_EMAIL_KEY = 'jubileeVerseRememberedEmail';
-
-/**
- * The login route's "the credential is valid but you have no account here" answer,
- * sent as 404 { needsSignup: true }. Read from the body rather than trusting the
- * status alone: a bare 404 could equally be a mis-routed request, and telling
- * someone to sign up when the API simply moved would be worse than a generic error.
- */
-function isNeedsSignup(body: unknown): boolean {
-  return typeof body === 'object' && body !== null && (body as { needsSignup?: unknown }).needsSignup === true;
-}
 
 function readRememberedEmail(): string {
   try {
@@ -168,6 +172,31 @@ export default function SignInPage() {
         return;
       }
 
+      // The password was RIGHT — there is just no account here yet. Hand the
+      // verified credential and the profile over to sign-up, which opens a create
+      // form already filled in. Telling someone with a working password to go and
+      // "sign up", then making them type all of it again, is the dead end this
+      // replaces. Joining is still a deliberate act: that screen asks them to
+      // confirm before anything is created.
+      if (isNeedsProfile(data)) {
+        writeSignupPrefill({
+          email: email.trim(),
+          password,
+          first_name: data.profile?.first_name || '',
+          last_name: data.profile?.last_name || '',
+          date_of_birth: data.profile?.date_of_birth || '',
+        });
+        // Carry the destination across the hand-off. Someone who clicked "sign in"
+        // from an article is still on their way there; without this they would
+        // finish the join and land on the home page instead. The value has already
+        // been through safeRedirectTarget, so it is a same-site relative path.
+        const target = safeRedirectTarget();
+        window.location.assign(
+          target === '/' ? '/signup' : `/signup?redirect=${encodeURIComponent(target)}`,
+        );
+        return;
+      }
+
       writeRememberedEmail(rememberMe ? email.trim() : null);
       setStoredAuth({
         authenticated: true,
@@ -184,18 +213,6 @@ export default function SignInPage() {
       // Full-page navigation so the AuthProvider re-hydrates from storage.
       window.location.assign(safeRedirectTarget());
     } catch (err) {
-      // 404 + needsSignup is the unambiguous one: the Identity Authority accepted
-      // the password, so the credential is RIGHT — there is simply no JubileeVerse
-      // account behind it. That is a family member who has never joined, or someone
-      // who deleted their account. Never say "incorrect password" here; they typed
-      // it correctly and would retype it forever. The "Sign Up" link already sits
-      // in this card's footer, so the message points at it rather than redirecting
-      // and throwing away what they typed.
-      if (err instanceof ApiError && err.status === 404 && isNeedsSignup(err.body)) {
-        setError(err.message || 'No JubileeVerse account for this email. Please sign up.');
-        setSubmitting(false);
-        return;
-      }
       // A 401 is ambiguous: wrong password, or no Jubilee ID at all? Ask the
       // lookup so we can point a first-time visitor at sign-up instead of letting
       // them retype a password they never had.

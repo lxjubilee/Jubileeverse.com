@@ -1307,20 +1307,35 @@ app.use(express.static(path.join(__dirname, 'public'), {
 // =============================================================================
 
 const rateLimit = require('express-rate-limit');
-const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Too many login attempts, please try again in 15 minutes' },
-    skip: () => NODE_ENV === 'test',
-});
-// Account deletion re-verifies a password, so it is a credential-guessing surface —
-// but it must NOT share loginLimiter's bucket. That one is keyed per-IP across all of
-// /api/auth/login, so ten mistyped sign-ins would block a legitimate deletion and a
-// few deletion attempts would lock the user out of signing in.
+
+// There is deliberately NO per-IP limiter on /api/auth/login any more.
 //
-// The window matches loginLimiter's deliberately. This endpoint is strictly harder
+// It used to allow 10 attempts per 15 minutes per IP. Two things made that hurt:
+// everyone behind one NAT address (a household, an office, a church hall) shared a
+// single budget, and the sign-up screen's entry step now posts to this same route
+// with `preview: true`, so sign-up and sign-in drew from that one bucket together.
+// Real people were being locked out of a site they had every right to enter.
+//
+// Removing it was an explicit product decision, made with the exposure stated:
+// password guessing against this endpoint is now throttled only by backOfficeLimiter
+// below (600/min across all of /api/), which is far too loose to stop credential
+// stuffing. The endpoint verifies credentials at the shared Identity Authority, so
+// what is unprotected here is the Jubilee ID itself, not merely a JubileeVerse
+// account.
+//
+// If that trade is ever revisited, the cheap fix is not a smaller number — it is
+// `skipSuccessfulRequests: true`, so only FAILED attempts count. A person signing in
+// correctly then never accumulates anything, while an attacker, who produces nothing
+// but failures, still runs into the wall. That keeps the protection and costs
+// legitimate users nothing.
+// Account deletion re-verifies a password, so it is a credential-guessing surface,
+// and it keeps its own limiter. It never shared one with /api/auth/login even when
+// that route had a limiter of its own: a common bucket meant a few mistyped sign-ins
+// could block a legitimate deletion, and a few deletion attempts could lock someone
+// out of signing in. Now that sign-in has no limiter at all, this is the last budget
+// standing on a password-checking route, which is another reason not to fold it in.
+//
+// This endpoint is strictly harder
 // to attack than login — it needs a valid session token AND the correct password AND
 // the account's own email typed out — so a tighter budget buys little. It costs a
 // lot, though: an earlier 5/hour setting locked out any user who mistyped their
@@ -3398,6 +3413,7 @@ const OIDC_ISSUER = process.env.OIDC_ISSUER || 'https://jubileeinspire.com/idp';
 const AUTH_LOGIN_MODE = (process.env.AUTH_LOGIN_MODE || 'local').toLowerCase() === 'sso' ? 'sso' : 'local';
 const {
   ssoEnabled, ssoHashPassword, ssoLogin, ssoLookup, ssoProvisionHash, ssoSetPassword,
+  ssoUpdateProfile,
 } = require('./lib/sso-client');
 
 /** True when delegation is both selected AND actually configured with a secret. */
@@ -11021,6 +11037,29 @@ app.post('/auth/logout', express.json(), async (req, res) => {
 // ── SSO delegation helpers ───────────────────────────────────────────────────
 
 /**
+ * Normalize whatever the authority sends for a date of birth into 'YYYY-MM-DD'.
+ *
+ * Its date_of_birth is a Postgres DATE, which serializes to an ISO instant at
+ * UTC midnight. Reading that back with toISOString() west of Greenwich yields the
+ * PREVIOUS day, so a birthday drifts one day earlier every time it round-trips.
+ * Taking the LOCAL parts of the parsed date keeps the calendar day the authority
+ * meant, which is what a <input type="date"> needs to show.
+ */
+function ssoDateOfBirth(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) {
+        // Already a plain 'YYYY-MM-DD' (or unusable) — take the date part as-is.
+        const raw = String(value).slice(0, 10);
+        return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+    }
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+/**
  * Upsert a user the Identity Authority just authenticated. Keys on EMAIL — that
  * is the real cross-platform key; sso_subject_id is recorded for traceability.
  *
@@ -11029,8 +11068,9 @@ app.post('/auth/logout', express.json(), async (req, res) => {
  * do NOT touch role, permissions, entitlements or cms_roles, so privileges granted
  * here survive and are never re-derived from the authority.
  *
- * Names are refreshed with COALESCE so a name changed on any family site
- * propagates here, but a null from the authority never blanks a local value.
+ * Names and date of birth are refreshed with COALESCE so a detail changed on any
+ * family site propagates here, but a null from the authority never blanks a local
+ * value.
  *
  * Note the explicit `'[]'::jsonb` entitlements on INSERT: the column DEFAULT is
  * '["jubileeverse_cms"]', which would hand back-office access to every identity
@@ -11044,6 +11084,7 @@ async function upsertUserFromSso(ssoUser, req = null) {
     const name = [firstName, lastName].filter(Boolean).join(' ').trim()
         || ssoUser.display_name || ssoUser.name || email;
     const subject = `sso|${ssoUser.id ?? email}`;
+    const dob = ssoDateOfBirth(ssoUser.date_of_birth ?? ssoUser.dateOfBirth ?? null);
 
     // A previously deleted account lands on the INSERT branch and is provisioned
     // again from what the authority just returned. Nothing here has to detect that
@@ -11056,26 +11097,61 @@ async function upsertUserFromSso(ssoUser, req = null) {
     // Reaching here at all is the caller's decision, not this function's. The login
     // route only calls it when a local account already exists OR the request came
     // from the sign-up screen (`provision: true`); a plain sign-in for an address
-    // with no local row is refused there with 404 needsSignup and never arrives.
+    // with no local row is answered there with needsProfile — a routing answer that
+    // mints nothing — and never arrives here.
     //
     // is_active is set explicitly rather than left to the column default, so a
     // re-provisioned account is unambiguously live. It is NOT in the DO UPDATE
     // list: an account an administrator disabled must stay disabled, and a
     // returning sign-in is not the place to re-enable it.
     const { rows: [user] } = await pgPool.query(
-        `INSERT INTO jv_users (email, name, first_name, last_name, sso_subject_id, role, entitlements, is_active, last_login_at)
-              VALUES ($1, $2, $3, $4, $5, 'user', '[]'::jsonb, 1, NOW())
+        `INSERT INTO jv_users (email, name, first_name, last_name, sso_subject_id, date_of_birth, role, entitlements, is_active, last_login_at)
+              VALUES ($1, $2, $3, $4, $5, $6::date, 'user', '[]'::jsonb, 1, NOW())
          ON CONFLICT (email) DO UPDATE
             SET last_login_at   = NOW(),
                 updated_at      = NOW(),
                 first_name      = COALESCE(EXCLUDED.first_name, jv_users.first_name),
                 last_name       = COALESCE(EXCLUDED.last_name,  jv_users.last_name),
                 name            = COALESCE(EXCLUDED.name,       jv_users.name),
+                date_of_birth   = COALESCE(EXCLUDED.date_of_birth, jv_users.date_of_birth),
                 sso_subject_id  = COALESCE(jv_users.sso_subject_id, EXCLUDED.sso_subject_id)
          RETURNING *`,
-        [email, name, firstName, lastName, subject]
+        [email, name, firstName, lastName, subject, dob]
     );
     return user;
+}
+
+/**
+ * Apply whatever someone corrected on the pre-filled create form.
+ *
+ * That form opens already filled from the Jubilee ID, so in the common case
+ * nothing was touched and this does nothing at all. When something WAS changed,
+ * the correction has to reach the authority: leave it local and the rest of the
+ * family keeps showing the old name, and the COALESCE refresh on the very next
+ * sign-in would quietly overwrite the edit with what the authority still holds.
+ *
+ * A blank field means "not supplied", never "erase what the authority has" — the
+ * form cannot be submitted with an empty name anyway, and an empty date is simply
+ * a detail the person chose not to give.
+ *
+ * Returns the SSO user to provision from: the original when nothing changed, or a
+ * copy carrying the edits. Never throws, and a failed propagation is not fatal —
+ * the local account is still created from what was typed.
+ */
+async function syncEditedProfileToSso(ssoUser, emailNorm, { firstName, lastName, dob }) {
+    const curFirst = String(ssoUser.first_name ?? ssoUser.firstName ?? '').trim();
+    const curLast  = String(ssoUser.last_name  ?? ssoUser.lastName  ?? '').trim();
+    const curDob   = ssoDateOfBirth(ssoUser.date_of_birth ?? ssoUser.dateOfBirth ?? null) || '';
+
+    const patch = {};
+    if (firstName && firstName !== curFirst) patch.first_name = firstName;
+    if (lastName  && lastName  !== curLast)  patch.last_name  = lastName;
+    if (dob       && dob       !== curDob)   patch.date_of_birth = dob;
+    if (Object.keys(patch).length === 0) return ssoUser;
+
+    const result = await ssoUpdateProfile(emailNorm, patch);
+    if (!result.ok) console.warn('[sso] profile update did not apply:', JSON.stringify(result));
+    return { ...ssoUser, ...patch };
 }
 
 /**
@@ -11132,7 +11208,17 @@ async function selfHealSsoLogin(emailNorm, password, req) {
 // two sites share an Identity Authority, so they must agree on what a surviving
 // Jubilee ID entitles you to, or deleting an account means something different
 // depending on which door you knock at.
-app.post('/api/auth/login', loginLimiter, ah(async (req, res) => {
+//
+// It answers the sign-up screen too. That screen asks for an email AND a password
+// up front and posts them here with `preview: true`, which routes without
+// committing anything:
+//   no identity anywhere      -> { redirect: 'signup' }  (full registration form)
+//   identity + local account  -> an ordinary sign-in, MFA gate and all
+//   identity, no local account-> { needsProfile, profile } (pre-filled create form)
+//   wrong password            -> 401, same as any other sign-in
+// The third answer is what plain sign-in returns for that case as well, so both
+// doors lead to the same pre-filled form instead of a dead end.
+app.post('/api/auth/login', ah(async (req, res) => {
     const { email, password, totp_code, rememberMe } = req.body || {};
     // Type-check before use: a non-string here would throw inside toLowerCase()
     // or scryptSync and surface as a 500 for what is really a malformed request.
@@ -11141,6 +11227,20 @@ app.post('/api/auth/login', loginLimiter, ah(async (req, res) => {
     }
     if (totp_code !== undefined && typeof totp_code !== 'string') {
         return res.status(400).json({ error: 'Invalid authentication code.' });
+    }
+    for (const [label, value] of [['first name', req.body.first_name], ['last name', req.body.last_name], ['date of birth', req.body.date_of_birth]]) {
+        if (value !== undefined && value !== null && typeof value !== 'string') {
+            return res.status(400).json({ error: `Invalid ${label}.` });
+        }
+    }
+    // A date of birth edited on the pre-filled create form has to clear the same
+    // bar registration sets before it is written to either store.
+    let editedDob = null;
+    if (typeof req.body.date_of_birth === 'string' && req.body.date_of_birth.trim()) {
+        const parsed = Date.parse(req.body.date_of_birth.trim());
+        if (Number.isNaN(parsed)) return res.status(400).json({ error: 'Please enter a valid date of birth.' });
+        if (parsed > Date.now()) return res.status(400).json({ error: 'Date of birth cannot be in the future.' });
+        editedDob = new Date(parsed).toISOString().slice(0, 10);
     }
     const emailNorm = email.toLowerCase().trim();
 
@@ -11152,6 +11252,29 @@ app.post('/api/auth/login', loginLimiter, ah(async (req, res) => {
     // it, so a deleted account is NOT resurrected merely because the authority
     // still holds the credential — the whole point of deleting it.
     const allowProvision = req.body.provision === true;
+    const preview = req.body.preview === true;
+
+    // Sign-up entry, first question: is this address known to EITHER store? If it
+    // is known to neither, the visitor is new and belongs on the registration form,
+    // and there is no point spending a credential check to discover that. The two
+    // legs and their failure directions mirror GET /api/auth/lookup exactly — our
+    // own table is decisive on its own, and only the authority leg fails OPEN, so an
+    // outage sends someone to a registration form that still re-checks server-side
+    // rather than stranding them on a password box they cannot satisfy.
+    //
+    // is_active is deliberately not a filter here, matching that route: a disabled
+    // row still occupies the address, and the answer for it belongs further down
+    // where the sign-in can explain itself.
+    if (preview) {
+        const { rows: knownLocally } = await pgPool.query(
+            `SELECT 1 FROM jv_users WHERE email = $1`, [emailNorm]
+        );
+        if (knownLocally.length === 0) {
+            if (!ssoDelegationActive()) return res.json({ success: false, redirect: 'signup' });
+            const found = await ssoLookup(emailNorm);
+            if (found.ok && !found.exists) return res.json({ success: false, redirect: 'signup' });
+        }
+    }
 
     if (ssoDelegationActive()) {
         let ssoStatus = null;
@@ -11175,17 +11298,45 @@ app.post('/api/auth/login', loginLimiter, ah(async (req, res) => {
         if (ssoUser) {
             // The authority verified the password. Complete the sign-in only if a
             // local account exists, unless this IS the sign-up. `is_active` is part
-            // of the test, matching Jubilujah: a disabled account answers "sign up"
-            // here rather than reaching the 403 below. That is a real difference in
-            // wording for a suspended user, and it is intentional — the two sites
-            // must not disagree about what a live Jubilee ID gets you.
+            // of the test, matching Jubilujah: a disabled account is routed to the
+            // create form below rather than reaching the 403 further down. It cannot
+            // rejoin its way out of being disabled — the upsert leaves is_active
+            // alone, so the 403 is still where it lands — but a suspended user does
+            // take a longer road to that message than a plain "account disabled".
+            // Kept deliberately: the two sites must not disagree about what a live
+            // Jubilee ID gets you.
             const { rows: [localRow] } = await pgPool.query(
                 `SELECT 1 FROM jv_users WHERE email = $1 AND is_active = 1`, [emailNorm]
             );
             if (!localRow && !allowProvision) {
-                return res.status(404).json({
-                    error: 'No JubileeVerse account for this email. Please sign up.',
-                    needsSignup: true,
+                // The credential is RIGHT — the authority just verified it. There is
+                // simply no account here yet: a family member who has never visited,
+                // or someone who deleted theirs. Hand back what the authority knows
+                // so the sign-up screen can open a create form that is already filled
+                // in, instead of dead-ending someone who typed their password
+                // correctly with "please sign up".
+                //
+                // This is not a way in. Creating the local row still takes a
+                // deliberate `provision: true` from that screen, so a deleted account
+                // stays deleted until its owner asks for it back.
+                return res.json({
+                    success: false,
+                    needsProfile: true,
+                    profile: {
+                        first_name: String(ssoUser.first_name ?? ssoUser.firstName ?? '').trim(),
+                        last_name:  String(ssoUser.last_name  ?? ssoUser.lastName  ?? '').trim(),
+                        date_of_birth: ssoDateOfBirth(ssoUser.date_of_birth ?? ssoUser.dateOfBirth ?? null) || '',
+                    },
+                });
+            }
+            // Joining from that pre-filled form: any correction made to the details
+            // goes to the shared Jubilee ID first, so the family sees one name and
+            // the next sign-in's refresh does not undo the edit.
+            if (allowProvision) {
+                ssoUser = await syncEditedProfileToSso(ssoUser, emailNorm, {
+                    firstName: String(req.body.first_name ?? '').trim(),
+                    lastName:  String(req.body.last_name  ?? '').trim(),
+                    dob: editedDob || '',
                 });
             }
             user = await upsertUserFromSso(ssoUser, req);
