@@ -33,6 +33,36 @@ interface SsePayload {
 }
 
 /**
+ * The envelope the endpoint asks the model for: `TITLE:` and its optional
+ * `SOURCE:` / `CATEGORY:` companions, then a blank line, then the body — which
+ * a model that was shown a `CONTENT:` marker on the way in tends to label on the
+ * way out.
+ */
+const ENVELOPE_LABEL = /^(?:TITLE|SOURCE|CATEGORY|CONTENT)[ \t]*:/i;
+const CONTENT_LABEL = /^\**[ \t]*CONTENT[ \t]*:\**[ \t]*\r?\n?/i;
+
+/**
+ * The body as it should read mid-stream.
+ *
+ * `done` carries content the server has already parsed and cleaned, but the
+ * chunks before it are the model's raw answer, and they are rendered as they
+ * arrive. So a reader watching a translation appear watched the envelope appear
+ * first — `TITLE:…` on the opening chunk, then `CONTENT:` sitting where the
+ * first sentence belongs. Stripped here as well as on the server, because the
+ * server never sees this intermediate state.
+ *
+ * While the header is still arriving there is no body to show yet, so nothing is
+ * shown: better a moment of empty than a moment of `TITLE:`. A response that
+ * opens straight into prose is passed through untouched.
+ */
+function streamedBody(raw: string): string {
+  if (!ENVELOPE_LABEL.test(raw.trimStart())) return raw.replace(CONTENT_LABEL, '');
+  const blank = raw.indexOf('\n\n');
+  if (blank === -1) return '';
+  return raw.slice(blank + 2).replace(CONTENT_LABEL, '');
+}
+
+/**
  * Translate Article widget. Tries the translation cache
  * (`GET /api/articles/:id/translation/:lang`) then streams a fresh translation
  * (`POST /api/articles/:id/translate`, SSE: cached|chunk|metadata|done|error).
@@ -133,12 +163,12 @@ export default function TranslateArticle({
             throw new Error(payload.message || 'Translation error');
           } else if (payload.type === 'metadata' && payload.title) {
             titleRef.current = payload.title;
-            onTranslated(titleRef.current, acc);
+            onTranslated(titleRef.current, streamedBody(acc));
           } else if (payload.type === 'chunk' && payload.text) {
             acc += payload.text;
-            onTranslated(titleRef.current, acc);
+            onTranslated(titleRef.current, streamedBody(acc));
           } else if (payload.type === 'cached' || payload.type === 'done') {
-            onTranslated(payload.title || titleRef.current, payload.content || acc);
+            onTranslated(payload.title || titleRef.current, payload.content || streamedBody(acc));
           }
         }
       }

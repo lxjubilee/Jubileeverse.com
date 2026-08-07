@@ -1,8 +1,10 @@
 'use strict';
 /**
- * Stray markup a translation model wraps around its own answer.
+ * Stray markup and labels a translation model wraps around its own answer.
  *
- * Observed on a Hindi article: the model returned the whole translated body
+ * Two shapes, both reported on the same source article.
+ *
+ * The first, on a Hindi article: the model returned the whole translated body
  * inside a tag of its own invention —
  *
  *     <budget:token_budget>
@@ -19,6 +21,14 @@
  * It was also visible rather than inert. `<budget:token_budget>` is a valid
  * CommonMark autolink (`<scheme:path>`), so react-markdown rendered it as a
  * link sitting in front of the article's first sentence.
+ *
+ * The second, on the Arabic translation of that article: the body opened on the
+ * word `CONTENT:`. The endpoint frames the article it sends with the same labels
+ * it asks for back — `TITLE:`, `SOURCE:`, `CATEGORY:`, then `CONTENT:` ahead of
+ * the body — and the parser lifts the first three off the response but has no
+ * reason to expect the fourth, which belongs to the input alone. A model that
+ * has just been shown the label answers with it, so it survived into the body
+ * and into the caches, and cached is where it stayed.
  *
  * Pulled out of server.js so the rules below can be tested against real model
  * output without a database or an API key.
@@ -73,9 +83,27 @@ const isArtifactTag = (name) => !isHtmlElement(name) && !isAutolink(name);
 const TAG_NAME = '[A-Za-z][A-Za-z0-9._:+-]*';
 
 /**
+ * The `CONTENT:` label, at the very start of a body and nowhere else.
+ *
+ * Anchored deliberately. An article may quote the word mid-sentence — a piece
+ * about publishing could reasonably print "CONTENT: a note on the format" — and
+ * only the copy sitting where the first sentence belongs is the echoed label.
+ *
+ * Tolerates what a model puts around it: the bold a markdown-minded translator
+ * adds (`**CONTENT:**`), a space before the colon, and either shape it arrives
+ * in — alone on its line, or run straight into the first sentence.
+ */
+const CONTENT_LABEL = /^\**[ \t]*CONTENT[ \t]*:\**[ \t]*\r?\n?/i;
+
+/** Drop a leading `CONTENT:` label. Returns the body unchanged when absent. */
+const stripContentLabel = (text) => text.replace(CONTENT_LABEL, '');
+
+/**
  * Strip wrapper tags a model put around a translation.
  *
- * Three passes, narrowest first:
+ * Three passes, narrowest first, with the `CONTENT:` label taken off either
+ * side of the first — the label can sit outside a wrapper the model invented or
+ * inside it, and which one costs nothing to allow for:
  *
  *   1. A matched pair enclosing the entire body is unwrapped, provided the tag
  *      is not a real HTML element. Repeated, because a model that invents one
@@ -89,7 +117,7 @@ const TAG_NAME = '[A-Za-z][A-Za-z0-9._:+-]*';
  */
 function stripTranslationArtifacts(content) {
     if (typeof content !== 'string' || content.length === 0) return content;
-    let out = content.trim();
+    let out = stripContentLabel(content.trim()).trim();
 
     // 1. Unwrap. Bounded rather than `while (true)`: a pathological input must
     // not spin here, and nothing legitimate nests model wrappers deeply.
@@ -98,6 +126,9 @@ function stripTranslationArtifacts(content) {
         if (!wrapped || isHtmlElement(wrapped[1])) break;
         out = wrapped[2].trim();
     }
+
+    // The label again, now that any wrapper enclosing it is off.
+    out = stripContentLabel(out).trim();
 
     // 2. Orphan closing tags.
     out = out.replace(new RegExp(`<\\/(${TAG_NAME})>`, 'g'), (tag, name) =>
@@ -136,4 +167,9 @@ function isImplausiblyShort(translated, source) {
     return out < src * IMPLAUSIBLE_RATIO;
 }
 
-module.exports = { stripTranslationArtifacts, isArtifactTag, isImplausiblyShort };
+module.exports = {
+    stripTranslationArtifacts,
+    stripContentLabel,
+    isArtifactTag,
+    isImplausiblyShort,
+};
