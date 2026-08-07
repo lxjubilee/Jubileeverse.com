@@ -1206,10 +1206,16 @@ app.use((req, res, next) => {
 // passes 30 s. The timeout answered 503 while the work carried on, so the
 // reader saw "Translation unavailable" and the handler then wrote to a response
 // that was already sent.
+//
+// Speech synthesis is slower than it looks: a 3,300-character paragraph measured
+// 22.5 s, which left barely seven seconds of headroom under the shared 30 s. A
+// timeout there is not a slow paragraph, it is a dead one — the reader gets 503,
+// and Read Aloud has only one way to report that.
 const LONG_RUNNING_PATHS = [
     [/^\/api\/admin\/regenerate-image$/, 300_000],
     [/^\/api\/articles\/[^/]+\/translate$/, 180_000],
     [/^\/api\/translate-batch$/, 120_000],
+    [/^\/api\/tts$/, 120_000],
 ];
 
 app.use((req, res, next) => {
@@ -14856,20 +14862,54 @@ app.post('/api/tts', async (req, res) => {
     const voiceEntry = TTS_VOICE_MAP[langKey] || TTS_VOICE_MAP['en-US'];
     const voiceName = voiceEntry[voiceGender] || voiceEntry.female;
 
+    // Every request opens its own WebSocket to Microsoft, and nothing used to shut
+    // it again: eight requests left eight sockets established. Read Aloud makes one
+    // request per paragraph, so a single reader working through an article leaked a
+    // socket per paragraph and they accumulated for the life of the process — until
+    // the file-descriptor limit, which takes the database pool down with it rather
+    // than just the audio.
+    //
+    // Declared out here so the failure paths below close it too: the socket is
+    // opened by setMetadata, so a throw anywhere after that leaks one exactly as
+    // the success path did.
+    let tts = null;
+    let ttsClosed = false;
+    const closeTts = () => {
+        if (ttsClosed || !tts) return;
+        ttsClosed = true;
+        try {
+            tts.close();
+        } catch (e) {
+            console.warn('[TTS] close failed:', e.message);
+        }
+    };
+
     try {
-        const tts = new MsEdgeTTS();
+        tts = new MsEdgeTTS();
         await tts.setMetadata(voiceName, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
         const { audioStream } = await tts.toStream(text.substring(0, 4000));
 
+        // Closed once, on whichever comes first: the audio finishing, the stream
+        // failing, or the reader navigating away mid-paragraph.
         res.setHeader('Content-Type', 'audio/mpeg');
         res.setHeader('Cache-Control', 'no-cache');
         audioStream.pipe(res);
+        audioStream.on('end', closeTts);
+        audioStream.on('close', closeTts);
         audioStream.on('error', (err) => {
             console.error('[TTS] Stream error:', err.message);
+            closeTts();
             if (!res.headersSent) res.status(500).json({ error: 'TTS failed' });
+        });
+        // A reader who skips ahead or leaves abandons the response; without this
+        // the synthesis runs to completion into a socket nobody is reading.
+        res.on('close', () => {
+            closeTts();
+            audioStream.destroy?.();
         });
     } catch (err) {
         console.error('[TTS] Error:', err.message);
+        closeTts();
         if (!res.headersSent) res.status(500).json({ error: 'TTS failed', message: err.message });
     }
 });
@@ -14938,6 +14978,8 @@ function translationIdentity(idStr) {
     };
 }
 
+const { stripTranslationArtifacts, isImplausiblyShort } = require('./lib/translation-artifacts');
+
 // GET /api/articles/:id/translation/:lang — check cache and increment hit_count
 app.get('/api/articles/:id/translation/:lang', async (req, res) => {
     const { id, lang } = req.params;
@@ -14954,7 +14996,14 @@ app.get('/api/articles/:id/translation/:lang', async (req, res) => {
             `SELECT translated_title, translated_content, is_rtl, translated_source_badge, translated_category FROM article_translations WHERE article_id = $1 AND language_code = $2`,
             [cacheKey, lang]
         );
-        if (result.rows.length > 0) {
+        // The widget asks here before it streams, so this is the first place a
+        // stored wrapper tag would reach a reader. Cleaned on read like the
+        // POST's cache branches, which is what lets rows written before the
+        // strip existed serve clean text.
+        const cleaned = result.rows.length > 0
+            ? stripTranslationArtifacts(result.rows[0].translated_content)
+            : '';
+        if (cleaned) {
             const row = result.rows[0];
             // Increment hit count (fire-and-forget)
             pgPool.query(
@@ -14964,12 +15013,18 @@ app.get('/api/articles/:id/translation/:lang', async (req, res) => {
             res.json({
                 found: true,
                 title: row.translated_title,
-                content: row.translated_content,
+                content: cleaned,
                 isRtl: row.is_rtl,
                 sourceBadge: row.translated_source_badge,
                 category: row.translated_category
             });
         } else {
+            // Reported as a miss when a row exists but holds nothing once the
+            // wrapper is off, so the widget re-translates instead of showing an
+            // empty article. Debris that is not empty — a row whose whole body
+            // was `<budget:token_budget>200000</budget:token_budget>` — is caught
+            // by the length check on the write path, which is where the original
+            // is in scope to compare against.
             res.json({ found: false });
         }
     } catch (err) {
@@ -15025,7 +15080,15 @@ app.post('/api/articles/:id/translate', async (req, res) => {
                 [articleId, language_code]
             )
             : { rows: [] };
-        if (cached.rows.length > 0) {
+        // Cleaned on the way out as well as in. Rows written before the strip
+        // existed still hold a model's wrapper tag, and a cache hit is the only
+        // path most readers take — sanitizing the write alone would leave those
+        // rows showing it forever. An entry that is nothing but a wrapper falls
+        // through to a fresh translation rather than being served as one.
+        const cachedContent = cached.rows.length > 0
+            ? stripTranslationArtifacts(cached.rows[0].translated_content)
+            : '';
+        if (cachedContent) {
             // Increment hit count for cached translation
             pgPool.query(
                 `UPDATE article_translations SET hit_count = COALESCE(hit_count, 0) + 1 WHERE article_id = $1 AND language_code = $2`,
@@ -15034,7 +15097,7 @@ app.post('/api/articles/:id/translate', async (req, res) => {
             sendEvent({
                 type: 'cached',
                 title: cached.rows[0].translated_title,
-                content: cached.rows[0].translated_content,
+                content: cachedContent,
                 isRtl: cached.rows[0].is_rtl,
                 sourceBadge: cached.rows[0].translated_source_badge,
                 category: cached.rows[0].translated_category
@@ -15112,7 +15175,12 @@ app.post('/api/articles/:id/translate', async (req, res) => {
                      FROM article_translation_bodies WHERE source_hash = $1 AND language_code = $2`,
                     [sourceHash, language_code]
                 );
-                if (byBody.rows.length > 0) {
+                // Cleaned on read, and skipped when nothing survives, for the
+                // same reasons as the id-keyed cache above.
+                const byBodyContent = byBody.rows.length > 0
+                    ? stripTranslationArtifacts(byBody.rows[0].translated_content)
+                    : '';
+                if (byBodyContent) {
                     pgPool.query(
                         `UPDATE article_translation_bodies SET hit_count = COALESCE(hit_count, 0) + 1
                          WHERE source_hash = $1 AND language_code = $2`,
@@ -15121,7 +15189,7 @@ app.post('/api/articles/:id/translate', async (req, res) => {
                     sendEvent({
                         type: 'cached',
                         title: byBody.rows[0].translated_title,
-                        content: byBody.rows[0].translated_content,
+                        content: byBodyContent,
                         isRtl: byBody.rows[0].is_rtl,
                         sourceBadge: byBody.rows[0].translated_source_badge,
                         category: byBody.rows[0].translated_category
@@ -15159,8 +15227,12 @@ app.post('/api/articles/:id/translate', async (req, res) => {
             systemInstr += `TITLE:[translated title]\n`;
             if (source_badge) systemInstr += `SOURCE:[translated source badge]\n`;
             if (category_label) systemInstr += `CATEGORY:[translated category]\n`;
-            systemInstr += `\n[translated HTML content preserving all HTML tags exactly as-is]\n`;
-            systemInstr += `Do not add any other commentary.`;
+            systemInstr += `\n[translated content, preserving any HTML tags that are already in it exactly as-is]\n`;
+            // A model wrapped a whole translation in a tag it made up
+            // (<budget:token_budget>), which then rendered as a link in front of
+            // the article. stripTranslationArtifacts() removes it either way;
+            // asking plainly is the cheaper half of the fix.
+            systemInstr += `Do not add any other commentary, and do not wrap the output in any tag of your own.`;
 
             const stream = anthropic.messages.stream({
                 model: 'claude-haiku-4-5-20251001',
@@ -15215,8 +15287,12 @@ app.post('/api/articles/:id/translate', async (req, res) => {
                 systemInstr += `TITLE:[translated title]\n`;
                 if (source_badge) systemInstr += `SOURCE:[translated source badge]\n`;
                 if (category_label) systemInstr += `CATEGORY:[translated category]\n`;
-                systemInstr += `\n[translated HTML content preserving all HTML tags exactly as-is]\n`;
-                systemInstr += `Do not add any other commentary.`;
+                systemInstr += `\n[translated content, preserving any HTML tags that are already in it exactly as-is]\n`;
+                // A model wrapped a whole translation in a tag it made up
+                // (<budget:token_budget>), which then rendered as a link in front
+                // of the article. stripTranslationArtifacts() removes it either
+                // way; asking plainly is the cheaper half of the fix.
+                systemInstr += `Do not add any other commentary, and do not wrap the output in any tag of your own.`;
 
                 const completion = await openai.chat.completions.create({
                     model: process.env.OPENAI_TRANSLATE_MODEL || 'gpt-4o',
@@ -15295,8 +15371,16 @@ app.post('/api/articles/:id/translate', async (req, res) => {
             }
         }
 
-        const translatedContent = lines.slice(contentStartIndex).join('\n').trim();
+        // The header parse above lifts off TITLE:/SOURCE:/CATEGORY: and takes
+        // the rest as content, so anything else the model volunteered — a tag it
+        // wrapped its own answer in — is still in here. Strip it before the
+        // caches below, which is what turned one bad response into a permanent
+        // one.
+        const translatedContent = stripTranslationArtifacts(
+            lines.slice(contentStartIndex).join('\n').trim(),
+        );
         if (!translatedTitle) translatedTitle = title; // Fallback to original
+        translatedTitle = stripTranslationArtifacts(translatedTitle);
 
         // Two caches, and which one is written turns on where the original came
         // from.
@@ -15311,6 +15395,19 @@ app.post('/api/articles/:id/translate', async (req, res) => {
         // ArticleReader), so the replacement would execute. Keyed by a hash of
         // the source text instead, a forged body can only ever collide with
         // itself.
+        // A response can be debris rather than a translation, and caching that is
+        // what turns a single bad response into a permanent one. Checked against
+        // the original's length, which is why this sits here and not on the read
+        // paths — the source is in scope only at the point it was translated.
+        if (isImplausiblyShort(translatedContent, content)) {
+            console.warn(
+                `[Translation] implausible result for ${language_code}: ` +
+                `${translatedContent.length} chars from ${content.length}; not cached`
+            );
+            sendEvent({ type: 'error', message: 'Unable to Translate at this Time' });
+            return res.end();
+        }
+
         if (serverSourced) {
             await pgPool.query(
                 `INSERT INTO article_translations (article_id, language_code, language_name, translated_title, translated_content, is_rtl, translated_source_badge, translated_category, hit_count)

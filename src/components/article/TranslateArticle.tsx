@@ -15,6 +15,13 @@ interface Props {
   onTranslated: (title: string, content: string) => void;
   /** Restore the original English title/content. */
   onRestore: () => void;
+  /**
+   * The language the article body is currently in ('en-US' when untranslated).
+   * Read Aloud needs it: the spoken locale has to match the text on screen. An
+   * English voice given a translated story reads it in an English accent at
+   * best, and for a non-Latin script returns no audio at all.
+   */
+  onLanguageChange?: (code: string) => void;
 }
 
 interface SsePayload {
@@ -36,6 +43,7 @@ export default function TranslateArticle({
   fallbackContent,
   onTranslated,
   onRestore,
+  onLanguageChange,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
@@ -158,6 +166,13 @@ export default function TranslateArticle({
     // every render; the ref guard is what keeps this to a single pass.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Report the article's language from one place rather than at each site that
+  // sets it: an explicit pick, the site-language adoption above, the reset to
+  // English when a translation fails, and Restore English all move `current`.
+  useEffect(() => {
+    onLanguageChange?.(current);
+  }, [current, onLanguageChange]);
 
   const restore = () => {
     setCurrent('en-US');

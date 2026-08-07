@@ -988,6 +988,23 @@ img {
   }
 }
 
+/* The single word being spoken, inside that block. Painted through the Custom
+   Highlight API rather than by wrapping words in spans: the article body is
+   React's, and inserting elements into it breaks React's own removal of the
+   text nodes it thinks it still owns the next time the body changes — which it
+   does, on every translation. A highlight is a range the browser paints over
+   the text it already rendered, so nothing about the document moves.
+
+   Colours match the block highlight above, one shade stronger so the word reads
+   as the point inside the paragraph. Only a few properties are honoured on
+   ::highlight() — colour, background, text-decoration, text-shadow — and these
+   are within that set. Browsers without the API simply keep the block
+   highlight, which is what this page had before. */
+::highlight(read-aloud-word) {
+  background-color: rgba(230, 172, 0, 0.35);
+  color: #fff;
+}
+
 /* Shown when a story has no image at all, so the card reads as intentionally
    image-less rather than as a failed load. */
 .content-card-image-placeholder {

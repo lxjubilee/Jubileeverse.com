@@ -104,6 +104,9 @@ export default function ArticleReader({
   // Translation swap (null = show the original).
   const [tTitle, setTTitle] = useState<string | null>(null);
   const [tContent, setTContent] = useState<string | null>(null);
+  // The language the body is currently in, reported by the translate widget.
+  // Read Aloud speaks in it, so a translated article is not read in English.
+  const [lang, setLang] = useState('en-US');
   // Live content override (e.g. reviewer "rewrite").
   const [overrideContent, setOverrideContent] = useState<string | null>(null);
   // Hero replaced by an admin regeneration, shown without waiting for a reload.
@@ -237,11 +240,14 @@ export default function ArticleReader({
           </div>
 
           <aside className={styles.sidebar}>
-            <ReadAloud text={rawContent} contentRef={proseRef} />
+            <ReadAloud text={rawContent} lang={lang} contentRef={proseRef} />
             <TranslateArticle
               articleId={reactionId}
               fallbackTitle={title}
               fallbackContent={content}
+              // The setter itself, not an arrow: it is referentially stable, so
+              // the widget's reporting effect cannot re-run every render.
+              onLanguageChange={setLang}
               onTranslated={(t, c) => {
                 setTTitle(t);
                 setTContent(c);
