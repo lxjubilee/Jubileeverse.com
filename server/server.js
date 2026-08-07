@@ -15383,7 +15383,13 @@ app.post('/api/articles/:id/translate', async (req, res) => {
             // (<budget:token_budget>), which then rendered as a link in front of
             // the article. stripTranslationArtifacts() removes it either way;
             // asking plainly is the cheaper half of the fix.
-            systemInstr += `Do not add any other commentary, and do not wrap the output in any tag of your own.`;
+            //
+            // The body is framed as CONTENT: on the way in, and a model shown
+            // that label answers with it — which is how an Arabic article came
+            // to open on the word CONTENT:. Only the three header lines above
+            // are wanted back, so say which.
+            systemInstr += `Do not add any other commentary, and do not wrap the output in any tag of your own. `;
+            systemInstr += `The translated content follows the blank line on its own, with no CONTENT: label in front of it.`;
 
             const stream = anthropic.messages.stream({
                 model: 'claude-haiku-4-5-20251001',
@@ -15442,8 +15448,11 @@ app.post('/api/articles/:id/translate', async (req, res) => {
                 // A model wrapped a whole translation in a tag it made up
                 // (<budget:token_budget>), which then rendered as a link in front
                 // of the article. stripTranslationArtifacts() removes it either
-                // way; asking plainly is the cheaper half of the fix.
-                systemInstr += `Do not add any other commentary, and do not wrap the output in any tag of your own.`;
+                // way; asking plainly is the cheaper half of the fix. The
+                // CONTENT: label the body is framed with on the way in comes
+                // back the same way, so it is ruled out here too.
+                systemInstr += `Do not add any other commentary, and do not wrap the output in any tag of your own. `;
+                systemInstr += `The translated content follows the blank line on its own, with no CONTENT: label in front of it.`;
 
                 const completion = await openai.chat.completions.create({
                     model: process.env.OPENAI_TRANSLATE_MODEL || 'gpt-4o',

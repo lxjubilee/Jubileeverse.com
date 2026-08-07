@@ -14,6 +14,7 @@
 
 const {
     stripTranslationArtifacts,
+    stripContentLabel,
     isArtifactTag,
     isImplausiblyShort,
 } = require('../../lib/translation-artifacts');
@@ -159,6 +160,56 @@ describe('autolinks are links, not debris', () => {
         expect(isArtifactTag('mailto:someone@example.org')).toBe(false);
         expect(isArtifactTag('https://example.org')).toBe(false);
         expect(isArtifactTag('p')).toBe(false);
+    });
+});
+
+describe('the CONTENT: label', () => {
+    // The Arabic translation of the same article opened on the word CONTENT:.
+    // The endpoint frames the body it sends with that label and asks only for
+    // TITLE:/SOURCE:/CATEGORY: back, so the parser had no reason to expect it —
+    // and a model shown the label answers with it.
+    const ARABIC = 'لأنه هكذا أحب الله العالم حتى بذل ابنه الوحيد.';
+
+    test('a label on its own line goes, and the body starts on its first sentence', () => {
+        const cleaned = stripTranslationArtifacts(`CONTENT:\n${ARABIC}`);
+
+        expect(cleaned).toBe(ARABIC);
+        expect(cleaned).not.toMatch(/CONTENT/);
+    });
+
+    test('a label run into the first sentence goes', () => {
+        expect(stripTranslationArtifacts(`CONTENT: ${ARABIC}`)).toBe(ARABIC);
+    });
+
+    test.each([
+        ['bolded by a markdown-minded translator', `**CONTENT:**\n${ARABIC}`],
+        ['lowercased', `content:\n${ARABIC}`],
+        ['spaced before the colon', `CONTENT :\n${ARABIC}`],
+        ['with trailing spaces on the line', `CONTENT:   \n${ARABIC}`],
+    ])('%s goes too', (_label, raw) => {
+        expect(stripTranslationArtifacts(raw)).toBe(ARABIC);
+    });
+
+    test('a label inside a wrapper the model invented goes with it', () => {
+        const raw = `<final_answer>\nCONTENT:\n${ARABIC}\n</final_answer>`;
+        expect(stripTranslationArtifacts(raw)).toBe(ARABIC);
+    });
+
+    test('a label in front of a wrapper goes as well', () => {
+        const raw = `CONTENT:\n<final_answer>\n${ARABIC}\n</final_answer>`;
+        expect(stripTranslationArtifacts(raw)).toBe(ARABIC);
+    });
+
+    // Anchored at the start for this reason: the word is only debris where the
+    // first sentence belongs.
+    test('the word is kept where an article genuinely uses it', () => {
+        const text = 'La plataforma advierte: CONTENT: no es un campo válido aquí.';
+        expect(stripTranslationArtifacts(text)).toBe(text);
+    });
+
+    test('a body that never carried the label is untouched', () => {
+        expect(stripContentLabel(ARABIC)).toBe(ARABIC);
+        expect(stripTranslationArtifacts(ARABIC)).toBe(ARABIC);
     });
 });
 
