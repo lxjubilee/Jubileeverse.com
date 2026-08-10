@@ -441,7 +441,7 @@ export default function JubileeDoor() {
                   <input type="email" className={fieldClass('email')} placeholder=" " autoComplete="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
                   <label className={styles.floatingLabel}>Email Address</label>
                 </div>
-                {TURNSTILE_SITE_KEY ? (
+                {TURNSTILE_SITE_KEY && !tnFailed ? (
                   <div ref={tnBoxRef} style={{ width: '100%', margin: '6px 0 14px', overflow: 'hidden' }}>
                     <div ref={tnRef} style={{ width: 300, transformOrigin: 'top left' }} />
                   </div>
@@ -449,7 +449,7 @@ export default function JubileeDoor() {
                 <button type="submit" className={`${styles.submit} ${styles.submitBold}`} disabled={submitting}>
                   {submitting ? (<><span className={styles.spinner} /> Checking...</>) : 'Continue'}
                 </button>
-                <p className={styles.fieldHint} style={{ textAlign: 'center' }}>No account yet? We&apos;ll set one up for you.</p>
+                <p className={styles.fieldHint} style={{ textAlign: 'center', marginTop: 16 }}>No account yet? We&apos;ll set one up for you.</p>
               </form>
             ) : null}
 
