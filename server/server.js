@@ -15257,10 +15257,19 @@ app.post('/api/articles/:id/translate', async (req, res) => {
     });
 
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    // `no-transform` is the half that keeps this stream a stream. A gzipping
+    // intermediary holds small writes in its compression buffer and lets them go
+    // in one piece at the end, which is exactly what the Next dev server's
+    // rewrite proxy was doing: the browser received all 20 KB of a translation
+    // as a single chunk after 36 seconds, so the article appeared at once and
+    // the widget's progress sat at 0% until it was already done. `no-transform`
+    // tells any cache or proxy it may not re-encode the body, and compression
+    // middleware honours it by declining to compress at all.
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
-    // Reverse proxies buffer a streamed body by default, which holds every event
-    // back until the translation finishes and loses the point of streaming.
+    // The nginx-family counterpart: reverse proxies buffer a streamed body by
+    // default, which holds every event back until the translation finishes and
+    // loses the point of streaming.
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
 
