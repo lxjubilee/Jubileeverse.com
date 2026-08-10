@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import Script from 'next/script';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import AuthBackground from '@/components/auth/AuthBackground';
 import LegalModals from '@/components/auth/LegalModals';
 import { api, ApiError } from '@/lib/api';
@@ -9,6 +10,18 @@ import { getStoredAuth, setStoredAuth } from '@/lib/authStorage';
 import { safeRedirectTarget } from '@/lib/redirect';
 import type { AuthUser } from '@/lib/types';
 import styles from '@/app/(auth)/auth.module.css';
+
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '';
+
+declare global {
+  // eslint-disable-next-line no-var
+  interface Window {
+    turnstile?: {
+      render: (el: HTMLElement, opts: Record<string, unknown>) => string;
+      remove: (id: string) => void;
+    };
+  }
+}
 
 const BACKGROUNDS = [
   'https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=1920&q=80',
@@ -147,6 +160,54 @@ export default function JubileeDoor() {
 
   useEffect(() => { setMaxDob(new Date().toISOString().slice(0, 10)); }, []);
 
+  // ── Cloudflare Turnstile (Screen 1, human verification) ──────────────────
+  // Client-side gate only; fail-safe (error-callback + 8s timeout release it) so a
+  // widget that can't render never blocks sign-in. The 'normal' 300px widget is
+  // CSS-scaled to the wrapper width so it matches the email box.
+  const [tnToken, setTnToken] = useState('');
+  const [tnFailed, setTnFailed] = useState(false);
+  const tnRef = useRef<HTMLDivElement>(null);       // inner 300px render target (scaled)
+  const tnBoxRef = useRef<HTMLDivElement>(null);    // outer full-width wrapper (measured)
+  const tnWidgetId = useRef<string | null>(null);
+  const renderTurnstile = useCallback(() => {
+    if (!TURNSTILE_SITE_KEY || !tnRef.current || !window.turnstile || tnWidgetId.current) return;
+    tnWidgetId.current = window.turnstile.render(tnRef.current, {
+      sitekey: TURNSTILE_SITE_KEY,
+      theme: 'dark',
+      size: 'normal',
+      callback: (t: string) => { setTnToken(t); setTnFailed(false); },
+      'error-callback': () => { setTnToken(''); setTnFailed(true); },
+      'expired-callback': () => setTnToken(''),
+    });
+  }, []);
+  useEffect(() => {
+    if (step === 'email') {
+      renderTurnstile();
+      const t = setTimeout(() => setTnFailed(true), 8000);
+      return () => clearTimeout(t);
+    }
+    if (TURNSTILE_SITE_KEY && window.turnstile && tnWidgetId.current) {
+      try { window.turnstile.remove(tnWidgetId.current); } catch { /* widget gone */ }
+    }
+    tnWidgetId.current = null;
+    setTnToken(''); setTnFailed(false);
+  }, [step, renderTurnstile]);
+  useEffect(() => {
+    if (!TURNSTILE_SITE_KEY || step !== 'email') return;
+    const box = tnBoxRef.current, inner = tnRef.current;
+    if (!box || !inner) return;
+    const TN_W = 300, TN_H = 65;
+    const apply = () => {
+      const s = box.clientWidth / TN_W;
+      inner.style.transform = `scale(${s})`;
+      box.style.height = `${TN_H * s}px`;
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [step]);
+
   const resetMessages = () => { setError(null); setErrorField(null); };
 
   const finish = (data: AuthSuccessResponse) => {
@@ -198,6 +259,7 @@ export default function JubileeDoor() {
     const addr = email.trim();
     if (!addr) { setErrorField('email'); setError('Email is required.'); return; }
     if (!isValidEmail(addr)) { setErrorField('email'); setError('Please enter a valid email.'); return; }
+    if (TURNSTILE_SITE_KEY && !tnToken && !tnFailed) { setError('Please complete the human verification.'); return; }
     setSubmitting(true);
     try {
       const look = await api.get<LookupResponse>(`/api/auth/lookup?email=${encodeURIComponent(addr)}`, { auth: false });
@@ -343,6 +405,9 @@ export default function JubileeDoor() {
 
   return (
     <>
+      {TURNSTILE_SITE_KEY ? (
+        <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" onLoad={renderTurnstile} />
+      ) : null}
       <div className={styles.waveBar} />
       <div className={styles.row}>
         <div className={`${styles.formPanel} ${styles.formPanelStack}`}>
@@ -376,6 +441,11 @@ export default function JubileeDoor() {
                   <input type="email" className={fieldClass('email')} placeholder=" " autoComplete="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
                   <label className={styles.floatingLabel}>Email Address</label>
                 </div>
+                {TURNSTILE_SITE_KEY ? (
+                  <div ref={tnBoxRef} style={{ width: '100%', margin: '6px 0 14px', overflow: 'hidden' }}>
+                    <div ref={tnRef} style={{ width: 300, transformOrigin: 'top left' }} />
+                  </div>
+                ) : null}
                 <button type="submit" className={`${styles.submit} ${styles.submitBold}`} disabled={submitting}>
                   {submitting ? (<><span className={styles.spinner} /> Checking...</>) : 'Continue'}
                 </button>
