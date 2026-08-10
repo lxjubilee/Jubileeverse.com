@@ -441,7 +441,7 @@ export default function JubileeDoor() {
                   <input type="email" className={fieldClass('email')} placeholder=" " autoComplete="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
                   <label className={styles.floatingLabel}>Email Address</label>
                 </div>
-                {TURNSTILE_SITE_KEY && !tnFailed ? (
+                {TURNSTILE_SITE_KEY ? (
                   <div ref={tnBoxRef} style={{ width: '100%', margin: '6px 0 14px', overflow: 'hidden' }}>
                     <div ref={tnRef} style={{ width: 300, transformOrigin: 'top left' }} />
                   </div>
