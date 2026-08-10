@@ -99,6 +99,10 @@ export default async function RootSegmentPage({
         // article_id, which a slug cannot supply; news carries a stable hashed
         // id instead.
         trackingId={reactionIdForSlug(article.slug)}
+        // Where the translation cache files this story. `article.date` is the
+        // manifest day it was read out of, which is exactly the CDN folder —
+        // `date_published` is not, since a late top-up run can differ.
+        cdnOrigin={{ date: article.date, slug: article.slug }}
         title={article.title}
         // The hero is the only picture the reader shows; the body's images —
         // hero included — are trimmed out of the prose.

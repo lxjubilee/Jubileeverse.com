@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ReadAloud from '@/components/article/ReadAloud';
-import TranslateArticle from '@/components/article/TranslateArticle';
+import TranslateArticle, { type NewsCdnOrigin } from '@/components/article/TranslateArticle';
 import ShareStory from '@/components/article/ShareStory';
 import DailyVerseWidget from '@/components/article/DailyVerseWidget';
 import RelatedStories from '@/components/article/RelatedStories';
@@ -40,6 +40,16 @@ export interface ArticleReaderProps {
    * because its id is a slug. Defaults to `id`.
    */
   trackingId?: string | number;
+  /**
+   * CDN coordinates for the translation cache, for news only.
+   *
+   * The same hash that makes `trackingId` above work is what makes the storage
+   * key underivable: the backend receives a one-way hash of the slug and cannot
+   * recover the folder the article was published into. So the day and slug
+   * travel alongside it. Published bundles need nothing — their id already names
+   * their category and slug.
+   */
+  cdnOrigin?: NewsCdnOrigin;
   title: string;
   content: string;
   image?: string | null;
@@ -88,6 +98,7 @@ function formatDate(value: string): string {
 export default function ArticleReader({
   id,
   trackingId,
+  cdnOrigin,
   title,
   content,
   image,
@@ -243,6 +254,7 @@ export default function ArticleReader({
             <ReadAloud text={rawContent} lang={lang} contentRef={proseRef} />
             <TranslateArticle
               articleId={reactionId}
+              cdnOrigin={cdnOrigin}
               fallbackTitle={title}
               fallbackContent={content}
               // The setter itself, not an arrow: it is referentially stable, so

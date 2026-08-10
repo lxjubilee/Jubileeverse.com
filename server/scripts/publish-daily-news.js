@@ -130,6 +130,14 @@ const LOG_DIR = path.join(__dirname, '..', 'logs', 'news');
 const MIN_IMAGE_BYTES = News.MIN_IMAGE_BYTES;
 
 /**
+ * A key under a day prefix that belongs to a translation rather than to the
+ * article itself — `hi-IN/<slug>/article.md`. Language codes are the only
+ * segment here carrying an uppercase region, which is what keeps this from
+ * matching an article slug.
+ */
+const TRANSLATION_KEY = /^[a-z]{2,3}-[A-Z]{2}\//;
+
+/**
  * Log to stdout and to a dated file.
  *
  * A scheduled task's console output is gone the moment it exits, and Task
@@ -854,12 +862,23 @@ function parseFrontmatter(markdown) {
 async function repairManifest(date) {
     const prefix = News.newsDayPrefix(date);
     const keys = await R2.listPrefix(prefix);
-    log(`repairing ${prefix} from ${keys.size} objects`);
+    // Translations live under the same day prefix, at `<lang>/<slug>/…`, and
+    // counting them here would make this number mean something other than "how
+    // many objects belong to the articles being repaired".
+    const articleKeys = [...keys.keys()].filter(k => !TRANSLATION_KEY.test(`${k.slice(prefix.length)}`));
+    log(`repairing ${prefix} from ${articleKeys.length} objects`);
 
     const bySlug = new Map();
     for (const [key, size] of keys) {
         // Accept either extension: images published before the WebP switch are
         // still .png, and a rebuild must not orphan them.
+        //
+        // Translation keys cannot reach the branches below and no change is
+        // needed for them, but that is load-bearing rather than incidental: a
+        // translation is `<lang>/<slug>/article.md`, so `[^/]+` captures the
+        // language and the remainder still holds a slash, which neither
+        // alternative accepts. Widen this pattern and `hi-IN` starts being
+        // published as an article.
         const m = new RegExp(`^${prefix}([^/]+)/(article\\.md|images/([0-9A-Za-z]{12})\\.(webp|png))$`).exec(key);
         if (!m) continue;
         if (!bySlug.has(m[1])) bySlug.set(m[1], { slug: m[1], md: false, images: new Map() });
@@ -970,10 +989,17 @@ async function pruneArticles(date, slugs) {
     const prefix = News.newsDayPrefix(date);
     log(`prune ${slugs.length} article(s) from ${prefix}`);
 
+    // One listing for the day, shared across every slug. Each article's keys are
+    // then picked out of it by News.listNewsArticleKeys, which takes the
+    // translated copies under `<lang>/<slug>/` as well as the English folder —
+    // so the preview printed below is honest about everything that goes, which
+    // is the entire safety story of this function.
+    const dayKeys = await R2.listPrefix(prefix);
+
     let total = 0;
     const plan = [];
     for (const slug of slugs) {
-        const keys = [...(await R2.listPrefix(`${prefix}${slug}/`)).keys()];
+        const keys = await News.listNewsArticleKeys(slug, date, dayKeys);
         if (!keys.length) { log(`  MISSING  ${slug}`); continue; }
         plan.push({ slug, keys });
         total += keys.length;

@@ -7,10 +7,27 @@ import { LANGUAGES, getLangName } from '@/lib/languages';
 import { getSiteLang } from '@/lib/translate';
 import styles from './widgets.module.css';
 
+/**
+ * Where a CDN news article is stored, so the backend can find the translation it
+ * filed there last time.
+ *
+ * Only news needs this. A published bundle is addressed as `<category>__<slug>`,
+ * which the backend can turn into a storage path on its own; a news article
+ * arrives as `reactionIdForSlug(slug)`, a one-way hash, so its day and slug have
+ * to travel separately.
+ */
+export interface NewsCdnOrigin {
+  /** The PST day the article is filed under (`YYYY-MM-DD`). */
+  date: string;
+  slug: string;
+}
+
 interface Props {
   articleId: string | number;
   fallbackTitle: string;
   fallbackContent: string;
+  /** CDN coordinates for news; omitted for every other source. */
+  cdnOrigin?: NewsCdnOrigin;
   /** Called as translated text streams in (title, content). */
   onTranslated: (title: string, content: string) => void;
   /** Restore the original English title/content. */
@@ -71,6 +88,7 @@ export default function TranslateArticle({
   articleId,
   fallbackTitle,
   fallbackContent,
+  cdnOrigin,
   onTranslated,
   onRestore,
   onLanguageChange,
@@ -97,9 +115,15 @@ export default function TranslateArticle({
     setErrorMsg('');
     const langName = getLangName(code);
 
-    // 1) cache hit?
+    // 1) cache hit? Carrying the CDN coordinates here rather than only on the
+    // POST is what makes this the cheap path: the backend can answer from stored
+    // bytes for the price of this request, instead of the reader uploading the
+    // whole article body below just to be told it was already translated.
+    const originQuery = cdnOrigin
+      ? `?news_date=${encodeURIComponent(cdnOrigin.date)}&news_slug=${encodeURIComponent(cdnOrigin.slug)}`
+      : '';
     try {
-      const r = await fetch(`/api/articles/${articleId}/translation/${code}`);
+      const r = await fetch(`/api/articles/${articleId}/translation/${code}${originQuery}`);
       if (r.ok) {
         const d = (await r.json()) as { found?: boolean; title?: string; content?: string };
         if (d.found && d.content) {
@@ -129,6 +153,7 @@ export default function TranslateArticle({
           language_name: langName,
           fallback_title: fallbackTitle,
           fallback_content: fallbackContent,
+          ...(cdnOrigin ? { news_date: cdnOrigin.date, news_slug: cdnOrigin.slug } : {}),
         }),
       });
       // The status is worth keeping: a bare "unavailable" gave no way to tell a

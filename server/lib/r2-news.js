@@ -489,17 +489,50 @@ async function readNewsDayIndex(date = new Date()) {
 }
 
 /**
- * Remove one article's folder — markdown, images, everything under it.
+ * Every key belonging to one article on one day: the English folder, and the
+ * translated copy of it in each language a reader has asked for.
+ *
+ * Translations are stored one segment earlier than the article they translate —
+ * `news/Y/M/D/hi-IN/<slug>/article.md` beside `news/Y/M/D/<slug>/article.md`
+ * (see lib/r2-translations.js) — so a delete scoped to `<slug>/` leaves every
+ * one of them behind. Nothing links to an orphan, so it is not a correctness
+ * bug; it is a storage bill that grows with the number of languages and never
+ * stops.
+ *
+ * The optional language group is why this cannot sweep a neighbour by accident,
+ * and it holds because an article slug can never look like a language code: a
+ * slug out of newsSlugify is always lowercase, and every code carries an
+ * uppercase region.
+ */
+function newsArticleKeyPattern(slug, date = new Date()) {
+    const prefix = newsDayPrefix(date).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const safeSlug = String(slug).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`^${prefix}(?:[a-z]{2,3}-[A-Z]{2}/)?${safeSlug}/`);
+}
+
+/**
+ * Remove one article's folder — markdown, images, translations, everything.
  *
  * Scoped to a single slug on a single day on purpose. Deletion here is not
  * recoverable, so the caller names exactly what goes.
+ *
+ * One LIST of the whole day rather than one per slug: with translations to
+ * collect this would otherwise be a LIST per language, and a day-wide listing is
+ * fewer round trips than even the original per-slug call when several articles
+ * are being removed at once.
  */
 async function deleteNewsArticle(slug, date = new Date()) {
-    const prefix = `${newsDayPrefix(date)}${slug}/`;
-    const keys = [...(await listPrefix(prefix)).keys()];
+    const keys = await listNewsArticleKeys(slug, date);
     if (!keys.length) return { slug, keys: [], deleted: [], errors: [] };
     const { deleted, errors } = await deleteObjects(keys);
     return { slug, keys, deleted, errors };
+}
+
+/** Keys for one article, English and translated, from a day-wide listing. */
+async function listNewsArticleKeys(slug, date = new Date(), dayKeys = null) {
+    const pattern = newsArticleKeyPattern(slug, date);
+    const present = dayKeys || (await listPrefix(newsDayPrefix(date)));
+    return [...present.keys()].filter(key => pattern.test(key));
 }
 
 function emptyDayIndex(date) {
@@ -681,6 +714,10 @@ async function upsertNewsLatest({ date = new Date(), count = 0, keep = 30 } = {}
 
 module.exports = {
     NEWS_PREFIX,
+    // Exported so r2-translations.js quotes frontmatter by the same rule rather
+    // than keeping a second copy of it. Two copies of a quoting rule is how the
+    // writer and the reader of a file end up disagreeing about it.
+    fmValue,
     NEWS_LATEST_KEY,
     NEWS_STATUS_KEY,
     NEWS_SLUGS_KEY,
@@ -704,6 +741,8 @@ module.exports = {
     publishNewsImage,
     publishNewsArticle,
     readNewsDayIndex,
+    newsArticleKeyPattern,
+    listNewsArticleKeys,
     deleteNewsArticle,
     upsertNewsDayIndex,
     rewriteNewsDayIndex,

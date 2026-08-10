@@ -15073,21 +15073,18 @@ app.post('/api/tts', async (req, res) => {
 // ARTICLE TRANSLATION (Claude AI streaming + PostgreSQL cache)
 // =============================================================================
 
-// Helper function to determine if a language uses Right-to-Left (RTL) text direction
-function isRTLLanguage(languageCode) {
-    const rtlLanguages = [
-        'ar',      // Arabic
-        'he', 'he-IL',  // Hebrew
-        'fa', 'fa-IR',  // Persian/Farsi
-        'ur', 'ur-PK',  // Urdu
-        'yi',      // Yiddish
-        'arc',     // Aramaic
-        'dv',      // Dhivehi/Maldivian
-        'ku',      // Kurdish (Sorani)
-        'ps'       // Pashto
-    ];
-    return rtlLanguages.includes(languageCode.toLowerCase());
-}
+// Which languages may be asked for, what they are called, and which ones read
+// right to left. Moved to lib/languages.js when the language code became part of
+// a CDN object key: it decides where bytes land in a bucket now, so it needs an
+// allowlist and a test holding it against the picker, neither of which belongs
+// inline here. isRTLLanguage is fixed there too — it used to compare a
+// lower-cased code against region-qualified entries like 'he-IL', so every RTL
+// language the picker offers was reported as left-to-right.
+const { languageName, isRTLLanguage } = require('./lib/languages');
+
+// Translated articles are stored beside the English ones on the CDN, so the
+// second reader to pick a language is served bytes rather than tokens.
+const Translations = require('./lib/r2-translations');
 
 // Ids above this floor are hashes of a non-numeric id, never a real serial.
 // Matches reactionIdForSlug() in src/lib/homeFeed.ts, which already hands the
@@ -15140,6 +15137,42 @@ app.get('/api/articles/:id/translation/:lang', async (req, res) => {
     const { id, lang } = req.params;
     const ident = translationIdentity(id);
     const cacheKey = ident.cacheKey;
+
+    // The CDN first, and deliberately ahead of the id-shape gate below: the ids
+    // that fail that gate — a hashed news id, a `<category>__<slug>` bundle id —
+    // are precisely the ones that have a CDN path. Checking after it would mean
+    // the only family with stored translations never had them looked up.
+    //
+    // This is also the cheap path's whole point. Answering here costs a ~200 byte
+    // GET; falling through means the widget posts the entire article body back
+    // just to be told it was already translated.
+    const target = Translations.resolveTranslationTarget({
+        id, lang, newsDate: req.query.news_date, newsSlug: req.query.news_slug,
+    });
+    if (target) {
+        // Concurrently: the stored object, and the current identity of the
+        // English article it was made from. A mismatch means the original was
+        // re-published, and the translation on file is of text nobody is reading
+        // any more — reported as a miss so the POST re-translates and overwrites.
+        const [stored, sourceObject] = await Promise.all([
+            Translations.readTranslation(target),
+            Translations.sourceFingerprint(target.sourceKey),
+        ]);
+        const fresh = stored
+            && !(sourceObject && stored.sourceObject && stored.sourceObject !== sourceObject);
+        if (fresh) {
+            console.log(`[Translation] CDN hit ${target.key}`);
+            return res.json({
+                found: true,
+                title: stored.title,
+                content: stored.content,
+                isRtl: stored.isRtl,
+                sourceBadge: stored.sourceBadge,
+                category: stored.category,
+            });
+        }
+    }
+
     // Same rule as the POST below: only ids whose original the server can read
     // are answered from the id-keyed cache. Anything else falls through to a
     // miss, and the POST path serves it from the content-addressed cache.
@@ -15194,15 +15227,34 @@ function isUUID(str) {
     return uuidRegex.test(str);
 }
 
+/** Primary translation model. Named so a stored translation can record it. */
+const ANTHROPIC_TRANSLATE_MODEL = 'claude-haiku-4-5-20251001';
+
 // POST /api/articles/:id/translate — stream Claude translation via SSE
 app.post('/api/articles/:id/translate', async (req, res) => {
     const idStr = req.params.id;
     const ident = translationIdentity(idStr);
     const articleId = ident.cacheKey;
-    const { language_code, language_name, fallback_title, fallback_content, source_badge, category_label } = req.body || {};
+    const {
+        language_code, language_name, fallback_title, fallback_content,
+        source_badge, category_label, news_date, news_slug,
+    } = req.body || {};
     if (!language_code || !language_name) {
         return res.status(400).json({ error: 'language_code and language_name required' });
     }
+
+    // The name the model is told to translate into. Taken from the server's own
+    // catalogue for a code it recognises, because `language_name` is
+    // caller-supplied and is interpolated straight into the system prompt below.
+    const targetLanguageName = languageName(language_code) || language_name;
+
+    // Where this translation is stored on the CDN, or null for an article that
+    // has no CDN home (a backend serial, a UUID) and stays on the PostgreSQL
+    // cache. News has to send its day and slug: it reaches this endpoint as a
+    // one-way hash of the slug, so the key cannot be derived from the id.
+    const cdnTarget = Translations.resolveTranslationTarget({
+        id: idStr, lang: language_code, newsDate: news_date, newsSlug: news_slug,
+    });
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -15309,6 +15361,31 @@ app.post('/api/articles/:id/translate', async (req, res) => {
         const sourceHash = serverSourced
             ? null
             : crypto.createHash('sha1').update(`${title}\n${content}`).digest('hex');
+        // The CDN, ahead of the PostgreSQL body cache below.
+        //
+        // Gated on `sourceHash` rather than on `cdnTarget` alone, which pins the
+        // two together: a hash exists exactly when the caller supplied the source
+        // text, and that is exactly the case where the article lives on the CDN
+        // rather than in this server's database. It also makes the staleness
+        // check exact — the stored translation names the text it was made from,
+        // so a re-published English article reads as a miss and is translated
+        // again rather than served from an older revision.
+        if (cdnTarget && sourceHash) {
+            const stored = await Translations.readTranslation(cdnTarget, { sourceHash });
+            if (stored) {
+                console.log(`[Translation] CDN hit ${cdnTarget.key}`);
+                sendEvent({
+                    type: 'cached',
+                    title: stored.title,
+                    content: stored.content,
+                    isRtl: stored.isRtl,
+                    sourceBadge: stored.sourceBadge,
+                    category: stored.category,
+                });
+                return res.end();
+            }
+        }
+
         if (sourceHash) {
             try {
                 await pgPool.query(`
@@ -15364,6 +15441,10 @@ app.post('/api/articles/:id/translate', async (req, res) => {
         let translatedSourceBadge = '';
         let translatedCategory = '';
         let translationSucceeded = false;
+        // Which model actually answered. Recorded in the stored translation, so
+        // an object on the CDN says truthfully what produced it rather than
+        // naming the primary that may have failed over.
+        let modelUsed = '';
         const isRtl = isRTLLanguage(language_code);
 
         // Build translation prompt with metadata
@@ -15378,7 +15459,7 @@ app.post('/api/articles/:id/translate', async (req, res) => {
 
         // Attempt 1: Anthropic Claude Haiku (fastest streaming)
         try {
-            let systemInstr = `You are a professional translator. Translate the following article into ${language_name}. Output format:\n`;
+            let systemInstr = `You are a professional translator. Translate the following article into ${targetLanguageName}. Output format:\n`;
             systemInstr += `TITLE:[translated title]\n`;
             if (source_badge) systemInstr += `SOURCE:[translated source badge]\n`;
             if (category_label) systemInstr += `CATEGORY:[translated category]\n`;
@@ -15396,7 +15477,7 @@ app.post('/api/articles/:id/translate', async (req, res) => {
             systemInstr += `The translated content follows the blank line on its own, with no CONTENT: label in front of it.`;
 
             const stream = anthropic.messages.stream({
-                model: 'claude-haiku-4-5-20251001',
+                model: ANTHROPIC_TRANSLATE_MODEL,
                 max_tokens: 8192,
                 system: systemInstr,
                 messages: [{ role: 'user', content: promptText }]
@@ -15433,6 +15514,7 @@ app.post('/api/articles/:id/translate', async (req, res) => {
                 }
             }
             translationSucceeded = true;
+            modelUsed = ANTHROPIC_TRANSLATE_MODEL;
             console.log('[Translation] Anthropic succeeded');
         } catch (anthropicErr) {
             console.log(`[Translation] Anthropic failed (${anthropicErr.message}), trying OpenAI...`);
@@ -15444,7 +15526,7 @@ app.post('/api/articles/:id/translate', async (req, res) => {
                     apiKey: process.env.OPENAI_API_KEY_PRIMARY || process.env.OPENAI_API_KEY_BACKUP
                 });
 
-                let systemInstr = `You are a professional translator. Translate the following article into ${language_name}. Output format:\n`;
+                let systemInstr = `You are a professional translator. Translate the following article into ${targetLanguageName}. Output format:\n`;
                 systemInstr += `TITLE:[translated title]\n`;
                 if (source_badge) systemInstr += `SOURCE:[translated source badge]\n`;
                 if (category_label) systemInstr += `CATEGORY:[translated category]\n`;
@@ -15458,8 +15540,9 @@ app.post('/api/articles/:id/translate', async (req, res) => {
                 systemInstr += `Do not add any other commentary, and do not wrap the output in any tag of your own. `;
                 systemInstr += `The translated content follows the blank line on its own, with no CONTENT: label in front of it.`;
 
+                const openaiModel = process.env.OPENAI_TRANSLATE_MODEL || 'gpt-4o';
                 const completion = await openai.chat.completions.create({
-                    model: process.env.OPENAI_TRANSLATE_MODEL || 'gpt-4o',
+                    model: openaiModel,
                     messages: [{
                         role: 'system',
                         content: systemInstr
@@ -15502,6 +15585,7 @@ app.post('/api/articles/:id/translate', async (req, res) => {
                     }
                 }
                 translationSucceeded = true;
+                modelUsed = openaiModel;
                 console.log('[Translation] OpenAI succeeded');
             } catch (openaiErr) {
                 console.error(`[Translation] Both APIs failed - Anthropic: ${anthropicErr.message}, OpenAI: ${openaiErr.message}`);
@@ -15593,6 +15677,33 @@ app.post('/api/articles/:id/translate', async (req, res) => {
                  ON CONFLICT (source_hash, language_code) DO NOTHING`,
                 [sourceHash, language_code, translatedTitle, translatedContent, isRtl, translatedSourceBadge || null, translatedCategory || null]
             ).catch(e => console.warn('[Translation] body cache write failed:', e.message));
+        }
+
+        // And to the CDN, where every environment can read it.
+        //
+        // Below the implausibility bail above, which is what keeps debris off the
+        // CDN entirely: nothing expires an object there, and a bad one would be
+        // handed to every later reader by the *fast* path, where no log line
+        // would ever mention it again.
+        //
+        // Fire-and-forget, like the body cache beside it — a reader waiting on
+        // `done` must not also be waiting on two round trips to R2. A reader who
+        // navigates away mid-stream still leaves the translation behind for the
+        // next one, which is a feature rather than an accident.
+        if (cdnTarget && sourceHash) {
+            Translations.sourceFingerprint(cdnTarget.sourceKey)
+                .then(sourceObject => Translations.writeTranslation(cdnTarget, {
+                    sourceHash,
+                    sourceObject,
+                    title: translatedTitle,
+                    sourceBadge: translatedSourceBadge,
+                    category: translatedCategory,
+                    isRtl,
+                    model: modelUsed,
+                    content: translatedContent,
+                }))
+                .then(({ key }) => console.log(`[Translation] stored ${key}`))
+                .catch(e => console.warn('[Translation] CDN write failed:', e.message));
         }
 
         sendEvent({
