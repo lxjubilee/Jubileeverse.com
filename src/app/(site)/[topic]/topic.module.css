@@ -71,4 +71,15 @@
   .compactGrid > .featured :global(.content-card-image) {
     aspect-ratio: 3.6267;
   }
+
+  /* That letterbox is barely half the height of the 16/9 source, and object-fit
+     cover's default centre split takes the missing half evenly off the top and
+     bottom — which is exactly where the heads are. Sliding the window up to 25%
+     leaves a quarter of the surplus above the subjects and three quarters below,
+     so faces and shoulders stay in frame with headroom left over. The image is
+     still covering, so nothing stretches, and below 1568px the card is a plain
+     16/9 one that crops nothing at all. */
+  .compactGrid > .featured :global(.content-card-image) img {
+    object-position: center 25%;
+  }
 }
