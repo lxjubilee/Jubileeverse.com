@@ -159,6 +159,21 @@
   border-color: #f87171;
 }
 
+/* Browsers paint autofilled fields with their own pale/white background, which
+   breaks the dark theme. Override it: a large inset box-shadow repaints the
+   field in the input's own dark tone, and text-fill-color keeps the value white.
+   The 9999s transition keeps the flash from reappearing after interaction. */
+.control:-webkit-autofill,
+.control:-webkit-autofill:hover,
+.control:-webkit-autofill:focus,
+.control:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #454545 inset;
+  box-shadow: 0 0 0 1000px #454545 inset;
+  -webkit-text-fill-color: #ffffff;
+  caret-color: #ffffff;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 /* Two fields side by side (First / Last name), stacking on narrow panels.
    Children keep their own `.floatingGroup` bottom margin, so the row needs no
    vertical spacing of its own. */
