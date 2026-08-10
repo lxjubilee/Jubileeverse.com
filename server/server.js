@@ -11459,12 +11459,16 @@ app.get('/api/auth/lookup', ah(async (req, res) => {
     const { rows } = await pgPool.query(
         `SELECT 1 FROM jv_users WHERE email = $1`, [email]
     );
-    if (rows.length > 0) return res.json({ exists: true, available: true });
+    const existsLocally = rows.length > 0;
+    // Report LOCAL presence too, so the one-door can pick Welcome-back (returning
+    // member) vs Confirm-it's-you (existing Jubilee ID, new here) before the password.
+    if (existsLocally) return res.json({ exists: true, existsInSso: true, existsLocally: true, available: true });
     if (ssoDelegationActive()) {
         const found = await ssoLookup(email);
-        return res.json({ exists: found.ok ? found.exists : false, available: found.ok });
+        const inSso = found.ok && found.exists === true;
+        return res.json({ exists: inSso, existsInSso: inSso, existsLocally: false, available: found.ok });
     }
-    res.json({ exists: false, available: true });
+    res.json({ exists: false, existsInSso: false, existsLocally: false, available: true });
 }));
 
 // GET /api/auth/me — cookie-first, Bearer fallback (S12: includes entitlements + has_cms_access)
