@@ -363,6 +363,25 @@
   gap: 8px;
 }
 
+/* How far the translation has got, set opposite the label the way Read Aloud
+   sets its elapsed time. Tabular figures so the row does not twitch sideways
+   each time the number changes width. */
+.statusPct {
+  margin-left: auto;
+  color: var(--accent-gold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The same rail as the Read Aloud bar without the seek affordance: this one
+   reports progress, it does not take a click. */
+.translateProgress {
+  margin-top: 8px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
 .restoreBtn {
   margin-top: 10px;
   width: 100%;

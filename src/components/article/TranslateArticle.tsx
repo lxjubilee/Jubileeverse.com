@@ -80,6 +80,56 @@ function streamedBody(raw: string): string {
 }
 
 /**
+ * Characters of translation per character of English, by language subtag.
+ *
+ * The stream carries no length of its own — the model is answering one open
+ * request, and neither it nor the endpoint knows how long the answer runs until
+ * it ends. So progress is measured against what the translation is expected to
+ * weigh, and that expectation has to account for the script: the same story is
+ * about half as many characters in Chinese and a quarter longer in German, and
+ * a flat comparison against the English body would park Chinese at 100% halfway
+ * through and German at 99% with three paragraphs still to come.
+ *
+ * These are approximations of typical prose, not measurements, which is why the
+ * bar below is clamped and never allowed to walk backwards.
+ */
+const EXPANSION: Record<string, number> = {
+  // zh and hi are measured off the translations already in the cache
+  // (zh-CN 0.38 over a complete story; hi-IN 1.03–1.12 across four). The rest
+  // are the usual figures for the script and will drift as real ones land.
+  zh: 0.4, ja: 0.65, ko: 0.7, th: 0.85,
+  ar: 0.95, he: 0.95, fa: 0.95, ur: 0.95, hi: 1.1, bn: 1,
+  de: 1.25, nl: 1.2, fr: 1.15, es: 1.15, pt: 1.15, it: 1.1, ro: 1.15,
+  ru: 1.1, uk: 1.1, pl: 1.1, el: 1.15, fi: 1.05, tr: 1.05, vi: 1.05,
+};
+/**
+ * For a language with no entry above. Kept a little high on purpose: an estimate
+ * that runs long ends with the bar jumping the last few percent, which reads as
+ * finishing early, while one that runs short parks at 99% and reads as stuck.
+ * Measured stored translations cluster around 1.0–1.05 (ro 1.02, af 1.04,
+ * es 1.04–1.08, et 0.97, fr 1.18).
+ */
+const DEFAULT_EXPANSION = 1.05;
+
+/**
+ * How many characters the translated body should run to.
+ *
+ * Tags are excluded from the scaling because the prompt asks for them back
+ * exactly as they arrived: an article that is half markup would otherwise be
+ * measured as if the markup shrank along with the prose.
+ *
+ * Returns 0 when there is nothing to measure against, which the caller reads as
+ * "no estimate" and renders as a plain spinner — a made-up percentage is worse
+ * than none.
+ */
+function expectedChars(source: string, code: string): number {
+  if (!source.trim()) return 0;
+  const ratio = EXPANSION[code.split('-')[0]] ?? DEFAULT_EXPANSION;
+  const markup = (source.match(/<[^>]*>/g) || []).join('').length;
+  return Math.round(markup + (source.length - markup) * ratio);
+}
+
+/**
  * Translate Article widget. Tries the translation cache
  * (`GET /api/articles/:id/translation/:lang`) then streams a fresh translation
  * (`POST /api/articles/:id/translate`, SSE: cached|chunk|metadata|done|error).
@@ -97,6 +147,8 @@ export default function TranslateArticle({
   const [filter, setFilter] = useState('');
   const [current, setCurrent] = useState<string>('en-US');
   const [status, setStatus] = useState<'idle' | 'loading' | 'streaming' | 'error'>('idle');
+  /** Percent of the translation that has arrived, or null when it cannot be estimated. */
+  const [progress, setProgress] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const titleRef = useRef(fallbackTitle);
   const didAdoptSiteLang = useRef(false);
@@ -112,6 +164,7 @@ export default function TranslateArticle({
     setOpen(false);
     setCurrent(code);
     setStatus('loading');
+    setProgress(null);
     setErrorMsg('');
     const langName = getLangName(code);
 
@@ -168,6 +221,19 @@ export default function TranslateArticle({
       let buffer = '';
       let acc = '';
 
+      // Measured against the English the server was asked to translate, so the
+      // count is known before the first chunk lands. Clamped to 99 while the
+      // stream is open and never allowed to fall: the target is an estimate, and
+      // a bar that reads 80% and then 60% looks broken in a way that a bar
+      // resting a moment at 99% does not.
+      const target = expectedChars(fallbackContent, code);
+      const advance = (bodySoFar: string) => {
+        if (!target) return;
+        const pct = Math.min(99, Math.round((bodySoFar.length / target) * 100));
+        setProgress((prev) => Math.max(prev ?? 0, pct));
+      };
+      if (target) setProgress(0);
+
       // eslint-disable-next-line no-constant-condition
       while (true) {
         const { value, done } = await reader.read();
@@ -191,9 +257,13 @@ export default function TranslateArticle({
             onTranslated(titleRef.current, streamedBody(acc));
           } else if (payload.type === 'chunk' && payload.text) {
             acc += payload.text;
-            onTranslated(titleRef.current, streamedBody(acc));
+            const body = streamedBody(acc);
+            advance(body);
+            onTranslated(titleRef.current, body);
           } else if (payload.type === 'cached' || payload.type === 'done') {
             onTranslated(payload.title || titleRef.current, payload.content || streamedBody(acc));
+            // The whole article is on screen now, whatever the estimate said.
+            if (target) setProgress(100);
           }
         }
       }
@@ -232,6 +302,7 @@ export default function TranslateArticle({
   const restore = () => {
     setCurrent('en-US');
     setStatus('idle');
+    setProgress(null);
     titleRef.current = fallbackTitle;
     onRestore();
   };
@@ -272,10 +343,27 @@ export default function TranslateArticle({
       </div>
 
       {status === 'loading' || status === 'streaming' ? (
-        <div className={styles.status}>
-          <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
-          {status === 'loading' ? 'Preparing translation…' : 'Translating…'}
-        </div>
+        <>
+          <div className={styles.status}>
+            <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+            <span>{status === 'loading' ? 'Preparing translation…' : 'Translating…'}</span>
+            {status === 'streaming' && progress !== null ? (
+              <span className={styles.statusPct}>{progress}%</span>
+            ) : null}
+          </div>
+          {status === 'streaming' && progress !== null ? (
+            <div
+              className={styles.translateProgress}
+              role="progressbar"
+              aria-valuenow={progress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Translating into ${currentLabel}`}
+            >
+              <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+            </div>
+          ) : null}
+        </>
       ) : null}
       {status === 'error' ? <div className={styles.error} style={{ marginTop: 10 }}>{errorMsg}</div> : null}
 
