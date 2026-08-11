@@ -503,7 +503,8 @@ export default function HomePage() {
 
   return (
     <main className="main-content">
-      {/* Hero bento — wrapper snaps its width to the Current Events card columns */}
+      {/* Hero bento — wrapper shares the Current Events card columns, so the
+          hero's edges land on the grid's edges at every width */}
       <div className={styles.heroRow}>
         <div className={styles.heroBento}>
           <section className={styles.heroContainer}>
@@ -531,18 +532,21 @@ export default function HomePage() {
         <div className="section-header">
           <h2 className="section-title">Current Events</h2>
         </div>
-        {/* `feed` only widens the featured cards; the column math, centring and
-            width caps stay with the shared .content-grid. */}
+        {/* `feed` only widens the featured cards; the column math stays with the
+            shared .content-grid. */}
         <div className={`content-grid ${styles.feed}`}>
           {loading && feed.length === 0
             ? Array.from({ length: 8 }).map((_, i) => (
                 // Two full rows in the featured pattern, so the skeletons stand
-                // exactly where the cards that replace them will.
+                // exactly where the cards that replace them will — same box, so
+                // nothing shifts when the real cards arrive.
                 <div
                   key={i}
                   className={`content-card skeleton${isFeatured(i) ? ` ${styles.featured}` : ''}`}
-                  style={{ height: 304 }}
-                />
+                >
+                  <div className="skeleton-image" />
+                  <div className="skeleton-body" />
+                </div>
               ))
             : displayFeed.map((story, i) => {
                 const slug = reactionSlugOf(story);
@@ -572,8 +576,10 @@ export default function HomePage() {
                   className={`content-card skeleton${
                     isFeatured(displayFeed.length + i) ? ` ${styles.featured}` : ''
                   }`}
-                  style={{ height: 304 }}
-                />
+                >
+                  <div className="skeleton-image" />
+                  <div className="skeleton-body" />
+                </div>
               ))
             : null}
 

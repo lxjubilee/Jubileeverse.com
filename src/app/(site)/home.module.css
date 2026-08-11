@@ -1,18 +1,15 @@
 /* Home-page-specific styling (hero bento, sidebar, newsletter, local news).
    Ported from index.html; shared chrome/card/grid styles live in globals.css. */
 
-/* The Current Events grid below is a centred flex row of fixed 300px cards with
-   a 12px gap, so its visual width snaps to whole columns (n*300 + (n-1)*12) and
-   the remainder becomes equal side gutters. A full-width hero therefore overhangs
-   the cards at any viewport that is not an exact multiple.
-   This wrapper reruns the same column math with an auto-fill grid and lets the
-   hero span every generated column, so the two line up at every width — no
-   hard-coded breakpoints, and immune to scrollbar-width rounding. */
+/* Mirrors the Current Events grid below (.content-grid in globals.css): the same
+   five fluid columns and 12px gap, with the hero spanning all of them. Both fill
+   their container edge to edge, so the hero's edges land on the card grid's edges
+   at every width. The hero spans 1 / -1, so it stays full width whatever the
+   ladder does to the column count — this row needs no breakpoints of its own. */
 .heroRow {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 300px);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
-  justify-content: center;
   margin-bottom: var(--space-xl);
 }
 
@@ -20,41 +17,43 @@
   grid-column: 1 / -1;
 }
 
-/* Featured cards in the Current Events grid: a large card two card columns wide
-   plus the gap between them (300 + 12 + 300 = 612), so a row is still a whole
-   number of columns wide and the hero above stays snapped to the same edges.
+/* Featured cards in the Current Events grid: a large card spanning two of the
+   grid's columns plus the gap between them, so a row is still a whole number of
+   columns wide and the hero above stays snapped to the same edges.
 
-   They exist ONLY at the five-per-row layout — from 1568px up, where
-   .content-grid is at its full 1548px (5 x 300 + 4 x 12). Below that the grid's
-   own max-width ladder drops it to four columns and this class goes inert:
-   every card is a plain 300px one, exactly as the feed looked before.
+   They exist ONLY at the five-per-row layout, because page.tsx's rhythm
+   (featuredLayout.ts) is measured for five columns: it moves the large card one
+   place right on each successive row and back to the left after four, and every
+   row holds four cards and fills the width exactly.
 
-   page.tsx moves the large card one place to the right on each successive row
-   and back to the left after four, and every row fills the width to the pixel:
+     row 1   large(1+2) + 3 normal
+     row 2   normal + large(2+3) + 2 normal
+     row 3   2 normal + large(3+4) + normal
+     row 4   3 normal + large(4+5)
 
-     row 1   large(1+2) + 3 normal          612 + 3x300 + 3x12       = 1548
-     row 2   normal + large(2+3) + 2 normal 300 + 612 + 2x300 + 3x12 = 1548
-     row 3   2 normal + large(3+4) + normal 2x300 + 612 + 300 + 3x12 = 1548
-     row 4   3 normal + large(4+5)          3x300 + 612 + 3x12       = 1548
+   At four columns or fewer a two-column card would leave the rhythm short and
+   punch holes in the grid, so the class goes inert and every card is a plain
+   one — exactly as the feed looked before.
 
-   Every row holds four cards either way, so the wrap points never move and the
-   columns stay aligned down the whole feed.
-
-   Nothing here is tied to a device — the grid is measured in CSS pixels, so
-   zooming out (or a wider screen) buys back the fifth column and the large
-   cards return, while zooming in drops a column and they all go normal. */
-@media (min-width: 1568px) {
+   1024px is where .content-grid's own ladder in globals.css steps down from five
+   columns to four, so this switches off in the same breakpoint that removes the
+   fifth column. Both are keyed to the viewport, so they can never disagree. */
+@media (min-width: 1024px) {
   .feed > .featured {
-    flex: 0 0 612px;
-    width: 612px;
-    max-width: 100%;
+    grid-column: span 2;
   }
 
-  /* 612 wide against the neighbours' 300x169 picture — the gap's 12px included,
-     so the large card is no taller than the cards beside it and the tops of
-     every card body in the row line up. */
+  /* Two columns and the 12px gap between them, against the neighbours' 16/9
+     picture, so the large card is no taller than the cards beside it and the
+     tops of every card body in the row line up.
+
+     Exact only at one column width — (2c + 12) / (c x 9/16) works out to
+     3.5556 + 21.33/c, so it drifts with the column. Across the range the columns
+     actually take (~190px at the 1024px breakpoint to ~500px on a 2560 display)
+     that is 3.67 down to 3.60, and 3.63 splits it: at most ~1% of the image's
+     height, a pixel or two, either way. */
   .feed > .featured :global(.content-card-image) {
-    aspect-ratio: 3.6267;
+    aspect-ratio: 3.63;
   }
 
   /* That letterbox is barely half the height of the 16/9 source, and object-fit
@@ -73,9 +72,6 @@
   grid-template-columns: 2fr 1fr;
   gap: var(--space-md);
   width: 100%;
-  max-width: var(--max-width);
-  margin-left: auto;
-  margin-right: auto;
 }
 
 .heroContainer {
@@ -296,9 +292,8 @@
 }
 
 /* Newsletter card */
+/* One grid cell wide, like every other card — the track sizes it. */
 .newsletterCard {
-  flex: 0 0 300px;
-  width: 300px;
   background: var(--bg-card);
   border-radius: var(--card-radius);
   padding: var(--space-lg);
@@ -365,12 +360,12 @@
 
 /* ---------------------------------------------------------------------------
    In-grid widget cards (compact Weather / Finance / Sports cards in the feed).
-   Sized like a .content-card (300×304) so they slot into the .content-grid.
+   Sized like a .content-card — one grid column wide, and stretched by the grid
+   to its row's height — so they slot into the .content-grid. No height of their
+   own: a floor here would drag the whole row up to it, since a grid row is as
+   tall as its tallest card.
 --------------------------------------------------------------------------- */
 .widgetCard {
-  flex: 0 0 300px;
-  width: 300px;
-  height: 304px;
   background: var(--bg-card);
   border-radius: var(--card-radius);
   overflow: hidden;

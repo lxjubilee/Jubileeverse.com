@@ -128,8 +128,6 @@ img {
 }
 
 .header-inner {
-  max-width: var(--max-width);
-  margin: 0 auto;
   padding: 0 10px;
   height: var(--header-height);
   display: flex;
@@ -748,8 +746,6 @@ img {
 }
 
 .nav-bar-inner {
-  max-width: var(--max-width);
-  margin: 0 auto;
   padding: 0 10px;
   height: 100%;
   display: flex;
@@ -883,10 +879,11 @@ img {
    MAIN CONTENT + SECTIONS
    ============================================================================ */
 
+/* Full-bleed: the page fills the viewport and takes the same 10px side gutter
+   the header and nav bar use, so the logo, the nav links and the first card in
+   every row all line up on the left edge. */
 .main-content {
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: var(--space-lg) 0 0 0;
+  padding: var(--space-lg) 10px 0;
   flex: 1;
   width: 100%;
   display: flex;
@@ -899,9 +896,6 @@ img {
   justify-content: space-between;
   margin-bottom: var(--space-md);
   padding-bottom: var(--space-sm);
-  max-width: var(--max-width);
-  margin-left: auto;
-  margin-right: auto;
   width: 100%;
 }
 
@@ -928,21 +922,62 @@ img {
    CONTENT CARD + GRID (shared across home + topic pages)
    ============================================================================ */
 
+/* Five fluid columns, not a row of fixed-width cards.
+   The card width is an OUTCOME of the column count here, where it used to be the
+   input. The old layout was a centred flex row of 300px cards capped by a width
+   ladder: it snapped to whole 300px columns and pushed the remainder out as side
+   gutters, and — because five 300px cards plus four 12px gaps need 1548px of grid
+   (a 1568px viewport) — it silently dropped to four or three columns on any
+   display narrower than that. A 1920 panel at 150-175% Windows scaling is only
+   ~1100-1280 CSS px, so most desktops never saw five across at all.
+
+   Pinning the count instead means five columns at every desktop width, with the
+   tracks dividing whatever space there is. minmax(0, 1fr) rather than plain 1fr:
+   a 1fr track floors at min-content, so a long unbroken headline would otherwise
+   push its column wider than its share and shove the rest off the row.
+
+   The ladder below sheds a column at a time once five would leave the cards too
+   narrow to read. Matches RelatedArticlesGrid.module.css, which has always laid
+   its end-of-article row out this way. */
 .content-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: var(--space-xl);
-  justify-content: center;
-  max-width: var(--max-width);
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
 }
 
+@media (max-width: 1023px) {
+  .content-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 840px) {
+  .content-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .content-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 440px) {
+  .content-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* No height at all — the card is exactly its picture plus its text.
+   The old 304px assumed a 300px-wide card, whose 16/9 picture is 169px tall and
+   left 135px for the body. The column is fluid now and usually narrower than
+   that, so the picture shrinks with it and a 304px floor showed up as dead space
+   under the byline. Grid stretches every card in a row to the tallest, and cards
+   in a row are all the same width, so the row still comes out even. */
 .content-card {
-  flex: 0 0 300px;
-  width: 300px;
-  height: 304px;
   background: var(--bg-card);
   border-radius: var(--card-radius);
   overflow: hidden;
@@ -1059,6 +1094,15 @@ img {
   gap: var(--space-sm);
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* Titles clamp at two lines but plenty run to one, so a row's cards differ by a
+   line and grid stretches the short ones to match. Only when the byline ENDS the
+   card: that slack then falls between the title and the byline instead of
+   hanging below it, and the bylines across a row sit on one baseline. With a
+   reactions row underneath, that row is already the one pinned to the bottom. */
+.content-card-meta:last-child {
+  margin-top: auto;
 }
 
 .content-card-date {
@@ -1284,6 +1328,20 @@ img {
   animation: skeleton-loading 1.5s infinite;
 }
 
+/* A .content-card skeleton has to reproduce the card's box rather than state a
+   height, now that a real card is sized by its content: the picture's height
+   follows the column width, so any fixed number would be wrong at most widths
+   and the grid would visibly resettle as the cards landed. These two stand in
+   for the picture and for a body of category + two title lines + byline +
+   reactions. Both are transparent — the shimmer belongs to the card behind. */
+.skeleton > .skeleton-image {
+  aspect-ratio: 16 / 9;
+}
+
+.skeleton > .skeleton-body {
+  height: 138px;
+}
+
 @keyframes skeleton-loading {
   0% {
     background-position: 200% 0;
@@ -1319,31 +1377,11 @@ img {
    RESPONSIVE
    ============================================================================ */
 
-@media (max-width: 1567px) {
-  .content-grid,
-  .hero-bento,
-  .section-header {
-    max-width: 1236px;
-  }
-}
-
-@media (max-width: 1267px) {
-  .content-grid,
-  .hero-bento,
-  .section-header {
-    max-width: 924px;
-  }
-}
-
-@media (max-width: 955px) {
-  .content-grid,
-  .hero-bento,
-  .section-header {
-    max-width: 612px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-}
+/* The ladder that used to live here (1236 / 924 / 612px caps at 1567 / 1267 /
+   955px) stepped .content-grid down to whole 300px columns and centred what was
+   left, which is exactly where the page's side margins came from. The auto-fill
+   tracks above pick the same column counts at the same widths on their own, so
+   the caps are gone and the grid runs to both edges at every size. */
 
 @media (max-width: 768px) {
   .header-media-links {
@@ -1486,9 +1524,13 @@ img {
 .bs-section-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
 .bs-section-blurb { font-size: 12px; color: var(--text-muted); }
 
-/* Mirrors .content-grid: a wrapping row of fixed 300px cards, capped so the row
-   holds 5 -> 4 -> 3 -> 2 -> 1 across the breakpoint ladder. The section header
-   rides the same ladder so it stays aligned with the grid's edges. */
+/* A wrapping row of fixed 300px cards, capped so the row holds 5 -> 4 -> 3 -> 2
+   -> 1 across the breakpoint ladder. The section header rides the same ladder so
+   it stays aligned with the grid's edges.
+
+   Backstage keeps this centred, capped layout: it is a self-contained reading
+   section with its own chrome, unlike the full-bleed .content-grid the home feed
+   and the category portals now use. */
 .bs-section-header,
 .bs-grid { max-width: 1548px; margin-left: auto; margin-right: auto; }
 .bs-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start; }

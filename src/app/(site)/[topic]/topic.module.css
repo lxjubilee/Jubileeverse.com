@@ -14,25 +14,17 @@
 /*
  * Article grid on the five published category portals.
  *
- * The cards are 10% shorter than the global 304px in globals.css, and the
- * reduction comes off the bottom: .content-card-image keeps its 16/9 ratio at
- * the top of the card, so shrinking the total height only shortens the body
- * beneath it.
+ * The card height rule that used to lead this block (304px less 10%) is gone
+ * with the fixed heights in globals.css: a card is its picture plus its text
+ * now, so it is already as short as its content and had nothing to trim.
  *
- * 304 - 10% leaves ~105px of body against ~169px of image. Minus the body's
- * padding that is a little tighter than the text needs, so the padding and the
- * title's bottom margin come in slightly — otherwise the byline in
- * .content-card-meta is the first thing clipped by the card's overflow:hidden.
- *
- * Scoped to this grid (and applied only to the published categories, not the
- * jubileeinspire portals that share this component) so cards on the home page,
- * search and every other feed keep their standard height. Global class names
- * are reached with :global() because StoryCard renders them, not this module.
+ * What remains is the tighter body: these portals sit their text closer to the
+ * picture than the home feed does. Scoped to this grid (and applied only to the
+ * published categories, not the jubileeinspire portals that share this
+ * component) so cards on the home page, search and every other feed keep the
+ * standard spacing. Global class names are reached with :global() because
+ * StoryCard renders them, not this module.
  */
-.compactGrid :global(.content-card) {
-  height: calc(304px * 0.9);
-}
-
 .compactGrid :global(.content-card-body) {
   padding: 10px;
 }
@@ -43,33 +35,35 @@
 
 /*
  * Featured cards — the same rhythm the home feed uses (see featuredLayout.ts):
- * a large card two card columns wide plus the gap between them
- * (300 + 12 + 300 = 612), moving one place to the right on each successive row.
+ * a large card spanning two of the grid's columns plus the gap between them,
+ * moving one place to the right on each successive row.
  *
- * Only at the five-per-row layout, from 1568px up, where .content-grid is at its
- * full 1548px. Below that the grid's own max-width ladder drops it to four
- * columns and this class goes inert: every card is a plain 300px one, exactly as
- * the portal looked before.
+ * Only at the five-per-row layout, since that rhythm is measured for five
+ * columns; at four or fewer this class goes inert and every card is a plain one,
+ * exactly as the portal looked before.
  *
- *   row 1   large(1+2) + 3 normal          612 + 3x300 + 3x12       = 1548
- *   row 2   normal + large(2+3) + 2 normal 300 + 612 + 2x300 + 3x12 = 1548
- *   row 3   2 normal + large(3+4) + normal 2x300 + 612 + 300 + 3x12 = 1548
- *   row 4   3 normal + large(4+5)          3x300 + 612 + 3x12       = 1548
+ *   row 1   large(1+2) + 3 normal
+ *   row 2   normal + large(2+3) + 2 normal
+ *   row 3   2 normal + large(3+4) + normal
+ *   row 4   3 normal + large(4+5)
+ *
+ * 1024px is where .content-grid's ladder in globals.css steps down from five
+ * columns to four, so this switches off in the same breakpoint that removes the
+ * fifth column. Matches the home feed in home.module.css.
  *
  * The card's HEIGHT is left to .compactGrid above, so a large card is exactly as
  * tall as its neighbours here too — only its width and image crop change.
  */
-@media (min-width: 1568px) {
+@media (min-width: 1024px) {
   .compactGrid > .featured {
-    flex: 0 0 612px;
-    width: 612px;
-    max-width: 100%;
+    grid-column: span 2;
   }
 
-  /* 612 wide against the neighbours' 300x169 picture — the gap's 12px included,
-     so the tops of every card body in the row line up. */
+  /* Two columns plus the 12px gap between them, against the neighbours' 16/9
+     picture, so the tops of every card body in the row line up. The ratio drifts
+     slightly with the column width; see home.module.css for the arithmetic. */
   .compactGrid > .featured :global(.content-card-image) {
-    aspect-ratio: 3.6267;
+    aspect-ratio: 3.63;
   }
 
   /* That letterbox is barely half the height of the 16/9 source, and object-fit
@@ -77,8 +71,8 @@
      bottom — which is exactly where the heads are. Sliding the window up to 25%
      leaves a quarter of the surplus above the subjects and three quarters below,
      so faces and shoulders stay in frame with headroom left over. The image is
-     still covering, so nothing stretches, and below 1568px the card is a plain
-     16/9 one that crops nothing at all. */
+     still covering, so nothing stretches, and below five columns the card is a
+     plain 16/9 one that crops nothing at all. */
   .compactGrid > .featured :global(.content-card-image) img {
     object-position: center 25%;
   }

@@ -69,15 +69,6 @@
   grid-column: span 2;
 }
 
-/* The global card is a fixed 300x304 tile. Here it fills whatever track it
-   lands in and takes its height from its content; the grid stretches every
-   card in a row to the tallest, so the row stays even. */
-.grid :global(.content-card) {
-  flex: initial;
-  width: auto;
-  height: auto;
-}
-
 /* Single-track cards keep the 16:9 picture. The lead card is two tracks plus
    the 12px gap wide, and ~3.63:1 is what keeps its picture exactly as tall as
    its neighbours' — the gap's share of that width barely shifts as the columns
@@ -86,13 +77,10 @@
   aspect-ratio: 3.63;
 }
 
-/* Bylines sit on the baseline of the row however long the titles run — the
-   lead card's one-liner lines up with the two-line titles beside it. Only when
-   the byline ends the card: with a reactions row under it, that row is already
-   the one pinned to the bottom. */
-.grid :global(.content-card-meta:last-child) {
-  margin-top: auto;
-}
+/* Bylines sit on the baseline of the row however long the titles run — the lead
+   card's one-liner lines up with the two-line titles beside it. This lives on
+   .content-card-meta:last-child in globals.css now, since every card grid wants
+   it; nothing is needed here. */
 
 /* Shed a column at a time, keeping the lead card double-width until it would
    leave its neighbour too narrow to read; below that every card is a full-width
