@@ -177,6 +177,7 @@
   color: var(--text-secondary);
   font-size: 17px;
   line-height: 1.8;
+  text-align: justify;
 }
 
 .prose h1,

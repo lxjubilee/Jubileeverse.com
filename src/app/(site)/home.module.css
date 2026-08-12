@@ -58,12 +58,12 @@
 
   /* That letterbox is barely half the height of the 16/9 source, and object-fit
      cover's default centre split takes the missing half evenly off the top and
-     bottom — which is exactly where the heads are. Sliding the window up to 25%
-     leaves a quarter of the surplus above the subjects and three quarters below,
-     so faces and shoulders stay in frame with headroom left over. Matches the
-     category portals in [topic]/topic.module.css. */
+     bottom — which is exactly where the heads are. Anchoring to the top keeps
+     the whole of that surplus below the subjects, so nothing is ever cropped off
+     the top of a head. The category portals in [topic]/topic.module.css still
+     take theirs at `center 25%`. */
   .feed > .featured :global(.content-card-image) img {
-    object-position: center 25%;
+    object-position: top center;
   }
 }
 

@@ -760,6 +760,9 @@ img {
   height: 100%;
   overflow-x: auto;
   scrollbar-width: none;
+  /* A flex item's floor is its content, so without this the row of links
+     refuses to shrink and pushes .nav-right off the end instead of scrolling. */
+  min-width: 0;
 }
 
 .nav-menu::-webkit-scrollbar {
@@ -870,9 +873,58 @@ img {
   flex-shrink: 0;
 }
 
+/* Never squashed: the links scroll, the controls keep their size. Both are flex
+   items and both shrink by default, which is what let the Personalize button be
+   compressed against a half-cut category label. */
 .nav-right {
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Fitting the nav row.
+
+   Measured against Segoe UI at the nav's 12px, the six labels come to 891px
+   once each link's 8px side padding, its 1px transparent border and the 4px
+   gaps are counted. The controls beside them add 130px (Personalize, labelled)
+   plus 42px (the flag), and .nav-bar-inner takes 10px of padding each side —
+   so the row needs a 1083px viewport before anything is clipped.
+
+   Below that .nav-menu's overflow is hidden (scrollbar-width: none), so the
+   last category was silently cut mid-word — "TORAH & HEBRAIC INS" — with no
+   scrollbar to say there was more. Two steps buy the width back:
+
+     <= 1120px   Personalize keeps its gear, drops its label: 130px -> 42px,
+                 so the row needs 995px. The 37px of headroom over the 1083px
+                 threshold covers the scrollbar, which browsers disagree about
+                 including in a media query's width.
+     <= 1000px   the links themselves tighten (8px padding -> 5px, 4px gap ->
+                 2px), another 46px, so the row needs 949px.
+
+   Under ~949px it can clip again until the hamburger takes over at 768px. That
+   band predates this block and closing it means either an 11px nav font or
+   moving the hamburger up, neither of which is a width question alone.
+--------------------------------------------------------------------------- */
+@media (max-width: 1120px) {
+  .btn-personalize span {
+    display: none;
+  }
+
+  .btn-personalize {
+    padding: 6px 8px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .nav-menu {
+    gap: 2px;
+  }
+
+  .nav-menu .nav-link {
+    padding-left: 5px;
+    padding-right: 5px;
+  }
 }
 
 /* ============================================================================
