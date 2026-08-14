@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import AuthBackground from '@/components/auth/AuthBackground';
-import LegalModals from '@/components/auth/LegalModals';
 import Modal from '@/components/ui/Modal';
 import { api, ApiError } from '@/lib/api';
 import styles from '../auth.module.css';
@@ -25,7 +24,6 @@ export default function ForgotPasswordPage() {
   const [validationMsg, setValidationMsg] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [sentEmail, setSentEmail] = useState('');
-  const [legal, setLegal] = useState<'privacy' | 'terms' | null>(null);
 
   const sendReset = async () => {
     setSubmitting(true);
@@ -132,13 +130,13 @@ export default function ForgotPasswordPage() {
           <div className={`${styles.footer} ${styles.footerBottom}`}>
             <p className={styles.copyright}>
               &copy; {new Date().getFullYear()} JubileeVerse.com |{' '}
-              <a href="#" onClick={(e) => (e.preventDefault(), setLegal('terms'))}>
+              <Link href="/terms" target="_blank" rel="noopener noreferrer">
                 Terms of Use
-              </a>{' '}
+              </Link>{' '}
               |{' '}
-              <a href="#" onClick={(e) => (e.preventDefault(), setLegal('privacy'))}>
+              <Link href="/privacy" target="_blank" rel="noopener noreferrer">
                 Privacy Policy
-              </a>
+              </Link>
             </p>
           </div>
         </div>
@@ -153,7 +151,6 @@ export default function ForgotPasswordPage() {
       <Modal open={!!validationMsg} onClose={() => setValidationMsg(null)}>
         <p style={{ textAlign: 'center', fontSize: 16, color: '#fff' }}>{validationMsg}</p>
       </Modal>
-      <LegalModals privacyOpen={legal === 'privacy'} termsOpen={legal === 'terms'} onClose={() => setLegal(null)} />
     </>
   );
 }

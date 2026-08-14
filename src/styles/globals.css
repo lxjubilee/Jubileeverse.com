@@ -1370,6 +1370,30 @@ img {
   color: var(--text-muted);
 }
 
+/* Terms / Privacy, the two link destinations that are real pages. */
+.footer-legal {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  font-size: var(--font-sm);
+}
+
+.footer-legal a {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.footer-legal a:hover {
+  color: var(--accent-gold);
+  text-decoration: underline;
+}
+
+.footer-legal span {
+  color: var(--border-color);
+}
+
 /* ============================================================================
    LOADING / UTILITIES
    ============================================================================ */

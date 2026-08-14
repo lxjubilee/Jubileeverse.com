@@ -4,7 +4,6 @@ import Link from 'next/link';
 import Script from 'next/script';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import AuthBackground from '@/components/auth/AuthBackground';
-import LegalModals from '@/components/auth/LegalModals';
 import { api, ApiError } from '@/lib/api';
 import { getStoredAuth, setStoredAuth } from '@/lib/authStorage';
 import { safeRedirectTarget } from '@/lib/redirect';
@@ -142,7 +141,6 @@ export default function JubileeDoor() {
   const [errorField, setErrorField] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [registered, setRegistered] = useState(false);
-  const [legal, setLegal] = useState<'privacy' | 'terms' | null>(null);
 
   // Already signed in → home. Read ?email= / ?registered= hand-offs.
   useEffect(() => {
@@ -396,8 +394,10 @@ export default function JubileeDoor() {
         <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
         <span className={styles.checkboxLabel}>
           I agree to the{' '}
-          <a href="#" onClick={(e) => (e.preventDefault(), setLegal('terms'))}>Terms of Use</a>{' '}
-          and <a href="#" onClick={(e) => (e.preventDefault(), setLegal('privacy'))}>Privacy Policy</a>
+          {/* New tab on purpose: a half-filled sign-up form must survive the read. */}
+          <Link href="/terms" target="_blank" rel="noopener noreferrer">Terms of Use</Link>{' '}
+          and{' '}
+          <Link href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</Link>
         </span>
       </label>
     </div>
@@ -600,8 +600,8 @@ export default function JubileeDoor() {
           <div className={`${styles.footer} ${styles.footerBottom}`}>
             <p className={styles.copyright}>
               &copy; {new Date().getFullYear()} JubileeVerse.com |{' '}
-              <a href="#" onClick={(e) => (e.preventDefault(), setLegal('terms'))}>Terms of Use</a>{' '}
-              | <a href="#" onClick={(e) => (e.preventDefault(), setLegal('privacy'))}>Privacy Policy</a>
+              <Link href="/terms" target="_blank" rel="noopener noreferrer">Terms of Use</Link>{' '}
+              | <Link href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</Link>
             </p>
           </div>
         </div>
@@ -612,8 +612,6 @@ export default function JubileeDoor() {
           cite="Psalm 27:1"
         />
       </div>
-
-      <LegalModals privacyOpen={legal === 'privacy'} termsOpen={legal === 'terms'} onClose={() => setLegal(null)} />
     </>
   );
 }

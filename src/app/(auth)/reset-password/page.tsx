@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import AuthBackground from '@/components/auth/AuthBackground';
-import LegalModals from '@/components/auth/LegalModals';
 import { api, ApiError } from '@/lib/api';
 import styles from '../auth.module.css';
 
@@ -51,7 +50,6 @@ function ResetPasswordInner() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [legal, setLegal] = useState<'privacy' | 'terms' | null>(null);
 
   // Validate the reset token on mount.
   useEffect(() => {
@@ -243,13 +241,13 @@ function ResetPasswordInner() {
             <div className={styles.footer}>
               <p className={styles.copyright}>
                 &copy; {new Date().getFullYear()} JubileeVerse.com |{' '}
-                <a href="#" onClick={(e) => (e.preventDefault(), setLegal('terms'))}>
+                <Link href="/terms" target="_blank" rel="noopener noreferrer">
                   Terms of Use
-                </a>{' '}
+                </Link>{' '}
                 |{' '}
-                <a href="#" onClick={(e) => (e.preventDefault(), setLegal('privacy'))}>
+                <Link href="/privacy" target="_blank" rel="noopener noreferrer">
                   Privacy Policy
-                </a>
+                </Link>
               </p>
             </div>
           </div>
@@ -261,12 +259,6 @@ function ResetPasswordInner() {
           cite="Psalm 51:10"
         />
       </div>
-
-      <LegalModals
-        privacyOpen={legal === 'privacy'}
-        termsOpen={legal === 'terms'}
-        onClose={() => setLegal(null)}
-      />
     </>
   );
 }

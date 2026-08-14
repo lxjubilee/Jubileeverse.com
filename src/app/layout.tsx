@@ -19,6 +19,9 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
+  // Without this, the per-page canonical links resolve relative to the document
+  // instead of the live origin.
+  metadataBase: new URL('https://jubileeverse.com'),
   title: 'JubileeVerse - Inspiring Faith, Sharing Hope',
   description: 'JubileeVerse - Uplifting Christian news, devotionals, and inspiration',
   // Next's own public/, not /images — that path rewrites to Express, and the

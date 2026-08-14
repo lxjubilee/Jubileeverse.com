@@ -1,0 +1,329 @@
+/* Shared styling for the standalone legal pages (/terms, /privacy).
+
+   Both pages render through LegalPage, so everything here is written once and
+   used twice. Design tokens come from globals.css; the header (48px) and nav
+   bar (50px) above are sticky, which is where the 110px scroll offsets and the
+   sidebar's top: 118px come from — without them an anchor jump lands under the
+   chrome. */
+
+/* ── Hero ────────────────────────────────── */
+.hero {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  border-bottom: 1px solid var(--border-color);
+  padding: 48px 16px 40px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(230, 172, 0, 0.12) 0%, transparent 70%);
+}
+
+.heroEyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--accent-gold);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.heroTitle {
+  font-size: clamp(28px, 5vw, 44px);
+  font-weight: 800;
+  letter-spacing: -1px;
+  margin-bottom: 14px;
+  position: relative;
+}
+
+.heroTitle .accent {
+  color: var(--accent-gold);
+}
+
+.heroSub {
+  font-size: 16px;
+  color: var(--text-secondary);
+  max-width: 620px;
+  margin: 0 auto;
+  line-height: 1.6;
+  position: relative;
+}
+
+/* Effective / last-updated chips under the summary. */
+.heroMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+  position: relative;
+}
+
+.metaChip {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 6px 14px;
+}
+
+.metaChip strong {
+  color: var(--accent-gold);
+  font-weight: 700;
+}
+
+/* ── Page shell: contents rail + prose column ─ */
+.layout {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 36px 16px 72px;
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+
+.toc {
+  position: sticky;
+  top: 118px;
+  border-left: 2px solid var(--border-color);
+  padding-left: 16px;
+}
+
+.tocTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+  margin-bottom: 12px;
+}
+
+/* The rail scrolls once the viewport is shorter than the section list. Left to
+   the platform that is a wide light-grey bar with stepper arrows — a system
+   control sitting in dark chrome. Same treatment as `.search-results` in
+   globals.css and the modal body: thin, no track, gold pill. */
+.tocList {
+  list-style: none;
+  margin: 0;
+  /* Right gutter keeps the link text and its hover fill off the thumb. */
+  padding: 0 6px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(230, 172, 0, 0.55) transparent;
+}
+
+.tocList::-webkit-scrollbar {
+  width: 10px;
+}
+
+/* Windows renders stepper arrows unless they're explicitly removed. */
+.tocList::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+.tocList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tocList::-webkit-scrollbar-thumb {
+  /* 3px transparent border + padding-box clip = a slim, inset pill */
+  background: linear-gradient(180deg, rgba(230, 172, 0, 0.75), rgba(230, 172, 0, 0.45));
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 8px;
+  min-height: 36px;
+}
+
+.tocList::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-gold);
+  background-clip: padding-box;
+}
+
+.tocList::-webkit-scrollbar-thumb:active {
+  background: var(--accent-gold-hover, var(--accent-gold));
+  background-clip: padding-box;
+}
+
+.tocList a {
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 5px 8px;
+  border-radius: 6px;
+}
+
+.tocList a:hover {
+  color: var(--accent-gold);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* ── Prose ───────────────────────────────── */
+.body {
+  min-width: 0;
+  font-size: 15.5px;
+  line-height: 1.75;
+  color: var(--text-primary);
+}
+
+.body > section {
+  scroll-margin-top: 110px;
+  margin-bottom: 34px;
+}
+
+.body h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent-gold);
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.body h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 22px 0 8px;
+}
+
+.body p {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+}
+
+.body ul,
+.body ol {
+  margin: 0 0 12px;
+  padding-left: 22px;
+  color: var(--text-secondary);
+}
+
+.body li {
+  margin-bottom: 8px;
+}
+
+.body li::marker {
+  color: var(--accent-gold);
+}
+
+.body strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.body a {
+  color: var(--accent-gold);
+  text-decoration: none;
+}
+
+.body a:hover {
+  text-decoration: underline;
+}
+
+/* The intro paragraph above the first numbered section. */
+.lead {
+  font-size: 16.5px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  border-left: 3px solid var(--accent-gold);
+  background: rgba(230, 172, 0, 0.06);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 18px;
+  margin-bottom: 32px;
+}
+
+.lead p {
+  margin: 0 0 10px;
+}
+
+.lead p:last-child {
+  margin-bottom: 0;
+}
+
+/* Callout for the clauses a reader should not skim past (AI disclaimers,
+   liability caps, arbitration). */
+.callout {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin: 0 0 16px;
+}
+
+.callout p:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Contact card + cross link ───────────── */
+.contact {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px 22px;
+}
+
+.contact p {
+  margin-bottom: 6px;
+}
+
+.crossLink {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.crossLink a {
+  color: var(--accent-gold);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.crossLink a:hover {
+  text-decoration: underline;
+}
+
+/* ── Narrow screens: drop the rail, inline the contents ─ */
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    padding-top: 28px;
+  }
+
+  .toc {
+    position: static;
+    border-left: none;
+    padding-left: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 16px 18px;
+    background: var(--bg-secondary);
+  }
+
+  .tocList {
+    max-height: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0;
+  }
+}

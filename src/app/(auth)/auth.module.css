@@ -555,29 +555,6 @@
   display: block;
 }
 
-.legalBody h1 {
-  font-size: 22px;
-  color: #ffbd59;
-  margin-bottom: 12px;
-}
-
-.legalBody h2 {
-  font-size: 16px;
-  color: #ffbd59;
-  margin: 20px 0 10px;
-}
-
-.legalBody p {
-  margin-bottom: 10px;
-  color: #fff;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.legalBody a {
-  color: #ffbd59;
-}
-
 /* Inline alerts / banners (sign in, reset password) */
 .alert {
   border-radius: 8px;
