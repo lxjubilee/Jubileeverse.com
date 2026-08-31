@@ -1,7 +1,7 @@
 /* ============================================================================
    Prayer module — guided-prayer audio experience (Spotify-style player).
    Ported faithfully from the original static prayer.html inline <style>.
-   Global design tokens (--bg-primary, --accent-gold, etc.) come from
+   Global design tokens (--bg-primary, --accent, etc.) come from
    globals.css. A few player-specific tokens are scoped here.
    ============================================================================ */
 
@@ -74,7 +74,7 @@
 }
 
 .filterChip.active {
-  background: var(--accent-gold);
+  background: var(--accent);
   color: #000;
 }
 
@@ -117,7 +117,7 @@
 
 .prayerItem.active {
   background: var(--bg-tertiary);
-  border-left: 3px solid var(--accent-gold);
+  border-left: 3px solid var(--accent);
 }
 
 .prayerItemArt {
@@ -143,7 +143,7 @@
 }
 
 .prayerItem.active .prayerItemName {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .prayerItemMeta {
@@ -185,8 +185,8 @@
 }
 
 .badgeGratitude {
-  background: rgba(230, 172, 0, 0.2);
-  color: var(--accent-gold);
+  background: rgba(61, 165, 255, 0.2);
+  color: var(--accent);
 }
 
 .badgeProtection {
@@ -237,7 +237,7 @@
 }
 
 .catMorning {
-  background: linear-gradient(135deg, #3a2d1a 0%, var(--bg-primary) 100%);
+  background: linear-gradient(135deg, #16283a 0%, var(--bg-primary) 100%);
 }
 
 .catEvening {
@@ -253,7 +253,7 @@
 }
 
 .catGratitude {
-  background: linear-gradient(135deg, #3a2d1a 0%, var(--bg-primary) 100%);
+  background: linear-gradient(135deg, #16283a 0%, var(--bg-primary) 100%);
 }
 
 .catProtection {
@@ -337,7 +337,7 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: var(--accent-gold);
+  background: var(--accent);
   border: none;
   cursor: pointer;
   display: flex;
@@ -351,7 +351,7 @@
 
 .btnPlayLarge:hover {
   transform: scale(1.05);
-  background: var(--accent-gold-hover);
+  background: var(--accent-hover);
 }
 
 .btnPlayLarge:active {
@@ -393,8 +393,8 @@
 }
 
 .btnFollow.following {
-  border-color: var(--accent-gold);
-  color: var(--accent-gold);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .voiceSelector {
@@ -436,7 +436,7 @@
 }
 
 .voiceBtn.active {
-  background: var(--accent-gold);
+  background: var(--accent);
   color: #000;
 }
 
@@ -460,8 +460,8 @@
   gap: 5px;
   padding: 4px 12px;
   border-radius: 12px;
-  background: rgba(230, 172, 0, 0.15);
-  color: var(--accent-gold);
+  background: rgba(61, 165, 255, 0.15);
+  color: var(--accent);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -477,14 +477,14 @@
   background: var(--bg-tertiary);
   border-radius: 12px;
   padding: 20px;
-  border-left: 4px solid var(--accent-gold);
+  border-left: 4px solid var(--accent);
 }
 
 .scriptureLabel {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  color: var(--accent-gold);
+  color: var(--accent);
   letter-spacing: 1px;
   margin-bottom: 8px;
 }
@@ -534,7 +534,7 @@
 }
 
 .prayerLine.speaking {
-  color: var(--accent-gold);
+  color: var(--accent);
   font-weight: 500;
 }
 
@@ -730,7 +730,11 @@
 .prayerPlayer {
   position: fixed;
   bottom: 0;
-  left: 0;
+  /* Clears the JubileeInspire rail. Fixed elements do not see .app-shell's
+     padding, so this bar spanned the full viewport and ran under it; the
+     variable is published by src/styles/inspire-rail.css and falls back to 0
+     wherever the rail is not mounted. */
+  left: var(--shell-inset, 0px);
   right: 0;
   height: var(--player-height);
   background: #181818;
@@ -790,7 +794,7 @@
 }
 
 .playerLikeBtn:hover {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 /* Player Center */
@@ -908,7 +912,7 @@
 }
 
 .progressBar:hover .progressFill {
-  background: var(--accent-gold);
+  background: var(--accent);
 }
 
 .progressKnob {
@@ -994,7 +998,7 @@
 }
 
 .volumeBar:hover .volumeFill {
-  background: var(--accent-gold);
+  background: var(--accent);
 }
 
 .volumeKnob {
@@ -1054,16 +1058,16 @@
 }
 
 .prayerItemFav:hover {
-  color: var(--accent-gold);
+  color: var(--accent);
   transform: scale(1.15);
 }
 
 .prayerItemFav.favorited {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .prayerItemFav.favorited svg {
-  fill: var(--accent-gold);
+  fill: var(--accent);
 }
 
 /* Favorites Panel */
@@ -1104,7 +1108,7 @@
 }
 
 .favoritesPanelTitle svg {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .favoritesPanelClose {

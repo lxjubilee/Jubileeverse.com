@@ -33,7 +33,7 @@
   width: 40px;
   height: 40px;
   border: 3px solid rgba(255, 255, 255, 0.1);
-  border-top-color: var(--accent-gold);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: financeSpin 0.8s linear infinite;
 }
@@ -81,14 +81,14 @@
 }
 
 .marketTab:hover {
-  border-color: var(--accent-gold);
+  border-color: var(--accent);
   color: var(--text-primary);
 }
 
 .marketTab.active {
-  background: var(--accent-gold);
+  background: var(--accent);
   color: #000;
-  border-color: var(--accent-gold);
+  border-color: var(--accent);
   font-weight: 600;
 }
 
@@ -276,7 +276,7 @@
 }
 
 .newsCard:hover {
-  border-color: var(--accent-gold);
+  border-color: var(--accent);
   transform: translateY(-2px);
 }
 
@@ -294,7 +294,7 @@
 
 .newsCardCategory {
   font-size: 10px;
-  color: var(--accent-gold);
+  color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 6px;

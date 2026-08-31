@@ -39,7 +39,7 @@
 }
 
 .viewAll:hover {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .viewAll svg {

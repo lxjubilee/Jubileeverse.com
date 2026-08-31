@@ -108,6 +108,9 @@ function formatMemberSince(createdAt: string | undefined): string {
 
 const STRENGTH_LEVELS = [
   { width: '20%', color: '#d13438', label: 'Very weak' },
+  // Amber, NOT the site accent. This ramp is red -> amber -> green, a severity
+  // scale every password field uses; the azure conversion turned the two middle
+  // rungs the same blue as a healthy UI control, so "Weak" read as reassurance.
   { width: '40%', color: '#f0ad4e', label: 'Weak' },
   { width: '60%', color: '#f0ad4e', label: 'Fair' },
   { width: '80%', color: '#107c10', label: 'Strong' },

@@ -190,7 +190,7 @@ export default function AdminDashboardPage() {
         <h1>
           <span>
             <span style={{ color: 'var(--text-primary)' }}>Jubilee</span>
-            <span style={{ color: 'var(--accent-gold)' }}>Verse</span>
+            <span style={{ color: 'var(--accent)' }}>Verse</span>
             <span style={{ color: 'var(--text-primary)' }}>.com</span>
           </span>
           <span className={styles.adminSub}>Jubilee Intelligence Architecture (JIA)</span>

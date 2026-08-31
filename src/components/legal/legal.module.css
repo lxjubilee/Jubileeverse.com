@@ -20,14 +20,14 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at 50% 0%, rgba(230, 172, 0, 0.12) 0%, transparent 70%);
+  background: radial-gradient(ellipse at 50% 0%, rgba(61, 165, 255, 0.12) 0%, transparent 70%);
 }
 
 .heroEyebrow {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 2px;
-  color: var(--accent-gold);
+  color: var(--accent);
   text-transform: uppercase;
   margin-bottom: 12px;
   position: relative;
@@ -42,7 +42,7 @@
 }
 
 .heroTitle .accent {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .heroSub {
@@ -76,7 +76,7 @@
 }
 
 .metaChip strong {
-  color: var(--accent-gold);
+  color: var(--accent);
   font-weight: 700;
 }
 
@@ -103,14 +103,14 @@
   font-weight: 700;
   letter-spacing: 1.6px;
   text-transform: uppercase;
-  color: var(--accent-gold);
+  color: var(--accent);
   margin-bottom: 12px;
 }
 
 /* The rail scrolls once the viewport is shorter than the section list. Left to
    the platform that is a wide light-grey bar with stepper arrows — a system
    control sitting in dark chrome. Same treatment as `.search-results` in
-   globals.css and the modal body: thin, no track, gold pill. */
+   globals.css and the modal body: thin, no track, azure pill. */
 .tocList {
   list-style: none;
   margin: 0;
@@ -123,7 +123,7 @@
   overflow-y: auto;
   /* Firefox */
   scrollbar-width: thin;
-  scrollbar-color: rgba(230, 172, 0, 0.55) transparent;
+  scrollbar-color: rgba(61, 165, 255, 0.55) transparent;
 }
 
 .tocList::-webkit-scrollbar {
@@ -143,7 +143,7 @@
 
 .tocList::-webkit-scrollbar-thumb {
   /* 3px transparent border + padding-box clip = a slim, inset pill */
-  background: linear-gradient(180deg, rgba(230, 172, 0, 0.75), rgba(230, 172, 0, 0.45));
+  background: linear-gradient(180deg, rgba(61, 165, 255, 0.75), rgba(61, 165, 255, 0.45));
   background-clip: padding-box;
   border: 3px solid transparent;
   border-radius: 8px;
@@ -151,12 +151,12 @@
 }
 
 .tocList::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-gold);
+  background: var(--accent);
   background-clip: padding-box;
 }
 
 .tocList::-webkit-scrollbar-thumb:active {
-  background: var(--accent-gold-hover, var(--accent-gold));
+  background: var(--accent-hover, var(--accent));
   background-clip: padding-box;
 }
 
@@ -171,7 +171,7 @@
 }
 
 .tocList a:hover {
-  color: var(--accent-gold);
+  color: var(--accent);
   background: rgba(255, 255, 255, 0.05);
 }
 
@@ -191,7 +191,7 @@
 .body h2 {
   font-size: 20px;
   font-weight: 700;
-  color: var(--accent-gold);
+  color: var(--accent);
   margin: 0 0 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border-color);
@@ -221,7 +221,7 @@
 }
 
 .body li::marker {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .body strong {
@@ -230,7 +230,7 @@
 }
 
 .body a {
-  color: var(--accent-gold);
+  color: var(--accent);
   text-decoration: none;
 }
 
@@ -243,8 +243,8 @@
   font-size: 16.5px;
   line-height: 1.7;
   color: var(--text-secondary);
-  border-left: 3px solid var(--accent-gold);
-  background: rgba(230, 172, 0, 0.06);
+  border-left: 3px solid var(--accent);
+  background: rgba(61, 165, 255, 0.06);
   border-radius: 0 8px 8px 0;
   padding: 16px 18px;
   margin-bottom: 32px;
@@ -293,7 +293,7 @@
 }
 
 .crossLink a {
-  color: var(--accent-gold);
+  color: var(--accent);
   font-weight: 600;
   text-decoration: none;
 }

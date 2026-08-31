@@ -78,7 +78,7 @@
   overflow-y: auto;
   /* Firefox */
   scrollbar-width: thin;
-  scrollbar-color: rgba(230, 172, 0, 0.55) transparent;
+  scrollbar-color: rgba(61, 165, 255, 0.55) transparent;
 }
 
 .body::-webkit-scrollbar {
@@ -99,7 +99,7 @@
 
 .body::-webkit-scrollbar-thumb {
   /* 3px transparent border + padding-box clip = a slim, inset pill */
-  background: linear-gradient(180deg, rgba(230, 172, 0, 0.75), rgba(230, 172, 0, 0.45));
+  background: linear-gradient(180deg, rgba(61, 165, 255, 0.75), rgba(61, 165, 255, 0.45));
   background-clip: padding-box;
   border: 3px solid transparent;
   border-radius: 8px;
@@ -107,12 +107,12 @@
 }
 
 .body::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-gold);
+  background: var(--accent);
   background-clip: padding-box;
 }
 
 .body::-webkit-scrollbar-thumb:active {
-  background: var(--accent-gold-hover, var(--accent-gold));
+  background: var(--accent-hover, var(--accent));
   background-clip: padding-box;
 }
 

@@ -24,7 +24,7 @@ export interface LegalSection {
 
 interface Props {
   eyebrow: string;
-  /** Rendered as "<title> <accent>" so the second half picks up the gold. */
+  /** Rendered as "<title> <accent>" so the second half picks up the accent azure. */
   title: string;
   accent: string;
   summary: string;

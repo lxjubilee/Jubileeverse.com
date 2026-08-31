@@ -79,7 +79,7 @@
 }
 
 .sourceBadge {
-  background: var(--accent-gold);
+  background: var(--accent);
   color: var(--bg-primary);
   font-size: 11px;
   font-weight: 700;
@@ -89,7 +89,7 @@
 }
 
 .category {
-  color: var(--accent-gold);
+  color: var(--accent);
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
@@ -201,12 +201,12 @@
 }
 
 .prose a {
-  color: var(--accent-gold);
+  color: var(--accent);
   text-decoration: underline;
 }
 
 .prose blockquote {
-  border-left: 3px solid var(--accent-gold);
+  border-left: 3px solid var(--accent);
   padding-left: 16px;
   margin: 1.4em 0;
   color: var(--text-primary);
@@ -229,8 +229,8 @@
 }
 
 .hopeCallout {
-  background: linear-gradient(135deg, rgba(230, 172, 0, 0.12), rgba(230, 172, 0, 0.03));
-  border: 1px solid rgba(230, 172, 0, 0.3);
+  background: linear-gradient(135deg, rgba(61, 165, 255, 0.12), rgba(61, 165, 255, 0.03));
+  border: 1px solid rgba(61, 165, 255, 0.3);
   border-radius: 14px;
   padding: 20px 24px;
   margin: var(--space-2xl) 0 0;
@@ -238,7 +238,7 @@
 
 .hopeCallout strong {
   display: block;
-  color: var(--accent-gold);
+  color: var(--accent);
   font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
@@ -256,8 +256,8 @@
 }
 
 .verseCard {
-  background: linear-gradient(135deg, rgba(230, 172, 0, 0.12), rgba(230, 172, 0, 0.03));
-  border: 1px solid rgba(230, 172, 0, 0.3);
+  background: linear-gradient(135deg, rgba(61, 165, 255, 0.12), rgba(61, 165, 255, 0.03));
+  border: 1px solid rgba(61, 165, 255, 0.3);
   border-radius: 14px;
   padding: 24px;
   margin: var(--space-2xl) 0;
@@ -274,7 +274,7 @@
 }
 
 .verseRef {
-  color: var(--accent-gold);
+  color: var(--accent);
   font-weight: 600;
   font-size: 14px;
 }
@@ -282,7 +282,7 @@
 .sourceLink {
   display: inline-block;
   margin-top: var(--space-lg);
-  color: var(--accent-gold);
+  color: var(--accent);
   font-size: 14px;
 }
 

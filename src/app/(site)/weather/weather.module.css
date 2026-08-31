@@ -25,7 +25,7 @@
   width: 40px;
   height: 40px;
   border: 3px solid rgba(255, 255, 255, 0.1);
-  border-top-color: var(--accent-gold);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -53,7 +53,7 @@
 
 .tryAgainBtn {
   margin-top: 8px;
-  background: var(--accent-gold);
+  background: var(--accent);
   color: #000;
   border: none;
   padding: 10px 24px;
@@ -85,7 +85,7 @@
 }
 
 .cityInput:focus {
-  border-color: var(--accent-gold);
+  border-color: var(--accent);
 }
 
 .cityInput::placeholder {
@@ -108,8 +108,8 @@
 }
 
 .useLocationBtn:hover {
-  border-color: var(--accent-gold);
-  color: var(--accent-gold);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Inline "city not found" error message. */
@@ -312,8 +312,8 @@
 }
 
 .hourlyItem.now {
-  border-color: var(--accent-gold);
-  background: rgba(230, 172, 0, 0.1);
+  border-color: var(--accent);
+  background: rgba(61, 165, 255, 0.1);
 }
 
 .hourlyTime {

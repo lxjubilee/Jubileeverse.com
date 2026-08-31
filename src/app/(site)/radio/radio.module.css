@@ -3,7 +3,7 @@
    The site header/nav/footer come from the (site) layout, so this module only
    contains the radio-specific three-column layout, station list, banner,
    now-playing/schedule, discover sidebar, mobile accordion and sticky player.
-   Design tokens (var(--bg-*), var(--accent-gold), etc.) are global.
+   Design tokens (var(--bg-*), var(--accent), etc.) are global.
    ============================================================================ */
 
 .radio {
@@ -79,7 +79,7 @@
 }
 
 .filterChip.active {
-  background: var(--accent-gold);
+  background: var(--accent);
   color: #000;
 }
 
@@ -122,7 +122,7 @@
 
 .stationItem.active {
   background: var(--bg-tertiary);
-  border-left: 3px solid var(--accent-gold);
+  border-left: 3px solid var(--accent);
 }
 
 .stationItemArt {
@@ -148,7 +148,7 @@
 }
 
 .stationItem.active .stationItemName {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .stationItemCategory {
@@ -191,8 +191,8 @@
 }
 
 .badgeMusic {
-  background: rgba(230, 172, 0, 0.2);
-  color: var(--accent-gold);
+  background: rgba(61, 165, 255, 0.2);
+  color: var(--accent);
 }
 
 .badgeReligious {
@@ -241,7 +241,7 @@
 }
 
 .stationBanner.catMusic {
-  background: linear-gradient(135deg, #3a2d1a 0%, var(--bg-primary) 100%);
+  background: linear-gradient(135deg, #16283a 0%, var(--bg-primary) 100%);
 }
 
 .stationBanner.catReligious {
@@ -317,7 +317,7 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: var(--accent-gold);
+  background: var(--accent);
   border: none;
   cursor: pointer;
   display: flex;
@@ -331,7 +331,7 @@
 
 .btnPlayLarge:hover {
   transform: scale(1.05);
-  background: var(--accent-gold-hover);
+  background: var(--accent-hover);
 }
 
 .btnPlayLarge:active {
@@ -376,8 +376,8 @@
 }
 
 .btnFollow.following {
-  border-color: var(--accent-gold);
-  color: var(--accent-gold);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .liveBadge {
@@ -423,14 +423,14 @@
   background: var(--bg-tertiary);
   border-radius: 12px;
   padding: 20px;
-  border-left: 4px solid var(--accent-gold);
+  border-left: 4px solid var(--accent);
 }
 
 .nowPlayingLabel {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  color: var(--accent-gold);
+  color: var(--accent);
   letter-spacing: 1px;
   margin-bottom: 8px;
 }
@@ -481,7 +481,7 @@
 
 .scheduleTime {
   font-size: 13px;
-  color: var(--accent-gold);
+  color: var(--accent);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -692,13 +692,13 @@
 
 .stationHeartBtn:hover,
 .discoverHeartBtn:hover {
-  color: var(--accent-gold);
+  color: var(--accent);
   transform: scale(1.1);
 }
 
 .stationHeartBtn.favorited,
 .discoverHeartBtn.favorited {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .stationHeartBtn svg,
@@ -724,7 +724,7 @@
 }
 
 .stationFollowBtn.following {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .stationFollowBtn svg {
@@ -769,7 +769,11 @@
 .radioPlayer {
   position: fixed;
   bottom: 0;
-  left: 0;
+  /* Clears the JubileeInspire rail. Fixed elements do not see .app-shell's
+     padding, so this bar spanned the full viewport and ran under it; the
+     variable is published by src/styles/inspire-rail.css and falls back to 0
+     wherever the rail is not mounted. */
+  left: var(--shell-inset, 0px);
   right: 0;
   height: var(--player-height);
   background: #181818;
@@ -828,11 +832,11 @@
 }
 
 .playerLikeBtn:hover {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .playerLikeBtn.favorited {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 /* Player center controls */
@@ -953,7 +957,7 @@
 }
 
 .volumeBar:hover .volumeFill {
-  background: var(--accent-gold);
+  background: var(--accent);
 }
 
 .volumeKnob {

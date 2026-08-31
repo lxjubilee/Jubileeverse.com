@@ -55,7 +55,7 @@
 }
 
 .barTitle .verse {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .statusIndicator {
@@ -78,7 +78,7 @@
 }
 
 .statusDot.busy {
-  background: var(--accent-gold);
+  background: var(--accent);
 }
 
 @keyframes chatPulse {
@@ -153,7 +153,7 @@
 }
 
 .messagesArea::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--accent-gold) 0%, #b8860b 100%);
+  background: linear-gradient(180deg, var(--accent) 0%, #1E7FD6 100%);
   border-radius: 5px;
 }
 
@@ -196,7 +196,7 @@
 }
 
 .message.assistant .messageAvatar {
-  background: var(--accent-gold);
+  background: var(--accent);
   color: var(--bg-primary);
 }
 
@@ -241,7 +241,7 @@
 }
 
 .messageContent a {
-  color: var(--accent-gold);
+  color: var(--accent);
   text-decoration: underline;
 }
 
@@ -308,7 +308,7 @@
 }
 
 .welcomeMessage h2 {
-  color: var(--accent-gold);
+  color: var(--accent);
   margin-bottom: 15px;
   font-size: 28px;
 }
@@ -342,12 +342,12 @@
 
 .suggestionCard:hover {
   background: var(--bg-card-hover);
-  border-color: var(--accent-gold);
+  border-color: var(--accent);
   transform: translateY(-2px);
 }
 
 .suggestionCard h3 {
-  color: var(--accent-gold);
+  color: var(--accent);
   font-size: var(--font-md);
   margin-bottom: 8px;
 }
@@ -390,7 +390,7 @@
 
 .messageInput:focus {
   outline: none;
-  border-color: var(--accent-gold);
+  border-color: var(--accent);
 }
 
 .messageInput::placeholder {
@@ -398,7 +398,7 @@
 }
 
 .sendButton {
-  background: var(--accent-gold);
+  background: var(--accent);
   color: var(--bg-primary);
   border: none;
   padding: 15px 30px;
@@ -412,7 +412,7 @@
 }
 
 .sendButton:hover:not(:disabled) {
-  background: var(--accent-gold-hover);
+  background: var(--accent-hover);
   transform: translateY(-2px);
 }
 

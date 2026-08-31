@@ -11,7 +11,7 @@ import styles from '@/app/(admin)/admin/dashboard.module.css';
  *   - roots come from GET /api/admin/categories?level=2
  *   - each branch loads its children on first expand
  *     (GET /api/admin/categories?parent_id= + GET /api/admin/albums?category_id=)
- *   - albums are folded into the tree as gold, leaf "🎵" pseudo-nodes
+ *   - albums are folded into the tree as accent-coloured, leaf "🎵" pseudo-nodes
  *   - double-click a name to rename (PUT) or delete (DELETE)
  * Expanded/selected state persists to localStorage under the original keys.
  */

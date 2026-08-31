@@ -337,7 +337,7 @@ export default function ArticleEditorModal({
                               href={u.path}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={{ color: 'var(--accent-gold)', fontSize: 12 }}
+                              style={{ color: 'var(--accent)', fontSize: 12 }}
                             >
                               View
                             </a>

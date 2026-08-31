@@ -24,7 +24,7 @@
   width: 40px;
   height: 40px;
   border: 3px solid rgba(255, 255, 255, 0.1);
-  border-top-color: var(--accent-gold);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -72,14 +72,14 @@
 }
 
 .leagueTab:hover {
-  border-color: var(--accent-gold);
+  border-color: var(--accent);
   color: var(--text-primary);
 }
 
 .leagueTab.active {
-  background: var(--accent-gold);
+  background: var(--accent);
   color: #000;
-  border-color: var(--accent-gold);
+  border-color: var(--accent);
   font-weight: 600;
 }
 
@@ -103,7 +103,7 @@
 
 .sectionTitleBadge {
   font-size: 11px;
-  background: var(--accent-gold);
+  background: var(--accent);
   color: #000;
   padding: 2px 8px;
   border-radius: 10px;
@@ -163,8 +163,8 @@
 }
 
 .matchCardStatus.upcoming {
-  color: var(--accent-gold);
-  background: rgba(230, 172, 0, 0.1);
+  color: var(--accent);
+  background: rgba(61, 165, 255, 0.1);
 }
 
 @keyframes pulse {
@@ -246,7 +246,7 @@
 
 .matchResult {
   font-size: 12px;
-  color: var(--accent-gold);
+  color: var(--accent);
   text-align: center;
   padding: 0 16px 10px;
 }
@@ -263,7 +263,7 @@
 .matchUpcomingDate {
   font-size: 13px;
   font-weight: 600;
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .matchUpcomingTime {
@@ -379,7 +379,7 @@
 }
 
 .quickLink:hover {
-  border-color: var(--accent-gold);
+  border-color: var(--accent);
   background: var(--bg-tertiary);
   color: var(--text-primary);
 }

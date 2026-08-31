@@ -4,11 +4,11 @@
   padding: 60px 20px;
 }
 
-/* Matches the gold used for the category heading. Scoped here rather than
+/* Matches the azure used for the category heading. Scoped here rather than
    changed on the global .section-title, which the home page and every other
    portal share. The page's CSS module loads after globals.css, so this wins. */
 .sectionTitle {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 /*

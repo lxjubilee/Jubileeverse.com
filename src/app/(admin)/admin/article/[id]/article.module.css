@@ -27,7 +27,7 @@
 
 .articleCategory {
   font-size: var(--font-sm);
-  color: var(--accent-gold);
+  color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-bottom: var(--space-sm);
@@ -97,7 +97,7 @@
 .formGroup input:focus,
 .formGroup textarea:focus,
 .formGroup select:focus {
-  border-color: var(--accent-gold);
+  border-color: var(--accent);
 }
 
 .formGroup input[readonly] {
@@ -204,8 +204,8 @@
 
 .btnSecondary:not(:disabled):hover {
   background: var(--bg-card);
-  border-color: var(--accent-gold);
-  color: var(--accent-gold);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* ── Toast (articles.html .toast) ── */

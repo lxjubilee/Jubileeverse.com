@@ -51,14 +51,14 @@
 }
 
 .toggleFollowActive {
-  background: var(--accent-gold);
-  border-color: var(--accent-gold);
+  background: var(--accent);
+  border-color: var(--accent);
   color: var(--bg-primary);
 }
 
 .toggleFollowActive:hover {
   color: var(--bg-primary);
-  border-color: var(--accent-gold);
+  border-color: var(--accent);
 }
 
 .toggleBlockActive {
@@ -94,7 +94,7 @@
 }
 
 .btnPrimary {
-  background: var(--accent-gold);
+  background: var(--accent);
   border: none;
   color: var(--bg-primary);
   padding: 8px 16px;
@@ -106,5 +106,5 @@
 }
 
 .btnPrimary:hover {
-  background: var(--accent-gold-hover);
+  background: var(--accent-hover);
 }

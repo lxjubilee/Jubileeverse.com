@@ -3,6 +3,8 @@ import { Orbitron, Playfair_Display } from 'next/font/google';
 import NavigationTracker from '@/components/layout/NavigationTracker';
 import { AuthProvider } from '@/lib/auth';
 import '@/styles/globals.css';
+// After globals.css, so the rail's rules win the ties it shares with the shell.
+import '@/styles/inspire-rail.css';
 
 const orbitron = Orbitron({
   subsets: ['latin'],

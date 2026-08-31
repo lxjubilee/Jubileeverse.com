@@ -155,7 +155,7 @@ export default function ArticlePage() {
         <div className={styles.error}>
           <h2>Article not found</h2>
           <p style={{ marginTop: 12 }}>
-            <Link href="/" style={{ color: 'var(--accent-gold)' }}>
+            <Link href="/" style={{ color: 'var(--accent)' }}>
               ← Back to home
             </Link>
           </p>

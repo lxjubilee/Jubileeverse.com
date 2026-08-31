@@ -94,7 +94,7 @@ export default function HeroCarousel({ stories, status, onRetry }: Props) {
         const excerpt = story.excerpt ? `${story.excerpt.substring(0, 200)}...` : '';
         // The badge names the story's section (Finance, Entertainment, …) the
         // same way StoryCard does. A story that carries neither gets no badge
-        // rather than an empty gold chip or an invented label.
+        // rather than an empty accent chip or an invented label.
         const label = story.topic || story.category || '';
         return (
           <div

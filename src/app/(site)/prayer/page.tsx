@@ -76,7 +76,7 @@ const HeartIcon = ({ filled }: { filled: boolean }) => (
     width="16"
     height="16"
     viewBox="0 0 24 24"
-    fill={filled ? 'var(--accent-gold)' : 'none'}
+    fill={filled ? 'var(--accent)' : 'none'}
     stroke="currentColor"
     strokeWidth={2}
   >
@@ -1100,14 +1100,14 @@ export default function PrayerPage() {
             className={styles.playerLikeBtn}
             onClick={toggleLike}
             title={isCurrentFavorite ? 'Remove from favorites' : 'Add to favorites'}
-            style={{ color: isCurrentFavorite ? 'var(--accent-gold)' : undefined }}
+            style={{ color: isCurrentFavorite ? 'var(--accent)' : undefined }}
           >
             <svg
               width="16"
               height="16"
               viewBox="0 0 24 24"
-              fill={isCurrentFavorite ? 'var(--accent-gold)' : 'none'}
-              stroke={isCurrentFavorite ? 'var(--accent-gold)' : 'currentColor'}
+              fill={isCurrentFavorite ? 'var(--accent)' : 'none'}
+              stroke={isCurrentFavorite ? 'var(--accent)' : 'currentColor'}
               strokeWidth={2}
             >
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -1192,7 +1192,7 @@ export default function PrayerPage() {
       <div className={`${styles.favoritesPanel} ${favoritesOpen ? styles.open : ''}`}>
         <div className={styles.favoritesPanelHeader}>
           <div className={styles.favoritesPanelTitle}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--accent-gold)" stroke="var(--accent-gold)" strokeWidth={2}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--accent)" stroke="var(--accent)" strokeWidth={2}>
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
             Favorite Prayers

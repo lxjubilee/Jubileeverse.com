@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import InspireRail from './InspireRail';
 import LanguagePanel from './LanguagePanel';
 import NavBar from './NavBar';
 import PersonalizePopup from './PersonalizePopup';
@@ -57,9 +58,15 @@ export default function SiteShell({ children, navCategories }: Props) {
     window.location.reload();
   }, []);
 
+  // jir-on pads the shell clear of the fixed rail: the header and category bar
+  // are sticky rather than fixed, so they take that padding with everything
+  // else and no piece of chrome needs an offset of its own. See
+  // src/styles/inspire-rail.css.
   return (
-    <div className="app-shell">
+    <div className="app-shell jir-on">
       <div className={`translate-bar${translating ? ' active' : ''}`} />
+
+      <InspireRail />
 
       <SiteHeader />
       {showNav ? (

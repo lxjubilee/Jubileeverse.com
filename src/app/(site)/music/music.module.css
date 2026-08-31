@@ -97,7 +97,7 @@
 }
 
 .filterChip.active {
-  background: var(--accent-gold);
+  background: var(--accent);
   color: #000;
 }
 
@@ -165,7 +165,7 @@
 
 .albumItem.active {
   background: var(--bg-tertiary);
-  border-left: 3px solid var(--accent-gold);
+  border-left: 3px solid var(--accent);
 }
 
 .albumItemArt {
@@ -191,7 +191,7 @@
 }
 
 .albumItem.active .albumItemName {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .albumItemArtist {
@@ -236,7 +236,7 @@
   display: flex;
   align-items: flex-end;
   gap: 24px;
-  background: linear-gradient(135deg, #3a2d1a 0%, var(--bg-primary) 100%);
+  background: linear-gradient(135deg, #16283a 0%, var(--bg-primary) 100%);
 }
 
 .albumBannerArt {
@@ -308,7 +308,7 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: var(--accent-gold);
+  background: var(--accent);
   border: none;
   cursor: pointer;
   display: flex;
@@ -320,7 +320,7 @@
 
 .btnPlayLarge:hover {
   transform: scale(1.05);
-  background: var(--accent-gold-hover);
+  background: var(--accent-hover);
 }
 
 .btnPlayLarge svg {
@@ -368,8 +368,8 @@
 }
 
 .btnFollow.following {
-  border-color: var(--accent-gold);
-  color: var(--accent-gold);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .btnMore {
@@ -425,7 +425,7 @@
 }
 
 .trackRow.playing {
-  background: rgba(230, 172, 0, 0.08);
+  background: rgba(61, 165, 255, 0.08);
 }
 
 .trackNum {
@@ -435,7 +435,7 @@
 }
 
 .trackRow.playing .trackNum {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .trackRow:hover .trackNumText {
@@ -465,7 +465,7 @@
 }
 
 .trackRow.playing .trackTitle {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .trackDuration {
@@ -568,7 +568,11 @@
 .musicPlayer {
   position: fixed;
   bottom: 0;
-  left: 0;
+  /* Clears the JubileeInspire rail. Fixed elements do not see .app-shell's
+     padding, so this bar spanned the full viewport and ran under it; the
+     variable is published by src/styles/inspire-rail.css and falls back to 0
+     wherever the rail is not mounted. */
+  left: var(--shell-inset, 0px);
   right: 0;
   height: var(--player-height);
   background: #181818;
@@ -628,11 +632,11 @@
 }
 
 .playerTrackLike:hover {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .playerTrackLike.liked {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 /* Player Center - Controls */
@@ -665,7 +669,7 @@
 }
 
 .playerBtn.active {
-  color: var(--accent-gold);
+  color: var(--accent);
 }
 
 .playerBtn svg {
@@ -735,7 +739,7 @@
 }
 
 .progressBar:hover .progressFill {
-  background: var(--accent-gold);
+  background: var(--accent);
 }
 
 .progressKnob {
@@ -804,7 +808,7 @@
 }
 
 .volumeBar:hover .volumeFill {
-  background: var(--accent-gold);
+  background: var(--accent);
 }
 
 .volumeKnob {
